@@ -2,7 +2,9 @@
 
 두 Google Drive 계정에 보관한 AI 모델을 한곳에서 찾고, 필요한 파일을 확인하고, 새 테스트 결과를 비교하는 개인용 대시보드입니다.
 
-> **현재 상태: v0.6.0 Windows 로컬 출시 준비 검증 완료(확인한 Edge·두 지정 모델 범위).** 최신 설치 패키지·한글/공백 경로 launcher·격리 복구·fresh 인증/수집·새 GPU A/B 실행·재생·저장·핵심 UI 표본을 확인했습니다. 기존 Python 3.10이 필요한 사용자 범위 설치형이며 standalone exe는 아닙니다. [M6 보고서](docs/M6_REPORT.md)에 최종 배포 해시·증거·알려진 제한을 기록했습니다. 공개 반영·태그/Release 식별은 실제 게시 결과를 확인해야 합니다.
+> **현재 상태: v0.6.0 개인용 Windows 로컬 출시 완료(확인한 Edge·두 지정 모델 범위).** 최신 설치 패키지·한글/공백 경로 launcher·격리 복구·fresh 인증/수집·새 GPU A/B 실행·재생·저장·핵심 UI 표본을 확인했습니다. 기존 Python 3.10이 필요한 설치형이며 standalone exe는 아닙니다. [v0.6.0 Release](https://github.com/castle923/Ai-manager/releases/tag/v0.6.0)와 [M6 보고서](docs/M6_REPORT.md)에서 배포 해시·증거·알려진 제한을 확인하세요.
+
+[Windows 배포 ZIP 받기](https://github.com/castle923/Ai-manager/raw/899cf8a5b9616d3773caf2fb7ebf47db99544002/releases/v0.6.0/ai-manager-0.6.0-windows.zip) · 157,240 bytes · SHA-256 `b1626bc374196984033b56d5eeaf89f2cfc30b0e6baa762dd32744f0cd865133`. [설치 안내](docs/INSTALL.md)를 먼저 확인합니다. 태그는 소스·ZIP 커밋 `899cf8a5…`에 고정하며 이후 main의 문서 상태 보완과 구분합니다.
 
 ## 현재 조회 기능과 후속 계획
 
@@ -88,7 +90,7 @@ powershell.exe -NoProfile -File .\scripts\setup_runtime.ps1
 | M3 | 선택한 모델의 로컬 준비 상태 확인 | 승인 범위 구현·13개 실자산·환경·독립 검증 완료 |
 | M4 | 음성 합성 모델 1종을 실제 실행 | 승인 범위 구현·새 WAV·재생·저장·취소·독립 검증 완료 |
 | M5 | 같은 계열 모델 2종의 새 실행 비교 | 승인 기능 검증 완료(확인한 로컬·Edge 범위) / Chrome 알려진 제한 |
-| M6 | 최신 패키지·신규 환경 설치·재시작/인증/DB/작업 복구·Edge 실제 사용 | 확인한 로컬/Edge 출시 준비 gate PASS / 최종 공개 반영·태그 식별 |
+| M6 | 최신 패키지·신규 환경 설치·재시작/인증/DB/작업 복구·Edge 실제 사용 | 확인한 Windows/Edge 범위 출시 완료 · v0.6.0 Release |
 
 첫 사용 가능한 버전은 **M2의 모델 조회 대시보드**, 첫 실제 추론 버전은 **M4**입니다. 실행 성공과 측정값은 실제 새 실행의 검증 결과에 연결합니다.
 

@@ -1,6 +1,6 @@
 # M6 개인용 로컬 출시 검증 보고서
 
-작성일: 2026-10-17 (Asia/Seoul) · 판정: 확인한 Windows 로컬 환경·정상 지원 Edge·두 지정 모델의 M6 출시 준비 gate PASS. 최종 package-4-final·설치·격리 복구·새 실제 Edge/GPU·핵심 UI 표본을 검증했다. 공개 저장소 반영과 v0.6.0 태그/Release 식별은 최종 게시 단계이며 실제 완료 여부를 별도로 확인한다. 모든 환경·장애·접근성 인증의 보장이 아니다.
+작성일: 2026-10-17 (Asia/Seoul) · 판정: 확인한 Windows 로컬 환경·정상 지원 Edge·두 지정 모델 범위에서 M6 개인용 로컬 출시 완료. 최종 package-4-final·설치·격리 복구·새 실제 Edge/GPU·핵심 UI 표본과 공개 반영을 검증했고 [v0.6.0 Release](https://github.com/castle923/Ai-manager/releases/tag/v0.6.0)를 실제 게시했다. 모든 환경·장애·접근성 인증의 보장이 아니다.
 
 ## 승인 범위와 보존
 
@@ -23,7 +23,7 @@ M6 고유 실행별 경로와 입력/출력 출처를 새로 만든다. M5 보�
 | DB·기록 복구 | 정상 snapshot을 새 대상에 복원하고 손상/잠금/재시작 반례를 격리 검증. 원본 보존·상태 일관성 확인 | 최종 설치본 독립 8개 경계 PASS·backup deadline/정확 canonical schema 확인. 손상 원본 수리 기능이 아님 |
 | 대표 실제 Edge E2E | 현재 설치본에서 실제 조회·선정 준비·새 실행·비교·재생·저장 등 대표 사용자 흐름을 새로 연결. 실제 원본/새 생성과 기록을 구분 | PASS: 새 M6 실제 A/B GPU 출력·재생·각 1회 저장·파일/설치 코드/모델 출처 독립 검증. 중립 평가 재조회·조회/상세 UI, CSS/package 교체 후 핵심 UI 재확인 |
 | 전체 UI·접근성 목표 회귀 | 상태별 화면·한국어·긴 이름·키보드/포커스·대비/reduced motion·768/1280/1440/1920을 현재 UI로 확인 | 4개 계획 폭 가로 넘침 0·상세 Escape/포커스 복귀·Tab 3px·현재 reduce 핵심 표본 확인. 작은 텍스트 대비 3개를 보완해 최종 Edge 표본 4.5:1 이상 확인. 전면 WCAG/스크린리더 인증 아님 |
-| 설치/시작/복구 안내·회귀·버전 태그 | 검증된 배포 형태의 재현 가능한 안내와 잔여 제한, 적절한 회귀·독립 검토·소스 반영·버전 식별 | INSTALL/RECOVERY 배포 포함·package-3 설치본 140개/19.797초 PASS, package-4-final Python 16개 불변과 정적 UI delta 독립 검증. 출시 준비 PASS·실제 게시/태그는 최종 단계 |
+| 설치/시작/복구 안내·회귀·버전 태그 | 검증된 배포 형태의 재현 가능한 안내와 잔여 제한, 적절한 회귀·독립 검토·소스 반영·버전 식별 | INSTALL/RECOVERY 배포 포함·package-3 설치본 140개/19.797초 PASS, package-4-final Python 16개 불변과 정적 UI delta 독립 검증. PASS: 출시 준비 및 소스/ZIP 원문 원격 대조 완료·v0.6.0 실제 태그/Release 게시 확인 |
 
 단순 smoke·API 응답·목업만으로 실제 화면 E2E를 대체하지 않는다. 운영 환경·표본·현재 해시가 다른 항목을 하나의 PASS로 합치지 않는다. 허용된 미해결 항목은 영향·다음 검증 조건을 남기고 완료 범위 검토에서 구분한다.
 
@@ -31,7 +31,7 @@ M6 고유 실행별 경로와 입력/출력 출처를 새로 만든다. M5 보�
 
 세 가지 선택의 런타임·용량 방향·업데이트·OAuth/저장 재검증 범위는 [Windows 프로그램 형태 배포 검토](WINDOWS_DISTRIBUTION.md)에 정리했다. 이번 installer/launcher는 새 설치·경계·CMD 시작과 실제 Edge E2E·CSS 보완 package-4-final의 핵심 UI/패키지를 검증했다. standalone exe/WebView2 host는 미구현 검토 항목이다.
 
-사용자가 요청한 프로그램 배포는 가능성·형식·작업 범위 검토 단계다. 실행 패키지 형식과 UI가 표시되는 방식을 분리해야 한다. 현재 앱은 Python 로컬 서비스와 React 정적 UI이며 HTML 파일을 단독 열어 쓰는 앱이 아니다.
+사용자가 요청한 프로그램 배포 중 이번 Python 설치형 launcher는 구현·검증했으며 standalone exe·독립 desktop host 대안은 후속 형식 검토 항목이다. 실행 패키지 형식과 UI가 표시되는 방식을 분리해야 한다. 현재 앱은 Python 로컬 서비스와 React 정적 UI이며 HTML 파일을 단독 열어 쓰는 앱이 아니다.
 
 | 대안 | 사용자 실행 방식과 검증 영향 | 현 단계 권고 |
 |---|---|---|
@@ -100,8 +100,17 @@ Edge native audio는 각각 ended=true·currentTime=duration·error null을 확�
 
 ## 완료 범위·최종 게시와 알려진 제한
 
-새 한국어 GPU 실행·비교·재생·저장·평가 재조회·핵심 UI의 현재 증거는 위와 같다. 작은 텍스트 대비 보완 뒤 package-4-final의 새 해시·소스/설치 바이트·대표 Edge UI를 재검증했다. 남은 최종 단계는 승인된 공개 파일 반영·원격 대조·v0.6.0 태그/Release 식별이다. 작업 crash/cancel의 실제 OS+합성 검증과 실제 GPU 결과를 분리한다. M5의 Chrome 제한은 알려진 이력으로 보존하고 이번 범위를 Chrome 조사로 확대하지 않는다. Edge를 우선한다.
+새 한국어 GPU 실행·비교·재생·저장·평가 재조회·핵심 UI의 현재 증거는 위와 같다. 작은 텍스트 대비 보완 뒤 package-4-final의 새 해시·소스/설치 바이트·대표 Edge UI를 재검증했다. 승인된 공개 텍스트 24개와 배포 ZIP 1개를 반영하고 원격 고정 커밋의 바이트를 대조했다. v0.6.0 태그/Release 실제 게시도 확인했다. 작업 crash/cancel의 실제 OS+합성 검증과 실제 GPU 결과를 분리한다. M5의 Chrome 제한은 알려진 이력으로 보존하고 이번 범위를 Chrome 조사로 확대하지 않는다. Edge를 우선한다.
 
 초기 추가 390px 관측에서 목록 제목의 과도한 줄바꿈이 보였다. package-4-final에서 좁은 화면 header를 세로 배치하도록 보완했고 실제 390px의 column 배치·가로 넘침 없음은 확인했다. 다만 해당 제목 전체의 최종 시각 확인은 도구 캡처/viewport 제약으로 끝내지 못했다. 원계획 최소 폭 768px 밖의 추가 관측이며 모바일 완성 PASS로 표시하지 않는다. 4개 대표 폭의 가로 넘침 없음도 모든 상태 조합의 검증을 뜻하지 않는다.
 
-현재 판정은 **확인한 Windows/Edge 환경의 M6 출시 준비 gate PASS, 공개 반영·원격 검증·태그/Release 식별은 최종 게시 단계**다. 공개 원문/비변경 blob·배포 ZIP 해시와 태그의 대상 커밋·Release 실제 존재는 게시 후 각각 확인한다. 태그 생성 전 완료됐다고 미리 주장하지 않는다. 알려진 Chrome 제한·390px 전체 시각 미확인·접근성 전면 audit/스크린리더·청취 품질·실제 GPU crash/장시간 stress 미검증을 보존한다.
+현재 판정은 **확인한 Windows/Edge 환경의 M6 개인용 로컬 출시 완료**다. 공개 텍스트/배포 ZIP 원격 바이트·비변경 blob 보존·ZIP 해시와 실제 태그/Release를 각각 확인했다. 알려진 Chrome 제한·390px 전체 시각 미확인·접근성 전면 audit/스크린리더·청취 품질·실제 GPU crash/장시간 stress 미검증을 보존한다.
+
+## 실제 공개 배포와 태그 대상
+
+- Release: [v0.6.0](https://github.com/castle923/Ai-manager/releases/tag/v0.6.0), draft=false·prerelease=false로 실제 게시. UTC 게시 시각은 `2026-10-16T18:24:07Z`이며 KST 기준 2026-10-17이다.
+- 태그 `v0.6.0`의 고정 대상은 소스·최종 ZIP을 함께 반영한 [899cf8a5b9616d3773caf2fb7ebf47db99544002](https://github.com/castle923/Ai-manager/commit/899cf8a5b9616d3773caf2fb7ebf47db99544002)다.
+- [검증된 Windows ZIP](https://github.com/castle923/Ai-manager/raw/899cf8a5b9616d3773caf2fb7ebf47db99544002/releases/v0.6.0/ai-manager-0.6.0-windows.zip)은 저장소 Git blob이며 157,240 bytes·위 SHA-256과 원격 바이트가 일치했다. 별도 Release asset 첨부 업로드는 0개다. 자동 source archive와 검증된 프로그램 배포 ZIP을 구분한다.
+- 게시 커밋은 텍스트 24개·ZIP 1개 원시 바이트 일치, 이전 비변경 47개 blob SHA/mode 보존, 삭제·예상 밖 파일 0을 확인했다.
+
+Release 게시 결과를 기록하기 위한 후속 main 변경은 문서만 수정한다. 태그를 후속 문서 커밋으로 이동하지 않으며 릴리스의 소스·ZIP 대상은 위 커밋에 고정한다. 현재 문서의 상태 보완과 릴리스 코드/배포 파일 버전을 혼동하지 않는다.
