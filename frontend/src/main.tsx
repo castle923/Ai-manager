@@ -27,6 +27,7 @@ import {
 import "./style.css";
 import { PreparationPanel } from "./PreparationPanel";
 import { TtsPanel } from "./TtsPanel";
+import { ComparisonPanel } from "./ComparisonPanel";
 
 type Scan = {
   scan_id: string;
@@ -395,6 +396,12 @@ function App() {
           >
             <Play size={19} /> 음성 작업실
           </button>
+          <button
+            className={section === "comparison" ? "nav active" : "nav"}
+            onClick={() => setSection("comparison")}
+          >
+            <Layers size={19} /> 새 A/B 비교
+          </button>
         </nav>
         <div className="sidebar-note">
           <ShieldCheck size={20} />
@@ -406,7 +413,7 @@ function App() {
         </div>
         <div className="sidebar-foot">
           <span className="dot" /> 개인 PC에서 실행 중
-          <small>M4 · 로컬 음성 작업실</small>
+          <small>M5 · 새 A/B 비교</small>
         </div>
       </aside>
       <div className="workspace">
@@ -419,7 +426,9 @@ function App() {
                 ? "모델 준비"
                 : section === "tts"
                   ? "음성 작업실"
-                  : "계정 및 수집"}
+                  : section === "comparison"
+                    ? "새 A/B 비교"
+                    : "계정 및 수집"}
           </span>
           <div className="top-meta">
             <ShieldCheck size={15} /> Drive 읽기 전용{" "}
@@ -437,16 +446,20 @@ function App() {
                     ? "모델 준비"
                     : section === "tts"
                       ? "음성 작업실"
-                      : "계정 및 수집"}
+                      : section === "comparison"
+                        ? "새 A/B 비교"
+                        : "계정 및 수집"}
               </h1>
               <p>
                 {section === "library"
                   ? "흩어져 있는 모델 파일을 모으고, 현재 확인 수준을 한눈에 살펴보세요."
                   : section === "preparation"
-                    ? "선정한 첫 모델의 파일과 환경을 준비하고, 확인 근거를 단계별로 살펴보세요."
+                    ? "선정 모델의 파일과 환경을 준비하고, 확인 근거를 단계별로 살펴보세요."
                     : section === "tts"
                       ? "새 한국어 문장을 음성으로 만들고, 이번 실행의 검증 결과를 확인하세요."
-                      : "두 계정의 연결과 허용 폴더 수집을 관리하세요."}
+                      : section === "comparison"
+                        ? "같은 새 입력으로 두 모델을 실행하고, 실제 조건과 결과를 함께 비교하세요."
+                        : "두 계정의 연결과 허용 폴더 수집을 관리하세요."}
               </p>
             </div>
             <button
@@ -486,7 +499,12 @@ function App() {
               {err(status.task.error || "operation_failed_check_connection")}
             </div>
           )}
-          {section === "tts" ? (
+          {section === "comparison" ? (
+            <ComparisonPanel
+              csrf={csrf}
+              onPrepare={() => setSection("preparation")}
+            />
+          ) : section === "tts" ? (
             <TtsPanel csrf={csrf} />
           ) : section === "preparation" ? (
             <PreparationPanel
@@ -1114,7 +1132,7 @@ function App() {
                         : "이 항목의 준비 어댑터는 미지원"}
                     </strong>
                     <p>
-                      현재 준비 기능은 Qwen3-TTS 0.6B CustomVoice 한 모델에만
+                      현재 준비 기능은 Qwen3-TTS 0.6B / 1.7B CustomVoice 모델에
                       제공됩니다. 준비 화면에서 선정 출처와 현재 검증 결과를
                       확인하세요.
                     </p>

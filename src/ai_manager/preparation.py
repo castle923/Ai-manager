@@ -10,10 +10,12 @@ import subprocess
 import threading
 import time
 import uuid
+import requests
 from datetime import datetime, timezone
 
 from .drive import Drive, DriveError, Cancelled, FOLDER
 from .inventory import Inventory
+from .models import DEFAULT_MODEL, load_manifest, model_ids, segment
 
 MODEL_SEGMENT = 'Qwen3-TTS-12Hz-0.6B-CustomVoice'
 ACTIVE = threading.Lock()
@@ -33,8 +35,8 @@ def atomic_text(path, encoded):
             if attempt==39:raise
             time.sleep(0.05)
 
-def manifest():
-    return json.loads(Path(__file__).with_name('model_manifest.json').read_text(encoding='utf8'))
+def manifest(model_id=DEFAULT_MODEL):
+    return load_manifest(model_id)
 
 def safe_relative(value):
     if not isinstance(value,str) or not value or '\\' in value or ':' in value or value.startswith('/'):
@@ -46,18 +48,21 @@ def safe_relative(value):
     return Path(*parts)
 
 def supported(item):
-    return item.get('account')=='B' and MODEL_SEGMENT in item.get('path','').split('/')
+    return item.get('account')=='B' and any(segment(mid) in item.get('path','').split('/') for mid in model_ids() if (Path(__file__).with_name('model_manifest.json' if mid == DEFAULT_MODEL else 'model_manifest_1.7b.json')).is_file())
 
 class PreparationError(Exception):
     pass
 
 class Preparation:
-    def __init__(self,home,settings=None,auth=None,drive_factory=Drive):
+    def __init__(self,home,settings=None,auth=None,drive_factory=Drive,*,model_id=DEFAULT_MODEL):
         self.home=Path(home)
+        self.model_id=model_id
+        self.segment=segment(model_id) if model_id != DEFAULT_MODEL else MODEL_SEGMENT
         self.settings=settings or {}
         self.auth=auth
         self.drive_factory=drive_factory
         self.base=self.home/'preparations'
+        if model_id != DEFAULT_MODEL:self.base=self.base/model_id
         self.current=self.base/'current.json'
 
     def _busy(self):
@@ -111,14 +116,14 @@ class Preparation:
             if not approved or not prior.issubset(approved):return []
             result=[]
             for row in db.execute('SELECT * FROM files WHERE scan_id=?',(latest['scan_id'],)):
-                if MODEL_SEGMENT in row['path'].split('/'):
+                if self.segment in row['path'].split('/'):
                     result.append(dict(row)|{'metadata':json.loads(row['metadata_json'])})
             return result
 
     def plan(self):
-        m=manifest(); rows=self._observed(); roots=set()
+        m=manifest(self.model_id); rows=self._observed(); roots=set()
         for row in rows:
-            parts=row['path'].split('/'); index=parts.index(MODEL_SEGMENT)
+            parts=row['path'].split('/'); index=parts.index(self.segment)
             if len(parts)==index+2:
                 roots.update(row['metadata'].get('parents',[]))
         blockers=[]
@@ -128,7 +133,7 @@ class Preparation:
         free=shutil.disk_usage(self.home).free
         required=total+512*1024*1024
         if free<required:blockers.append('insufficient_disk')
-        return dict(status='blocked' if blockers else 'available',files=m['files'],total_bytes=total,required_bytes=required,free_bytes=free,blockers=blockers)
+        return dict(status='blocked' if blockers else 'available',files=[dict(f,origin='official_model_component' if f.get('official_supplement') else 'designated_drive_component') for f in m['files']],total_bytes=total,required_bytes=required,free_bytes=free,blockers=blockers)
 
     def environment(self):
         record=self.home/'runtime'/'environment.json'
@@ -141,7 +146,8 @@ class Preparation:
         except (OSError,ValueError):return dict(status='blocked',blockers=['runtime_record_invalid'])
 
     def snapshot(self):
-        m=manifest(); state=self._load(); state.pop('pid',None)
+        m=manifest(self.model_id); state=self._load(); state.pop('pid',None)
+        state['files']=[dict(f,origin='official_model_component' if f.get('official_supplement') else 'designated_drive_component') for f in state.get('files',[])]
         if state.get('status')=='ready':
             try:
                 if not re.fullmatch('[a-f0-9]{32}',state['id']):raise ValueError()
@@ -172,7 +178,7 @@ class Preparation:
     def _mapping(self,drive,m):
         rows=self._observed();roots=set()
         for row in rows:
-            parts=row['path'].split('/');i=parts.index(MODEL_SEGMENT)
+            parts=row['path'].split('/');i=parts.index(self.segment)
             if len(parts)==i+2:roots.update(row['metadata'].get('parents',[]))
         if len(roots)!=1:raise PreparationError('ambiguous_model' if roots else 'model_not_found')
         root=next(iter(roots));self._check_ancestry(drive,root)
@@ -203,7 +209,8 @@ class Preparation:
         for f in m['files']:
             item=mapping.get(f['path'])
             if not item:raise PreparationError('missing_component')
-            if str(item.get('size'))!=str(f['size']):raise PreparationError('source_changed')
+            expected=f.get('official_supplement',{}).get('observed_drive_bytes',f['size'])
+            if str(item.get('size'))!=str(expected):raise PreparationError('source_changed')
         return mapping
 
     def prepare(self,cancel=None):
@@ -228,14 +235,15 @@ class Preparation:
         try:
             plan=self.plan()
             if plan['blockers']:raise PreparationError(plan['blockers'][0])
-            m=manifest();run_id=uuid.uuid4().hex
+            m=manifest(self.model_id);run_id=uuid.uuid4().hex
             self.base.mkdir(parents=True,exist_ok=True)
             run=self.base/run_id;run.mkdir(exist_ok=False)
             state=dict(id=run_id,pid=os.getpid(),status='downloading',downloaded_bytes=0,total_bytes=plan['total_bytes'],current_file=None,files_verified=0,files=[dict(f,downloaded_bytes=0,status='pending') for f in m['files']],configuration='unverified',integrity='unverified',runtime='unverified',execution='not_run',error=None,started_at=now())
             self._save(state,run)
             drive=self.drive_factory(lambda force_refresh=False:self.auth.access('B',force_refresh=force_refresh),cancel=cancel)
             sources=self._mapping(drive,m)
-            provenance=dict(run_id=run_id,model=m['name'],revision=m['revision'],source=m['source'],files=sources)
+            provenance=dict(run_id=run_id,model=m['name'],revision=m['revision'],source=m['source'],files=sources,
+                            origins={f['path']:dict(kind='official_model_component', **f['official_supplement']) if f.get('official_supplement') else dict(kind='designated_drive_component',drive_file_id=sources[f['path']]['id']) for f in m['files']})
             (run/'inputs.json').write_text(json.dumps(provenance,indent=2),encoding='utf8')
             paths=set();last_progress=0.0
             for f in state['files']:
@@ -252,7 +260,7 @@ class Preparation:
                 part=target.with_name(target.name+'.part')
                 sha=hashlib.sha256();md5=hashlib.md5();sha1=hashlib.sha1();size=0
                 with part.open('xb') as output:
-                    stream = drive.content(source['id'], size=f['size']) if isinstance(drive, Drive) else drive.content(source['id'])
+                    stream = self._official_content(f, cancel) if f.get('official_supplement') else drive.content(source['id'], size=f['size']) if isinstance(drive, Drive) else drive.content(source['id'])
                     for chunk in stream:
                         if cancel.is_set():raise Cancelled('cancelled')
                         if shutil.disk_usage(run).free < len(chunk)+64*1024*1024:raise PreparationError('insufficient_disk')
@@ -268,7 +276,7 @@ class Preparation:
                 if size!=f['size']:raise PreparationError('size_mismatch')
                 if sha.hexdigest()!=f['sha256']:raise PreparationError('hash_mismatch')
                 for field,digest in (('md5Checksum',md5),('sha1Checksum',sha1),('sha256Checksum',sha)):
-                    if fresh.get(field) and fresh[field]!=digest.hexdigest():raise PreparationError('hash_mismatch')
+                    if not f.get('official_supplement') and fresh.get(field) and fresh[field]!=digest.hexdigest():raise PreparationError('hash_mismatch')
                 after=drive.metadata(source['id'])
                 if any(after.get(k)!=fresh.get(k) for k in ('id','version','modifiedTime','size','parents','name','md5Checksum','sha1Checksum','sha256Checksum','driveId','mimeType')) or after.get('trashed'):raise PreparationError('source_changed')
                 # New destination only: link fails rather than replacing an existing file.
@@ -296,6 +304,24 @@ class Preparation:
                 lockfile.close()
                 ACTIVE.release()
         return self.snapshot()['preparation']
+
+    def _official_content(self, item, cancel):
+        # Only this pinned, explicitly approved configuration supplement is allowed.
+        supplement=item['official_supplement'];m=manifest(self.model_id)
+        expected='https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-CustomVoice/resolve/'+m['revision']+'/speech_tokenizer/config.json'
+        if self.model_id!='qwen3-tts-1.7b-customvoice' or item['path']!='speech_tokenizer/config.json' or supplement['url']!=expected or item['size']!=2336 or item['sha256']!='ee65bb901c876664ab8707c487157aa1a6ee57c65969b28fb5ec9dc211e68167':
+            raise PreparationError('unsupported_supplement')
+        try:
+            with requests.Session() as session:
+                session.trust_env=False
+                # No Drive credentials or user model tokens enter the public request.
+                with session.get(expected,stream=True,timeout=(15,60)) as response:
+                    if response.status_code!=200:raise PreparationError('official_component_unavailable')
+                    for chunk in response.iter_content(64*1024):
+                        if cancel.is_set():raise Cancelled('cancelled')
+                        if chunk:yield chunk
+        except requests.RequestException:
+            raise PreparationError('official_component_unavailable') from None
 
     def probe_runtime(self):
         python=self.home/'runtime'/'venv'/'Scripts'/'python.exe'

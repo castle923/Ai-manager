@@ -28,10 +28,10 @@ def serve(home, settings, auth, browser=webbrowser.open, port=0):
         return {"accounts": {a: {"credential_saved": bool(auth.store.get(a)), "roots": sum(r["account"] == a for r in settings["allowlist"])} for a in ("A", "B")},
                 "task": dict(task), "inventory": Inventory(home).summary()}
 
-    def work(action, account):
+    def work(action, account, model_id=None):
         try:
             if action == "prepare":
-                result = preparation.prepare(cancel)
+                result = Preparation(home, settings, auth, model_id=model_id).prepare(cancel) if model_id else preparation.prepare(cancel)
             elif action == "runtime_check":
                 result = preparation.probe_runtime()
             elif action == "connect":
@@ -78,6 +78,12 @@ def serve(home, settings, auth, browser=webbrowser.open, port=0):
             path = urlsplit(self.path).path
             if path == "/api/tts/status":
                 return self.reply(200, inference.snapshot())
+            if path == '/api/comparisons/status':
+                return self.reply(200, inference.comparison_snapshot())
+            match_comparison = re.fullmatch(r'/api/comparisons/([a-f0-9]{32})', path)
+            if match_comparison:
+                try: return self.reply(200, {'comparison': inference.comparison_get(match_comparison[1])})
+                except InferenceError as error: return self.reply(404, {'error': str(error)})
             match = re.fullmatch(r"/api/tts/runs/([a-f0-9]{32})(/audio)?", path)
             if match:
                 try:
@@ -98,7 +104,11 @@ def serve(home, settings, auth, browser=webbrowser.open, port=0):
                     return self.reply(404, {"error": "not_found"})
                 return self.reply(200, asset.read_text(encoding="utf-8"), mimetypes.guess_type(str(asset))[0] or "text/plain")
             if path == "/api/preparation":
-                return self.reply(200, preparation.snapshot())
+                try:
+                    mid = parse_qs(urlsplit(self.path).query).get('model_id', [None])[0]
+                    return self.reply(200, Preparation(home, settings, auth, model_id=mid).snapshot() if mid else preparation.snapshot())
+                except ValueError as error:
+                    return self.reply(400, {'error': str(error)})
             if path == "/api/session":
                 return self.reply(200, {"csrf": csrf})
             if path in {"/api/dashboard", "/api/detail"}:
@@ -131,6 +141,15 @@ def serve(home, settings, auth, browser=webbrowser.open, port=0):
 
         def do_POST(self):
             if not self.allowed() or not secrets.compare_digest(self.headers.get("X-AiManager-CSRF", ""), csrf):
+                # Consume only a bounded rejected body so Windows can deliver the
+                # denial response reliably; authentication is never bypassed.
+                self.close_connection = True
+                try:
+                    rejected_length = int(self.headers.get('Content-Length', '0'))
+                    if 0 < rejected_length <= 4096:
+                        self.connection.settimeout(1)
+                        self.rfile.read(rejected_length)
+                except (ValueError, OSError): pass
                 return self.reply(403, {"error": "forbidden"})
             if self.headers.get("Content-Type") != "application/json":
                 return self.reply(415, {"error": "json_required"})
@@ -139,6 +158,23 @@ def serve(home, settings, auth, browser=webbrowser.open, port=0):
                 if not 0 < length <= 4096:
                     raise ValueError()
                 data = json.loads(self.rfile.read(length))
+                comparison_action = re.fullmatch(r'/api/comparisons/([a-f0-9]{32})/(cancel|evaluation)', self.path)
+                if self.path == '/api/comparisons' or comparison_action:
+                    if not isinstance(data, dict): raise ValueError()
+                    try:
+                        if self.path == '/api/comparisons':
+                            if set(data) != {'text', 'model_ids'}: raise InferenceError('invalid_request')
+                            result = inference.comparison_create(data['text'], data['model_ids'])
+                        elif comparison_action[2] == 'cancel':
+                            if data: raise InferenceError('invalid_request')
+                            result = inference.comparison_cancel(comparison_action[1])
+                        else:
+                            if set(data) != {'preference', 'notes'}: raise InferenceError('invalid_evaluation')
+                            result = inference.comparison_evaluate(comparison_action[1], data['preference'], data['notes'])
+                        return self.reply(202 if not comparison_action or comparison_action[2] == 'cancel' else 200, {'comparison': result})
+                    except InferenceError as error:
+                        code = str(error)
+                        return self.reply(404 if code == 'comparison_not_found' else 409 if code in {'queue_full','operation_running','comparison_not_completed'} else 400, {'error': code})
                 if self.path == '/api/tts/runs' or re.fullmatch(r'/api/tts/runs/[a-f0-9]{32}/cancel', self.path):
                     if not isinstance(data, dict): raise ValueError()
                     try:
@@ -163,6 +199,11 @@ def serve(home, settings, auth, browser=webbrowser.open, port=0):
                 return self.reply(400, {"error": "invalid_request"})
             if action in ("prepare", "runtime_check") and account != "B":
                 return self.reply(400, {"error": "invalid_request"})
+            model_id = data.get('model_id')
+            if model_id is not None:
+                from .models import model_ids
+                if action != 'prepare' or not isinstance(model_id, str) or model_id not in model_ids():
+                    return self.reply(400, {'error': 'unsupported_model'})
             if action == "cancel":
                 cancel.set()
                 return self.reply(202, {"status": "cancel_requested"})
@@ -171,7 +212,7 @@ def serve(home, settings, auth, browser=webbrowser.open, port=0):
             cancel.clear()
             task.clear()
             task.update(status="running", action=action, account=account)
-            threading.Thread(target=work, args=(action, account), daemon=True).start()
+            threading.Thread(target=work, args=(action, account, model_id), daemon=True).start()
             self.reply(202, {"status": "started"})
 
     with ThreadingHTTPServer(("127.0.0.1", port), Handler) as server:

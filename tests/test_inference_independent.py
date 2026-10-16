@@ -155,12 +155,12 @@ class IndependentInferenceTests(unittest.TestCase):
         assets=self.home/'preparations'/prep_id/'assets';assets.mkdir(parents=True)
         content=b'new synthetic model component for independent review'
         (assets/'config.json').write_bytes(content)
-        model=dict(model_id='synthetic-test-model',name='synthetic-test-model',revision='r1',source='https://example.invalid/official',files=[dict(path='config.json',size=len(content),sha256=hashlib.sha256(content).hexdigest())])
+        model=dict(model_id='qwen3-tts-0.6b-customvoice',name='synthetic-test-model',revision='r1',source='https://example.invalid/official',files=[dict(path='config.json',size=len(content),sha256=hashlib.sha256(content).hexdigest())])
         (assets.parent.parent/'current.json').write_text(json.dumps(dict(id=prep_id,status='ready',integrity='matched')))
         runtime=self.home/'runtime';(runtime/'venv/Scripts').mkdir(parents=True)
         (runtime/'venv/Scripts/python.exe').write_bytes(b'not executed')
         (runtime/'environment.json').write_text(json.dumps(dict(status='ready')))
-        run=dict(id='c'*32,text='이번 검증의 새 입력',input_sha256='d'*64,parameters={},model={})
+        run=dict(id='c'*32,text='이번 검증의 새 입력',input_sha256='d'*64,parameters={},model={'id':model['model_id'],'name':model['name'],'revision':model['revision']})
         self.manager._path(run['id']).mkdir()
         with patch('ai_manager.inference.manifest',return_value=model):
             self.manager._prepare(run)

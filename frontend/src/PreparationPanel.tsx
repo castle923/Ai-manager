@@ -14,6 +14,12 @@ type PreparationFile = {
   size: number;
   sha256?: string;
   downloaded_bytes?: number;
+  origin?: string;
+  official_supplement?: {
+    url: string;
+    reason: string;
+    observed_drive_bytes: number;
+  };
   status?: string;
 };
 type PreparationData = {
@@ -228,6 +234,7 @@ export function PreparationPanel({
   canCancel: boolean;
   csrf: RefObject<string>;
 }) {
+  const [modelId, setModelId] = useState("qwen3-tts-0.6b-customvoice");
   const [data, setData] = useState<PreparationData | null>(null);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
@@ -239,9 +246,12 @@ export function PreparationPanel({
     const controller = new AbortController();
     async function poll() {
       try {
-        const response = await fetch("/api/preparation", {
-          signal: controller.signal,
-        });
+        const response = await fetch(
+          `/api/preparation?model_id=${encodeURIComponent(modelId)}`,
+          {
+            signal: controller.signal,
+          },
+        );
         const body = await response.json();
         if (!response.ok) throw Error(reason(body.error || "request_failed"));
         if (active) {
@@ -264,7 +274,7 @@ export function PreparationPanel({
       controller.abort();
       clearTimeout(timer);
     };
-  }, [refresh]);
+  }, [refresh, modelId]);
   async function act(action: "prepare" | "cancel" | "runtime_check") {
     if (!csrf.current || pending) return;
     setPending(true);
@@ -275,7 +285,7 @@ export function PreparationPanel({
           "Content-Type": "application/json",
           "X-AiManager-CSRF": csrf.current,
         },
-        body: JSON.stringify({ action, account: "B" }),
+        body: JSON.stringify({ action, account: "B", model_id: modelId }),
       });
       const body = await response.json();
       if (!response.ok) throw Error(reason(body.error || "request_failed"));
@@ -346,15 +356,35 @@ export function PreparationPanel({
     [
       "실제 실행",
       "실행하지 않음",
-      "M4에서 새 입력으로 추론과 출력 검증을 수행합니다.",
+      "실제 생성 결과는 음성 작업실·새 A/B 비교에서 확인합니다.",
       false,
     ],
   ] as const;
   return (
     <div className="preparation-page">
+      <div className="panel preparation-model-selector">
+        <label htmlFor="preparation-model">준비할 모델</label>
+        <select
+          id="preparation-model"
+          value={modelId}
+          disabled={busy || pending}
+          onChange={(event) => {
+            setModelId(event.target.value);
+            setData(null);
+            setError("");
+          }}
+        >
+          <option value="qwen3-tts-0.6b-customvoice">
+            Qwen3-TTS · 0.6B CustomVoice
+          </option>
+          <option value="qwen3-tts-1.7b-customvoice">
+            Qwen3-TTS · 1.7B CustomVoice
+          </option>
+        </select>
+      </div>
       <section className="preparation-hero panel">
         <div className="preparation-hero-top">
-          <span className="eyebrow">SELECTED MODEL / M3</span>
+          <span className="eyebrow">SELECTED MODEL / FILE VERIFICATION</span>
           <span
             className={"badge " + (run.status === "ready" ? "green" : "amber")}
           >
@@ -363,9 +393,25 @@ export function PreparationPanel({
         </div>
         <h2>{data.supported_model.name}</h2>
         <p className="preparation-intro">
-          한국어 음성 합성 · 0.6B · CustomVoice{" "}
-          <span>첫 모델 전용 준비 어댑터</span>
+          한국어 음성 합성 · CustomVoice <span>선정 모델 준비 어댑터</span>
         </p>
+        {plan.files.some(
+          (file) =>
+            file.origin === "official_model_component" ||
+            file.official_supplement,
+        ) && (
+          <p className="preparation-source-note">
+            가중치: 지정 Drive · 구성 파일{" "}
+            {
+              plan.files.filter(
+                (file) =>
+                  file.origin === "official_model_component" ||
+                  file.official_supplement,
+              ).length
+            }
+            개: 공식 고정 버전 보완 · Drive 원본 보존
+          </p>
+        )}
         {run.id && (
           <div className="preparation-progress">
             <div>
@@ -425,7 +471,9 @@ export function PreparationPanel({
             <RefreshCw size={16} />
             조건 다시 확인
           </button>
-          <p>모델 추론과 음성 생성은 M4 단계입니다.</p>
+          <p>
+            준비 후 음성 작업실 또는 새 A/B 비교에서 실제 음성을 생성하세요.
+          </p>
         </div>
         <details className="preparation-provenance">
           <summary>허용 출처 · 공식 revision · 이번 실행 기록 보기</summary>
@@ -434,6 +482,20 @@ export function PreparationPanel({
               <dt>허용된 다운로드 출처</dt>
               <dd>
                 계정 {plan.account || "B"} · 지정 모델 폴더 · Drive 읽기 전용
+                {modelId === "qwen3-tts-1.7b-customvoice" && (
+                  <small className="cell-note">
+                    {plan.files
+                      .filter(
+                        (file) =>
+                          file.origin === "official_model_component" ||
+                          file.official_supplement,
+                      )
+                      .map((file) => file.path)
+                      .join(", ")}
+                    은 0바이트 Drive 파일 대신 이 화면의 공식 고정 revision에서
+                    새로 받았습니다. Drive 원본은 변경하지 않습니다.
+                  </small>
+                )}
               </dd>
             </div>
             <div>
@@ -575,6 +637,16 @@ export function PreparationPanel({
                   <tr key={file.path}>
                     <td>
                       <strong>{file.path}</strong>
+                      {modelId === "qwen3-tts-1.7b-customvoice" && (
+                        <small className="cell-note">
+                          {file.origin === "official_model_component" ||
+                          file.official_supplement
+                            ? "공식 고정 revision 보완"
+                            : file.origin === "designated_drive_component"
+                              ? "지정 Drive 원본"
+                              : "출처 확인 중"}
+                        </small>
+                      )}
                     </td>
                     <td>{size(file.size)}</td>
                     <td>

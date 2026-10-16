@@ -55,7 +55,13 @@ def main():
         from qwen_tts import Qwen3TTSModel
         if not torch.cuda.is_available():
             result['error'] = 'runtime_not_ready'; raise RuntimeError()
-        torch.manual_seed(request['parameters']['seed'])
+        parameters=request['parameters']
+        sampling=dict(do_sample=True, top_k=50, top_p=1.0, temperature=0.9, repetition_penalty=1.05, subtalker_dosample=True, subtalker_top_k=50, subtalker_top_p=1.0, subtalker_temperature=0.9)
+        if parameters.get('sampling') != sampling:
+            result['error']='inference_failed';raise ValueError('unsupported_sampling_parameters')
+        if parameters['language'] != 'Korean' or parameters['speaker'] != 'Sohee' or parameters['batch_size'] != 1 or parameters['instruct'] is not None or parameters['max_new_tokens'] != 1024:
+            result['error']='inference_failed';raise ValueError('unsupported_parameters')
+        torch.manual_seed(parameters['seed'])
         torch.cuda.reset_peak_memory_stats()
         phase('loading'); start = time.monotonic()
         model = Qwen3TTSModel.from_pretrained(request['model_path'], device_map='cuda:0', dtype=torch.bfloat16,
@@ -71,8 +77,8 @@ def main():
             return value
         model.model.talker.generate = tracked_generate
         with torch.inference_mode():
-            wavs, rate = model.generate_custom_voice(text=text, language='Korean', speaker='Sohee',
-                                                      max_new_tokens=1024)
+            wavs, rate = model.generate_custom_voice(text=text, language=parameters['language'], speaker=parameters['speaker'],
+                                                      max_new_tokens=parameters['max_new_tokens'], **sampling)
         torch.cuda.synchronize(); inference = time.monotonic() - start
         phase('validating')
         if not completion.get('eos_reached'):

@@ -15,10 +15,13 @@ import uuid
 import wave
 
 from .preparation import atomic_text, manifest, now, safe_relative
+from .models import DEFAULT_MODEL, model_ids, manifest_path
 
 TERMINAL = {'succeeded', 'failed', 'cancelled', 'interrupted'}
 DEFAULTS = dict(language='Korean', speaker='Sohee', batch_size=1, instruct=None,
-                max_text_length=300, timeout_seconds=600, max_new_tokens=1024)
+                max_text_length=300, timeout_seconds=600, max_new_tokens=1024,
+                sampling=dict(do_sample=True, top_k=50, top_p=1.0, temperature=0.9, repetition_penalty=1.05,
+                              subtalker_dosample=True, subtalker_top_k=50, subtalker_top_p=1.0, subtalker_temperature=0.9))
 
 
 class InferenceError(ValueError):
@@ -175,6 +178,9 @@ class Inference:
         self.base = self.home / 'tts'
         self.base.mkdir(parents=True, exist_ok=True)
         regular(self.base, self.home)
+        self.comparison_base = self.home / 'comparisons'
+        self.comparison_base.mkdir(parents=True, exist_ok=True)
+        regular(self.comparison_base, self.home)
         self.owner = FileOwner(self.base / 'owner.lock')
         self.timeout, self.popen = timeout, popen
         self.lock = threading.RLock()
@@ -213,7 +219,7 @@ class Inference:
             atomic_text(self._path(run['id']) / 'state.json', json.dumps(run, ensure_ascii=False, indent=2))
 
     def _public(self, run):
-        result = {key: run.get(key) for key in ('id', 'status', 'started_at', 'finished_at', 'text', 'input_sha256', 'parameters', 'model', 'error', 'metrics', 'output')}
+        result = {key: run.get(key) for key in ('id', 'status', 'started_at', 'finished_at', 'text', 'input_sha256', 'parameters', 'model', 'error', 'metrics', 'output', 'comparison_id', 'comparison_side')}
         result['audio_url'] = f"/api/tts/runs/{run['id']}/audio" if run['status'] == 'succeeded' else None
         return result
 
@@ -233,7 +239,7 @@ class Inference:
             except (OSError, KeyError, ValueError):
                 raise InferenceError('run_not_found') from None
 
-    def create(self, text):
+    def _validate_text(self, text):
         if not isinstance(text, str) or not text.strip():
             raise InferenceError('text_required')
         text = text.strip()
@@ -243,22 +249,171 @@ class Inference:
             raise InferenceError('invalid_request') from None
         if len(text) > DEFAULTS['max_text_length'] or any(ord(c) < 32 and c not in '\n\t' for c in text):
             raise InferenceError('text_too_long' if len(text) > DEFAULTS['max_text_length'] else 'invalid_request')
+        return text
+
+    def _available(self, count=1):
+        if not self.owner.handle or self.closed.is_set():
+            raise InferenceError('operation_running')
+        if sum(run['status'] == 'queued' for run in self._runs()) + count > 3:
+            raise InferenceError('queue_full')
+
+    def _new_run(self, text, model_id, *, seed=None, comparison_id=None, side=None, staged=False):
+        m = manifest(model_id)
+        run_id = uuid.uuid4().hex
+        directory = self._path(run_id); directory.mkdir()
+        run = dict(id=run_id, status='staged' if staged else 'queued', started_at=now(), finished_at=None, text=text,
+                   input_sha256=hashlib.sha256(text.encode('utf8')).hexdigest(),
+                   parameters={key: DEFAULTS[key] for key in ('language', 'speaker', 'batch_size', 'instruct', 'max_new_tokens')} |
+                              {'seed': int.from_bytes(os.urandom(4), 'little') if seed is None else seed, 'sampling': dict(DEFAULTS['sampling'])},
+                   model={'id': m['model_id'], 'name': m['name'], 'revision': m['revision'], 'preparation_id': None},
+                   comparison_id=comparison_id, comparison_side=side, error=None, metrics={}, output=None)
+        atomic_text(directory / 'input.json', json.dumps({'text': text, 'sha256': run['input_sha256'], 'parameters': run['parameters']}, ensure_ascii=False, indent=2))
+        self._save(run)
+        return run
+
+    def create(self, text):
+        text = self._validate_text(text)
         with self.lock:
-            if not self.owner.handle or self.closed.is_set():
-                raise InferenceError('operation_running')
-            if sum(run['status'] == 'queued' for run in self._runs()) >= 3:
-                raise InferenceError('queue_full')
-            run_id = uuid.uuid4().hex
-            directory = self._path(run_id); directory.mkdir()
-            m = manifest()
-            run = dict(id=run_id, status='queued', started_at=now(), finished_at=None, text=text,
-                       input_sha256=hashlib.sha256(text.encode('utf8')).hexdigest(),
-                       parameters={key: DEFAULTS[key] for key in ('language', 'speaker', 'batch_size', 'instruct', 'max_new_tokens')} | {'seed': int.from_bytes(os.urandom(4), 'little')},
-                       model={'id': m['model_id'], 'name': m['name'], 'revision': m['revision'], 'preparation_id': None},
-                       error=None, metrics={}, output=None)
-            atomic_text(directory / 'input.json', json.dumps({'text': text, 'sha256': run['input_sha256'], 'parameters': run['parameters']}, ensure_ascii=False, indent=2))
-            self._save(run); self.wake.set()
+            self._available()
+            run = self._new_run(text, DEFAULT_MODEL)
+            self.wake.set()
             return self._public(run)
+
+    def _comparison_path(self, comparison_id):
+        if not isinstance(comparison_id, str) or not re.fullmatch('[a-f0-9]{32}', comparison_id):
+            raise InferenceError('comparison_not_found')
+        return regular(self.comparison_base / comparison_id, self.home)
+
+    def _comparison_load(self, comparison_id):
+        try:
+            value = json.loads(regular(self._comparison_path(comparison_id) / 'state.json', self.home).read_text(encoding='utf8'))
+            if value['id'] != comparison_id:
+                raise ValueError()
+            return value
+        except (OSError, ValueError, KeyError):
+            raise InferenceError('comparison_not_found') from None
+
+    def _comparison_save(self, comparison):
+        atomic_text(self._comparison_path(comparison['id']) / 'state.json', json.dumps(comparison, ensure_ascii=False, indent=2))
+
+    def _comparison_public(self, comparison):
+        runs = [self.get(run_id) for run_id in comparison['run_ids']]
+        if len(runs) != 2 or any(run['comparison_id'] != comparison['id'] or run['comparison_side'] != side or
+                                run['text'] != comparison['text'] or hashlib.sha256(run['text'].encode('utf8')).hexdigest() != comparison['input_sha256'] or
+                                run['input_sha256'] != comparison['input_sha256'] or run['parameters'] != comparison['parameters'] or
+                                run['model']['id'] != comparison['conditions']['execution_order'][index]
+                                for index, (run, side) in enumerate(zip(runs, ('A', 'B')))):
+            raise InferenceError('comparison_invalid')
+        states = [run['status'] for run in runs]
+        if any(state not in TERMINAL for state in states):
+            status = 'cancelling' if 'cancelling' in states else 'queued' if all(state in {'queued', 'staged'} for state in states) else 'running'
+        elif all(state == 'succeeded' for state in states):
+            status = 'completed'
+        elif 'succeeded' in states:
+            status = 'partial'
+        elif 'interrupted' in states:
+            status = 'interrupted'
+        elif all(state == 'cancelled' for state in states):
+            status = 'cancelled'
+        else:
+            status = 'failed'
+        result = {key: comparison.get(key) for key in ('id', 'created_at', 'text', 'input_sha256', 'parameters', 'run_ids', 'conditions', 'evaluation')}
+        result.update(status=status, finished_at=max((run['finished_at'] or '' for run in runs)) if all(state in TERMINAL for state in states) else None, runs=runs)
+        return result
+
+    def comparison_get(self, comparison_id):
+        with self.lock:
+            comparison = self._comparison_load(comparison_id)
+            if not comparison.get('admitted'):raise InferenceError('comparison_not_found')
+            return self._comparison_public(comparison)
+
+    def comparison_snapshot(self):
+        from .preparation import Preparation
+        with self.lock:
+            comparisons = []
+            for path in self.comparison_base.glob('*/state.json'):
+                try: comparisons.append(self.comparison_get(path.parent.name))
+                except InferenceError: continue
+            models = []
+            for model_id in model_ids():
+                try:
+                    m = manifest(model_id)
+                    prep = Preparation(self.home, model_id=model_id)
+                    state = prep.snapshot()['preparation']
+                    ready = state.get('status') == 'ready' and state.get('integrity') == 'matched'
+                    blockers = ([] if ready else [state.get('error') or 'model_not_ready']) + ([] if state.get('runtime') == 'ready' else ['runtime_not_ready'])
+                    models.append(dict(id=model_id, name=m['name'], revision=m['revision'], preparation_state=state['status'],
+                                       blockers=blockers))
+                except ValueError:
+                    continue
+            return dict(supported_models=models, defaults=DEFAULTS,
+                        comparisons=sorted(comparisons, key=lambda item: item['created_at'], reverse=True), active_run_id=self.active,
+                        queued_runs=sum(run['status'] == 'queued' for run in self._runs()), queue_capacity=3,
+                        owner_available=bool(self.owner.handle) and not self.closed.is_set())
+
+    def comparison_create(self, text, models):
+        text = self._validate_text(text)
+        if not isinstance(models, list) or len(models) != 2 or any(not isinstance(mid, str) or mid not in model_ids() for mid in models) or models[0] == models[1]:
+            raise InferenceError('unsupported_comparison_models')
+        try:
+            for model_id in models: manifest(model_id)
+        except ValueError as error:
+            raise InferenceError(str(error)) from None
+        with self.lock:
+            self._available(2)
+            comparison_id = uuid.uuid4().hex
+            directory = self._comparison_path(comparison_id); directory.mkdir()
+            runs = []
+            try:
+                seed = int.from_bytes(os.urandom(4), 'little')
+                for model_id, side in zip(models, ('A', 'B')):
+                    runs.append(self._new_run(text, model_id, seed=seed, comparison_id=comparison_id, side=side, staged=True))
+                comparison = dict(id=comparison_id, created_at=now(), text=text, input_sha256=runs[0]['input_sha256'],
+                                  parameters=runs[0]['parameters'], run_ids=[run['id'] for run in runs], evaluation=None,
+                                  admitted=False, conditions=dict(cold_loading=True, execution_order=models, sample_count_per_model=1, cache_reuse=False,
+                                                  timing_scope='per_run_includes_integrity_check', gpu_memory_scope='pytorch_peak_allocated'))
+                atomic_text(directory / 'input.json', json.dumps({'text': text, 'input_sha256': comparison['input_sha256'], 'parameters': comparison['parameters'], 'model_ids': models}, ensure_ascii=False, indent=2))
+                self._comparison_save(comparison)
+                for run in runs:
+                    run['status'] = 'queued'; self._save(run)
+                comparison['admitted'] = True
+                self._comparison_save(comparison)
+            except Exception:
+                # Do not publish an executable half-pair if persistence fails.
+                for run in runs:
+                    self.cancelled.add(run['id'])
+                    run.update(status='interrupted', error='comparison_enqueue_failed', finished_at=now())
+                    try: self._save(run)
+                    except OSError: pass
+                raise InferenceError('comparison_enqueue_failed') from None
+            self.wake.set()
+            return self._comparison_public(comparison)
+
+    def comparison_cancel(self, comparison_id):
+        with self.lock:
+            self._available(0)
+            comparison = self._comparison_load(comparison_id)
+            # Validate ownership before mutating either linked run.
+            self._comparison_public(comparison)
+            for run_id in comparison['run_ids']:
+                self.cancel(run_id)
+            return self._comparison_public(comparison)
+
+    def comparison_evaluate(self, comparison_id, preference, notes):
+        if not isinstance(preference, str) or preference not in {'A', 'B', 'tie', 'undecided'} or not isinstance(notes, str) or len(notes) > 2000:
+            raise InferenceError('invalid_evaluation')
+        try: notes.encode('utf8')
+        except UnicodeEncodeError: raise InferenceError('invalid_evaluation') from None
+        if any(ord(c) < 32 and c not in '\n\t' for c in notes):
+            raise InferenceError('invalid_evaluation')
+        with self.lock:
+            self._available(0)
+            comparison = self._comparison_load(comparison_id)
+            if self._comparison_public(comparison)['status'] != 'completed':
+                raise InferenceError('comparison_not_completed')
+            comparison['evaluation'] = dict(preference=preference, notes=notes.strip(), recorded_at=now(), source='user')
+            self._comparison_save(comparison)
+            return self._comparison_public(comparison)
 
     def cancel(self, run_id):
         with self.lock:
@@ -280,14 +435,18 @@ class Inference:
 
     def _prepare(self, run):
         from .preparation import Preparation
-        prep = Preparation(self.home)
+        model_id = run.get('model', {}).get('id', DEFAULT_MODEL)
+        m = manifest(model_id)
+        if any(run.get('model', {}).get(key) != m[field] for key,field in (('id','model_id'),('name','name'),('revision','revision'))):
+            raise InferenceError('model_integrity_failed')
+        prep = Preparation(self.home, model_id=model_id)
         state = prep._load()
         if state.get('status') != 'ready' or state.get('integrity') != 'matched' or not re.fullmatch('[a-f0-9]{32}', state.get('id', '')):
             raise InferenceError('model_not_ready')
         if prep.environment().get('status') != 'ready':
             raise InferenceError('runtime_not_ready')
         assets = regular(prep.base / state['id'] / 'assets', self.home)
-        m = manifest(); verified = []
+        verified = []
         for item in m['files']:
             self._check_cancel(run['id'])
             path = regular(assets / safe_relative(item['path']), self.home)
@@ -301,19 +460,21 @@ class Inference:
         python = regular(self.home / 'runtime' / 'venv' / 'Scripts' / 'python.exe', self.home)
         if not python.is_file(): raise InferenceError('runtime_not_ready')
         worker = Path(__file__).with_name('tts_worker.py')
-        provenance = dict(run_id=run['id'], checked_at=now(), inputs=[dict(item, kind='designated_model_component', local_path=str(assets / safe_relative(item['path'])), source=m['source']) for item in verified],
-                          input_sha256=run['input_sha256'], manifest_sha256=digest(Path(__file__).with_name('model_manifest.json')),
-                          code_sha256={p.name: digest(p) for p in (Path(__file__), worker)},
+        provenance = dict(run_id=run['id'], checked_at=now(), inputs=[dict(item, kind='official_model_component' if item.get('official_supplement') else 'designated_model_component', local_path=str(assets / safe_relative(item['path'])), source=item.get('official_supplement',{}).get('url',m['source'])) for item in verified],
+                          input_sha256=run['input_sha256'], preparation_provenance_sha256=digest(prep.base / state['id'] / 'inputs.json') if (prep.base / state['id'] / 'inputs.json').is_file() else None, manifest_sha256=digest(manifest_path(model_id)),
+                          code_sha256={p.name: digest(p) for p in (Path(__file__), worker, Path(__file__).with_name('models.py'), Path(__file__).with_name('preparation.py'), Path(__file__).with_name('server.py'))},
+                          comparison_id=run.get('comparison_id'), comparison_side=run.get('comparison_side'),
                           runtime=prep.environment(), runtime_lock_sha256=digest(self.home / 'runtime' / 'requirements.lock') if (self.home / 'runtime' / 'requirements.lock').is_file() else None,
                           cold_loading=True, timeout_seconds=self.timeout, offline=True)
         directory = self._path(run['id'])
         atomic_text(directory / 'provenance.json', json.dumps(provenance, ensure_ascii=False, indent=2))
-        atomic_text(directory / 'request.json', json.dumps(dict(run_id=run['id'], model_path=str(assets), text=run['text'], parameters=run['parameters']), ensure_ascii=False))
+        atomic_text(directory / 'request.json', json.dumps(dict(run_id=run['id'], model_id=model_id, model_revision=m['revision'], model_path=str(assets), text=run['text'], parameters=run['parameters']), ensure_ascii=False))
         return python, worker
 
     def _execute(self, run):
         started = time.monotonic(); directory = self._path(run['id']); child = None
         try:
+            self._check_cancel(run['id'])
             run['status'] = 'preparing'; self._save(run)
             python, worker = self._prepare(run)
             self._check_cancel(run['id'])
@@ -369,11 +530,22 @@ class Inference:
                 run['metrics']['total_seconds'] = round(time.monotonic() - started, 3)
                 self._save(run)
 
+    def _eligible(self, run):
+        if run['id'] in self.cancelled:return False
+        if not run.get('comparison_id'):return True
+        try:
+            comparison = self._comparison_load(run['comparison_id'])
+            if not comparison.get('admitted'):return False
+            view = self._comparison_public(comparison)
+            return run['id'] in view['run_ids']
+        except (InferenceError, OSError, KeyError, ValueError):
+            return False
+
     def _loop(self):
         while not self.closed.is_set():
             self.wake.wait(.5); self.wake.clear()
             with self.lock:
-                queued = [run for run in reversed(self._runs()) if run['status'] == 'queued']
+                queued = [run for run in reversed(self._runs()) if run['status'] == 'queued' and self._eligible(run)]
                 if not queued: continue
                 run = queued[0]; self.active = run['id']
             self._execute(run)
