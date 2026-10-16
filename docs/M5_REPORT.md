@@ -1,6 +1,6 @@
 # M5 두 모델 새 A/B 비교 보고서
 
-갱신일: 2026-10-17 (Asia/Seoul) · 버전: v0.5.0 · 판정: 구현·핵심 A/B GPU 실행·재생·부분 취소 검증 완료, 최초 A 브라우저 저장 확인·후속 A/B 다운로드 차단 원인 미해결. M5 전체 PASS 또는 모든 검증 완료로 판정하지 않는다. 실제 실행의 원시 시각은 비공개 출처 기록에 그대로 보존한다.
+갱신일: 2026-10-17 (Asia/Seoul) · 버전: v0.5.0 · 판정: 구현·핵심 A/B GPU 실행·재생·부분 취소 검증 완료, 최초 A 저장 확인·이전 후속 A/B 차단 원인 미해결·최신 로그 보강 재현의 브라우저 결과 미확정. M5 전체 PASS 또는 모든 검증 완료로 판정하지 않는다. 실제 실행의 원시 시각은 비공개 출처 기록에 그대로 보존한다.
 
 ## 승인과 허용 자산
 
@@ -25,11 +25,11 @@
 
 ## M5 핵심 검증 이력과 현재 다운로드 상태
 
-123개 회귀·최종 UI·wheel은 앞선 동일 M5 구현의 검증 이력이다. 이번 후속 갱신은 기존 기록 진단과 별도 6개 mock 테스트이며, 이전 123개 테스트·GPU 실행·wheel을 새로 수행한 것으로 표시하지 않는다.
+123개 회귀·최종 UI·wheel은 앞선 동일 M5 구현의 검증 이력이다. 후속 갱신은 기존 기록 진단·별도 6개 timeout mock 테스트와 아래 서버 진단 코드의 4개 신규/3개 기존 서버 테스트로 구분한다. 이전 123개 테스트·GPU 실행·wheel을 새로 수행한 것으로 표시하지 않는다.
 
 | 항목 | 확인 상태 | 확인 범위·한계 |
 |---|---|---|
-| 최종 자동 회귀·독립 반례 | 실행 코드 회귀·독립 반례 123개 PASS·18.59초 | 회귀 실행 당시 코드·테스트·frontend 33개 파일 전후 SHA-256 일치. 이후 UI 출처 표시 문구만 수정했고 실행 코드 5개는 유지. 최종 UI는 새 빌드·DOM 검증으로 별도 확인. 이전 단발 socket 10053 원인은 미확정 |
+| 최종 자동 회귀·독립 반례 | 실행 코드 회귀·독립 반례 123개 PASS·18.59초 | 회귀 실행 당시 코드·테스트·frontend 33개 파일 전후 SHA-256 일치. 당시 후속 UI 출처 표시 수정까지 실행 코드 5개는 유지됐으나, 이후 아래 새 승인 범위의 서버 진단 로그 구현은 별도 변경이다. 최종 UI는 새 빌드·DOM 검증으로 별도 확인. 이전 단발 socket 10053 원인은 미확정 |
 | 비교 등록 저장 실패·모델 바인딩 | BLOCK 수정 후 독립 검증 PASS | admitted commit barrier·eligible scheduler로 저장 실패의 미등록 작업 실행 차단. 실제 CPU worker 0개·재시작 interrupted 확인. model ID/name/revision 변조 6개 반례 차단 |
 | 최종 UI 빌드·의존성·대표 폭 | TypeScript 포함 빌드 PASS·npm 전체 audit 0·최신 번들 정상/부분 완료 독립 검토 PASS | 768/1280/1440/1920에서 가로 넘침 0·사이드바 top 0, 정상 audio 2·부분 audio 1·평가 차단·Tab 포커스 3px. reduced motion 초기 검토 PASS·최종 1440 화면 시각 검토 양호 |
 | 1.7B 준비 | 실제 UI 다운로드·12개 파일 전량 크기·정확한 집합·원시 SHA-256 독립 검증 PASS | 준비 ID `410b980f87f3414bbe2a054b9daf22aa`. 필수 config 2,336 bytes 공식 pin 일치·Drive 원본 보존. 실제 두 번째 모델 로딩·새 추론도 PASS |
@@ -38,10 +38,10 @@
 | 실제 부분 취소 | PASS | 새 비교 A 성공·B running 중 UI 취소→partial. A 오디오 보존·B 파일/출력/오디오 없음·API 409·평가 비활성·worker 0·active 없음 |
 | 최초 A 브라우저 저장 기록 | 확인 | 이번 M5의 기존 다운로드 파일 207,404 bytes가 원본 A WAV SHA-256과 일치. Chrome 기존 이력 complete·interrupt 0·danger 0과 연결. 새 다운로드 E2E 재실행은 아님 |
 | 후속 A/B 브라우저 다운로드 | BLOCK·원인 미해결 | 두 후속 기록은 state 4·interrupt 11 FILE_BLOCKED·danger 4 MAYBE_DANGEROUS_CONTENT·0 bytes. 최초 A 저장 성공과 후속 차단을 별개로 기록 |
-| 배포용 wheel | 최종 UI 포함 새 v0.5.0 wheel PASS | 새 staging에서 빌드한 19개 package 파일이 현재 소스·두 manifest·최종 UI 번들과 원시 SHA-256 일치. 빌드 전후 현재 파일 불변·오래된 static 없음 |
-| 공개 대상 검토 | PASS | M5 최초 게시 20개 파일의 원문 대조·비변경 blob 보존 완료. 이번 후속 갱신도 확정 whitelist의 원격 고정 커밋 UTF-8 원문 대조·비변경 blob 보존·삭제 0 절차 적용 |
+| 배포용 wheel | 최종 UI 포함 새 v0.5.0 wheel PASS | 새 staging에서 빌드한 당시 19개 package 파일이 빌드 시점 소스·두 manifest·최종 UI 번들과 원시 SHA-256 일치. 이후 서버 진단 코드 변경을 포함한 현재 wheel 검증을 뜻하지 않음 |
+| 공개 대상 검토 | PASS | M5 최초 게시 20개 파일의 원문 대조·비변경 blob 보존 완료. 이번 진단 코드·문서 갱신도 확정 whitelist의 원격 고정 커밋 UTF-8 원문 대조·비변경 blob 보존·삭제 0 절차 적용 |
 
-최종 GPU 검증 소스는 inference SHA-256 `c879355fa05f55f97660ef3a5e64fcfa2f2ad5b151665f5bce2b7fbe8919cfe8`, worker SHA-256 `f861269a1c0ac58efa2e5a9b468cf641642c55ce12a5c36b65cf3c61f6adf059`에 연결한다. 마지막 UI 표시 수정은 모델 실행 소스를 바꾸지 않는다. 최종 새 wheel은 138,473 bytes이며 SHA-256은 `2d7e9e4fc9d61b0f3fb77c028cdcb0717ab375f909b21640af9e067ca8c35a13`다. 새 staging의 출처·빌드·19개 원시 파일 대조 기록은 `<private_app>/m5-final-wheel-eaca08f706fb43d984e98c99107ea974/`에 보존한다. 이전 wheel을 재사용하지 않았다. 공개 저장소에는 wheel·생성 UI 번들 자체를 넣지 않는다.
+기존 실제 GPU 검증 시점의 소스는 inference SHA-256 `c879355fa05f55f97660ef3a5e64fcfa2f2ad5b151665f5bce2b7fbe8919cfe8`, worker SHA-256 `f861269a1c0ac58efa2e5a9b468cf641642c55ce12a5c36b65cf3c61f6adf059`에 연결한다. 당시 마지막 UI 표시 수정은 모델 실행 소스를 바꾸지 않았다. 이후 서버 진단 코드의 별도 변경과 구분한다. 당시 최종 새 wheel은 138,473 bytes이며 SHA-256은 `2d7e9e4fc9d61b0f3fb77c028cdcb0717ab375f909b21640af9e067ca8c35a13`다. 새 staging의 출처·빌드·19개 원시 파일 대조 기록은 `<private_app>/m5-final-wheel-eaca08f706fb43d984e98c99107ea974/`에 보존한다. 이전 wheel을 재사용하지 않았다. 공개 저장소에는 wheel·생성 UI 번들 자체를 넣지 않는다.
 
 ## 실제 새 정상 비교
 
@@ -90,7 +90,7 @@ A 성공 오디오를 보존하고 B는 WAV 파일·성공 output·audio URL이 
 
 영속 ledger의 in_flight를 동작 전에 저장하고 timeout·도구 오류·응답 누락 후 결과를 indeterminate로 기록한다. 같은 세션에서 A 재클릭과 B 진행을 중단하며 경로 반환만으로 무결성 PASS를 선언하지 않는다. 이번 6개 오프라인 mock 테스트는 이 계약만 검증했다. CUA의 150,000ms 인자 수용은 단순 출력으로만 확인했으며 150초 지속 실행·브라우저 동작·다운로드·GPU 실행은 수행하지 않았다. 이것은 추가 다운로드 권한이나 Chrome 차단 해결의 근거가 아니다.
 
-## 최신 제한 재현 승인과 실제 결과
+## 로그 보강 전 1차 제한 재현
 
 사용자는 앞선 읽기 전용 조사 후 보안 설정을 유지하고 원인 로그를 먼저 준비한 제한 다운로드 재현·검증·문서·저장소 반영을 별도로 승인했다. 이번 지정 진단에 한해 기존 추가 다운로드 중단 지시를 대체하며 자동 반복·다른 방식 저장·정책/보안/확장/CDP 설정 변경을 허용하지 않는다. 같은 M5 기존 WAV는 이 재현의 지정 원본으로만 사용하고 새 TTS 성공 근거로 사용하지 않는다.
 
@@ -98,9 +98,31 @@ A 성공 오디오를 보존하고 B는 WAV 파일·성공 output·audio URL이 
 
 읽기 전용 지원 이벤트에서 A 다운로드 시작과 progress canceled·0 bytes를 확인했고 같은 항목의 새 브라우저 기록은 state 4·FILE_BLOCKED 11·danger 4·0 bytes·빈 MIME이었다. 기준 해당 기록은 3개에서 4개가 됐으며 대상 파일은 없었다. 이벤트와 새 기록의 연결은 비공개 식별값으로 확인하고 공개하지 않는다. A 클릭 1회·B 0회·재시도 0회·보안/정책/확장/CDP 설정 변경 0회·새 모델 추론 0회다.
 
-읽기 전용 Network 이벤트 조회에서는 해당 요청·응답·loadingFailed·ExtraInfo 이벤트를 얻지 못했고, 확인한 서버 실행 stdout/stderr도 비어 있었다. 앱 handler는 요청 로그를 남기지 않는 현재 구현이다. 따라서 GET의 서버 도달 여부는 미확정이며 0 bytes·빈 MIME만으로 HTTP 응답 이전에 차단됐다고 확정하지 않는다.
+읽기 전용 Network 이벤트 조회에서는 해당 요청·응답·loadingFailed·ExtraInfo 이벤트를 얻지 못했고, 확인한 서버 실행 stdout/stderr도 비어 있었다. 당시 앱 handler는 요청 로그를 남기지 않았다. 따라서 GET의 서버 도달 여부는 미확정이며 0 bytes·빈 MIME만으로 HTTP 응답 이전에 차단됐다고 확정하지 않는다.
 
 **명시 timeout을 적용한 정상 클릭 반환 뒤에도 FILE_BLOCKED가 재현됐으므로 timeout 수정은 현재 차단의 해결이 아니다.** 보안 callback·대상 결정의 발신 원인 로그는 포착하지 못해 근본 원인은 여전히 미확정이다. 이번 결과는 기존 원본의 다운로드 진단이며 새 TTS 성공이나 M5 전체 PASS가 아니다. 독립 읽기 전용 검토에서 기존 3개 기록의 모든 기존 필드 불변·새 항목 정확히 1개·이벤트와 새 브라우저 항목의 연결·대상 파일 부재를 확인했다. 이벤트 결과는 hasMore=false·truncated=false였고 클릭은 313ms 정상 반환이었다. 비공개에는 baseline·단일 시도 ledger·이벤트·사후 기록·독립 검토를 보존한다. [한정 승인](APPROVALS.md) · [호출 계약](DOWNLOAD_VALIDATION.md)
+
+## 로그 보강 후 2차 제한 재현
+
+앞선 1회 재현은 위 결과로 완료됐다. 사용자는 이어 서버의 opt-in 개인정보 최소화 진단 로그 구현·검증·로컬 재시작, 지원되는 브라우저 관찰 로그 준비, 준비 후 보안 설정을 유지한 별도 1회 재현·결과 반영을 새로 승인했다. 서버 진단 코드 구현·검증·로컬 기동과 이번 별도 단일 재현을 수행했다. 서버 응답은 확인했지만 브라우저 종결 결과는 indeterminate다. 앞선 관측을 이번 실행 결과로 대체하지 않는다.
+
+같은 M5 기존 A WAV만 진단 원본으로 지정하고 새 TTS 추론은 하지 않는다. 쿠키·토큰·비밀값 수집, 정책·보안·확장·CDP download behavior 변경, 다른 방식 저장 우회와 자동 반복은 금지한다. 새 진단 출처·원시 로그는 비공개에 보존한다. 서버 코드가 바뀌므로 기존 GPU·123개 테스트·wheel 검증은 당시 이력이며 새 진단 코드의 검증·재현 증거를 별도로 기록한다. 기존 wheel에는 새 진단 코드가 없고 이번 진단 코드 포함 wheel을 새로 만들지 않았다. [새 한정 승인](APPROVALS.md)
+
+### 서버 opt-in 개인정보 최소화 로그 구현
+
+새 `download_diagnostics.py`와 서버 연결은 프로세스 환경변수 `AI_MANAGER_DOWNLOAD_DIAGNOSTICS=1`일 때만 동작한다. 기본값 off에서는 로그 파일을 만들지 않으며 진단 health 경로는 404다. 활성화 시 새 비공개 세션 폴더에 JSONL을 생성한다. 로그는 GET 오디오·진단 health 경로만 관찰하고 route 별칭·생성 request ID·시각·응답 상태·allowlist MIME·안전한 attachment filename·길이·기록 단계·서버가 쓴 바이트 수를 남긴다. 원시 헤더·query·body·입력 텍스트·개인 파일 경로·쿠키·인증 토큰을 기록하지 않는다.
+
+세션당 1,000개 레코드 상한·thread lock·flush를 적용한다. 로그 I/O 실패는 앱 처리를 유지하되 진단 health를 false로 만든다. 서버의 request_received→response_prepared→headers_sent→body_written→response_complete 또는 오류 단계를 구분한다. 서버 write/flush 완료는 브라우저 수신·다운로드 저장 완료를 증명하지 않는다.
+
+새 서버 진단 코드 SHA-256은 `319407cfbe4ab9e4c6a233970c29253fd793f5497ccc998784cbb3b00012657d`(server.py), `2b64de9df819432fd44e8a52485bb06c18eaddc07f544bcc6cf7e946c039ef78`(download_diagnostics.py)다. 새 합성 테스트 4개와 기존 서버 테스트 3개를 통과했다. 기본 off 무파일, query/비밀값 제외·thread 동시 기록·상한, 로그 실패 health, 합성 HTTP 성공/403/404·응답 헤더 보존을 확인했다. 승인된 기존 idle 서버를 정상 종료하고 앱의 기존 가상환경으로 진단을 켠 새 서버를 기동했다. health healthy=true와 실제 JSONL 5단계의 비민감 health 응답을 확인했으며 이 준비 검증에서 실제 오디오 요청은 0회였다. 초기 잘못 선택한 시스템 Python은 의존성 부재로 종료했고 기존 앱 환경으로 바로잡았다. 새 패키지 설치·보안 설정 변경은 하지 않았다.
+
+### 브라우저 관찰 로그 준비와 이번 서버 관측
+
+설치 버전의 지원 기능으로 `Network.enable`을 호출해 네트워크 이벤트 관찰을 준비했다. download behavior·보안 설정 변경과 구분한다. callback 주체나 OS 보안 제품의 원인 코드까지 포착한다고 보장하지 않으며 쿠키·인증 헤더는 보존하지 않는다. 사전 준비에서 health 요청의 브라우저 Network request/response 200·loadingFinished와 서버 5단계 기록을 확인해 관찰 기능 준비를 검증했다. 이후 이번 지정 A 원본 링크를 한 번 클릭했고 323ms에 정상 반환했다. 서버 독립 로그는 기준 30개에서 35개로 늘었으며 attachment 요청 하나의 GET 수신→응답 준비→헤더 전송→body write→flush 완료 5단계가 연결됐다. HTTP 200·audio/wav·정확한 A attachment filename·Content-Length 207,404·쓰기 207,404 bytes를 확인했다. 정확한 파일명과 원시 로그는 비공개에 보존하고 공개하지 않는다. 원시 시각상 클릭은 UTC 16:22:30.585~16:22:30.908, 서버 응답 단계는 UTC 16:22:30.656~16:22:30.690으로 기록됐다. 독립 서버 로그 검토도 새 request 1개·5개 단계와 write/flush 바이트를 확인했다.
+
+이번에는 GET의 서버 도달과 응답 바이트 작성·flush를 직접 확인했다. 앞선 재현의 서버 도달 미확인 한계는 그 이전 시도에 그대로 적용한다. 이번 서버 작성 완료도 브라우저 수신·파일 저장 성공을 증명하지 않는다. 브라우저 다운로드 시작 이벤트는 관찰했지만 progress·Browser 종결 이벤트나 정확한 오디오 Network 실패 이벤트는 확인하지 못했다. 조회는 truncated=false였으나 관찰되지 않은 이벤트의 원인이나 저장 상태를 확정하지 않는다. 활성 History의 일반 읽기 전용(mode=ro) 조회는 확인한 두 프로필에서 오류가 났고 rollback journal이 존재했다. immutable 조회에서 새 행이 없다는 사실만으로 최신 이력을 온전히 읽었다고 보장할 수 없어 완료·실패·차단으로 판정하지 않는다.
+
+JavaScript dialog 조회는 null이었지만 native 저장·권한 prompt의 존재 여부를 판정하지 못한다. 사용자에게 추가 버튼을 누르지 않고 현재 표시 문구만 확인해 달라고 요청했고 답을 기다리는 상태다. 추가 클릭·B 진행·재시도·보안 설정 변경은 하지 않았다. 현재 결과는 **서버 도달·응답 작성 확인 / 브라우저 수신·저장·종료 상태 indeterminate / 근본 원인 미확정**이다. 앞선 FILE_BLOCKED 기록을 이번 시도의 종결 결과로 대체하지 않는다. 현재 구현·관측·한계를 게시하되 사용자 답변과 종결 증거가 오면 별도로 갱신한다.
 
 ## 보존·재사용·공개 범위
 

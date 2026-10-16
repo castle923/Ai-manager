@@ -5,6 +5,8 @@ import threading
 import webbrowser
 from pathlib import Path
 import mimetypes
+import os
+from .download_diagnostics import DownloadDiagnostics
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit, parse_qs
 
@@ -19,6 +21,7 @@ def serve(home, settings, auth, browser=webbrowser.open, port=0):
     from .preparation import Preparation
     preparation = Preparation(home, settings, auth)
     inference = Inference(home)
+    diagnostics = DownloadDiagnostics(home, enabled=os.environ.get("AI_MANAGER_DOWNLOAD_DIAGNOSTICS") == "1")
     csrf = secrets.token_urlsafe(32)
     job_lock = threading.Lock()
     cancel = threading.Event()
@@ -61,6 +64,17 @@ def serve(home, settings, auth, browser=webbrowser.open, port=0):
 
         def reply(self, status, data, content_type="application/json; charset=utf-8", download=None):
             body = data if isinstance(data, bytes) else data.encode() if isinstance(data, str) else json.dumps(data, ensure_ascii=False).encode()
+            context = getattr(self, "diagnostic_context", None)
+            diagnostics.record(context, "response_prepared", status=status, mime=content_type, download=download, content_length=len(body))
+            stage = "response_headers"
+            try:
+                self._write_reply(status, body, content_type, download, context)
+            except (OSError, ValueError):
+                diagnostics.record(context, "response_error", error_stage=getattr(self, "diagnostic_stage", stage))
+                raise
+
+        def _write_reply(self, status, body, content_type, download, context):
+            self.diagnostic_stage = "response_headers"
             self.send_response(status)
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(body)))
@@ -70,12 +84,28 @@ def serve(home, settings, auth, browser=webbrowser.open, port=0):
                 self.send_header("Content-Disposition", 'attachment; filename="' + download + '"')
             self.send_header("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
             self.end_headers()
-            self.wfile.write(body)
+            diagnostics.record(context, "headers_sent", status=status)
+            self.diagnostic_stage = "response_body"
+            written = self.wfile.write(body)
+            diagnostics.record(context, "body_written", bytes_written=written if written is not None else len(body))
+            self.diagnostic_stage = "response_flush"
+            self.wfile.flush()
+            diagnostics.record(context, "response_complete", bytes_written=written if written is not None else len(body))
 
         def do_GET(self):
+            self.diagnostic_context = diagnostics.begin("GET", self.path)
+            try:
+                return self._do_GET()
+            except Exception:
+                diagnostics.record(self.diagnostic_context, "request_error", error_stage="handler")
+                raise
+
+        def _do_GET(self):
             if not self.allowed():
                 return self.reply(403, {"error": "forbidden"})
             path = urlsplit(self.path).path
+            if path == "/api/diagnostics/health":
+                return self.reply(200 if diagnostics.enabled else 404, diagnostics.health() if diagnostics.enabled else {"error": "not_found"})
             if path == "/api/tts/status":
                 return self.reply(200, inference.snapshot())
             if path == '/api/comparisons/status':
