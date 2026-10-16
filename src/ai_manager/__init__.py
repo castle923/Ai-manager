@@ -1,1 +1,1 @@
-"""New M1 implementation; no model execution or downloads."""
+"""Private local model inventory, verified preparation and approved TTS."""

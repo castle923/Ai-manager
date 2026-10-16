@@ -1,4 +1,4 @@
-"""Loopback dashboard and approved asset preparation; no model inference."""
+"""Loopback dashboard, approved asset preparation and bounded local TTS."""
 import json
 import secrets
 import threading
@@ -9,13 +9,16 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit, parse_qs
 
 from .auth import AuthError
+from .inference import Inference, InferenceError
+import re
 
 
-def serve(home, settings, auth, browser=webbrowser.open):
+def serve(home, settings, auth, browser=webbrowser.open, port=0):
     from .inventory import Inventory
     from .dashboard import Dashboard
     from .preparation import Preparation
     preparation = Preparation(home, settings, auth)
+    inference = Inference(home)
     csrf = secrets.token_urlsafe(32)
     job_lock = threading.Lock()
     cancel = threading.Event()
@@ -56,13 +59,15 @@ def serve(home, settings, auth, browser=webbrowser.open):
             expected = f"127.0.0.1:{self.server.server_port}"
             return self.headers.get("Host") == expected and self.headers.get("Origin", "http://" + expected) == "http://" + expected
 
-        def reply(self, status, data, content_type="application/json; charset=utf-8"):
-            body = data.encode() if isinstance(data, str) else json.dumps(data, ensure_ascii=False).encode()
+        def reply(self, status, data, content_type="application/json; charset=utf-8", download=None):
+            body = data if isinstance(data, bytes) else data.encode() if isinstance(data, str) else json.dumps(data, ensure_ascii=False).encode()
             self.send_response(status)
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
+            if download:
+                self.send_header("Content-Disposition", 'attachment; filename="' + download + '"')
             self.send_header("Content-Security-Policy", "default-src 'self'; script-src 'self'; style-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'")
             self.end_headers()
             self.wfile.write(body)
@@ -71,6 +76,16 @@ def serve(home, settings, auth, browser=webbrowser.open):
             if not self.allowed():
                 return self.reply(403, {"error": "forbidden"})
             path = urlsplit(self.path).path
+            if path == "/api/tts/status":
+                return self.reply(200, inference.snapshot())
+            match = re.fullmatch(r"/api/tts/runs/([a-f0-9]{32})(/audio)?", path)
+            if match:
+                try:
+                    if match[2]:
+                        return self.reply(200, inference.audio(match[1]), "audio/wav", match[1] + '.wav' if parse_qs(urlsplit(self.path).query).get('download') == ['1'] else None)
+                    return self.reply(200, {"run": inference.get(match[1])})
+                except InferenceError as error:
+                    return self.reply(404 if str(error) == 'run_not_found' else 409, {"error": str(error)})
             if path == "/":
                 entry = Path(__file__).parent / "static" / "index.html"
                 if not entry.is_file():
@@ -103,7 +118,6 @@ def serve(home, settings, auth, browser=webbrowser.open):
             if path == "/api/status":
                 return self.reply(200, state())
             if path == "/api/files":
-                import re
                 try:
                     query = parse_qs(urlsplit(self.path).query)
                     scan_id = query["scan"][0]
@@ -122,9 +136,22 @@ def serve(home, settings, auth, browser=webbrowser.open):
                 return self.reply(415, {"error": "json_required"})
             try:
                 length = int(self.headers.get("Content-Length", "0"))
-                if not 0 < length <= 1024:
+                if not 0 < length <= 4096:
                     raise ValueError()
                 data = json.loads(self.rfile.read(length))
+                if self.path == '/api/tts/runs' or re.fullmatch(r'/api/tts/runs/[a-f0-9]{32}/cancel', self.path):
+                    if not isinstance(data, dict): raise ValueError()
+                    try:
+                        if self.path == '/api/tts/runs':
+                            if set(data) != {'text'}: raise InferenceError('invalid_request')
+                            result = inference.create(data['text'])
+                        else:
+                            if data: raise InferenceError('invalid_request')
+                            result = inference.cancel(self.path.split('/')[4])
+                        return self.reply(202, {'run': result})
+                    except InferenceError as error:
+                        code = str(error)
+                        return self.reply(404 if code == 'run_not_found' else 409 if code in {'queue_full', 'operation_running'} else 400, {'error': code})
                 if not isinstance(data, dict) or not isinstance(data.get("action"), str):
                     raise ValueError()
                 action, account = data["action"], data.get("account")
@@ -147,13 +174,16 @@ def serve(home, settings, auth, browser=webbrowser.open):
             threading.Thread(target=work, args=(action, account), daemon=True).start()
             self.reply(202, {"status": "started"})
 
-    with ThreadingHTTPServer(("127.0.0.1", 0), Handler) as server:
+    with ThreadingHTTPServer(("127.0.0.1", port), Handler) as server:
         server.daemon_threads = True
         server.timeout = 1
         url = f"http://127.0.0.1:{server.server_port}/"
         print("Ai-manager 로컬 화면: " + url, flush=True)
         browser(url)
-        server.serve_forever()
+        try:
+            server.serve_forever()
+        finally:
+            inference.close()
 
 
 HTML = """<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ai-manager · M1</title><link rel="stylesheet" href="/style.css"><body><main><p class="eyebrow">AI-MANAGER / M1</p><h1>내 모델 목록 연결</h1><p>두 계정의 지정 폴더를 읽기 전용으로 확인합니다. 파일 내용 다운로드와 모델 실행은 이후 단계입니다.</p><section id="accounts" aria-label="계정 연결"></section><section><h2>진행 상태</h2><p id="task" role="status" aria-live="polite"></p><button id="cancel">현재 작업 취소</button></section><section><h2>이번 앱의 수집 기록</h2><p>완료·부분 실패·과거 스캔을 구분합니다. 파일 발견은 구성·무결성·실행 검증을 뜻하지 않습니다.</p><label for="scan-select">조회할 수집 기록</label><select id="scan-select"></select><p id="inventory"></p><p id="scan-errors" role="status"></p><div class="table-wrap"><table><thead><tr><th scope="col">파일 이름</th><th scope="col">후보 종류</th><th scope="col">크기</th><th scope="col">수정일</th><th scope="col">발견 위치</th></tr></thead><tbody id="files"></tbody></table></div><p id="page-info"></p><button id="previous">이전 50개</button><button id="next">다음 50개</button></section><p id="error" role="alert"></p></main><script src="/app.js"></script></body></html>"""
