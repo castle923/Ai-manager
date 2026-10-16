@@ -49,3 +49,11 @@
 ### 로그 보강 재현의 종결 한계
 
 사전 health Network request/response 200·loadingFinished와 서버 5단계로 준비 상태를 확인했다. 새 시도는 323ms 정상 클릭 반환과 서버의 단일 attachment GET·200 audio/wav·207,404바이트 응답 작성/flush·브라우저 다운로드 시작 이벤트까지 확인했다. 브라우저 수신·저장 성공은 별도이며 종결 이벤트는 확인하지 못했다. 활성 History의 mode=ro 조회는 확인한 두 프로필에서 오류가 났고 rollback journal이 존재해 immutable 조회의 새 행 부재만으로 최신 완료·실패 상태를 확정하지 않는다. JavaScript dialog null도 native 저장·권한 prompt 부재를 증명하지 않는다. 사용자는 현재 저장·허용·native prompt가 보이지 않는다고 답했다. 이는 현재 화면 관찰이며 해당 시도의 과거 prompt나 다운로드 종결 상태를 단독 증명하지 않는다. 같은 시도의 기존 기록을 한 번 더 읽기 전용으로 확인했다. terminal 이벤트 일치 0개지만 truncated=true여서 종결 이벤트 부재를 단정하지 않는다. 일반 mode=ro/query_only의 3개 프로필 중 1개는 해당 기록이 없고 활성 2개는 database locked·rollback journal 상태여서 최신 종결을 판정할 수 없다. immutable fallback은 최신 판정에 사용하지 않았다. 추가 클릭·다운로드 0회이며 client 종결·저장 무결성·근본 원인은 indeterminate로 남긴다. 이 사용자 관찰은 새 재시도 승인이 아니다. 이전 FILE_BLOCKED 이력과 이번 미확정 결과를 구분한다.
+
+## 명시적 Edge 전환의 한정 진단
+
+사용자가 Edge 전환을 명시 승인하여 정상 지원 연결로 앱·health·관찰 로그 준비를 확인한 뒤 단일 재현을 수행했다. 같은 M5 A 원본 저장 링크를 승인 범위에서 한 번 클릭했고 지원 download 이벤트 대기가 경로를 반환했다. Page 진행 207,404/207,404 bytes·completed·truncated=false를 확인했으며 실제 파일 207,404 bytes·지정 A 원본 SHA-256 일치와 독립 읽기 전용 파일 검사를 완료했다. 서버 독립 로그도 정확히 attachment 요청 하나의 5단계·HTTP 200·audio/wav·207,404 bytes write/flush를 확인했다. Edge의 정상 지원 단일 A 경로는 검증됐으나 Chrome 차단 원인·앞선 Chrome 시도의 client 종결 상태는 미확정이다. Edge History 잠금으로 추가 조회하지 않았으며 History 종결을 검증했다고 주장하지 않는다. 명시 deny가 나오면 중단하고 정책·보안·확장·CDP download behavior 변경이나 반복·다른 방식 저장으로 우회하지 않는다. Edge의 정책·위험 분류 존재 여부를 미리 단정하지 않는다. 이 한정 승인은 이전 Chrome 저장 결과를 확정하지 않으며 Chrome 근본 원인이나 기존 차단 해결로 표시하지 않는다. 준비 관측만의 timeout은 클릭 0회에서 발생했고 실제 재현은 observer와 anchor를 같은 외부 150초 호출로 수행했다. 브라우저와 관찰 호출 경로가 모두 달라 단일 변수 비교로 해석하지 않는다.
+
+Edge 실제 재현은 클릭 전에 지원 download observer를 설치하고 외부 150,000ms·observer 45,000ms·클릭 120,000ms를 같은 호출에 적용했다. observer의 경로 반환·Page completed·실제 저장 파일 해시와 서버 로그를 연결했다. B·재시도·downloadMedia·새 TTS 추론·보안 설정 변경은 0회다. 준비 관측 timeout은 다운로드 클릭 전에 발생한 별도 기록이며 실제 시도의 실패로 섞지 않는다. 명시 승인된 Edge A 경로 성공을 Chrome 차단 해결·브라우저만 바꾼 단일 변수 효과·M5 전체 PASS로 확대하지 않는다.
+
+Edge B 다운로드는 이번 범위에서 수행하지 않아 미검증이다. 사용자 요청에 따라 이후 이 프로젝트 브라우저 작업은 Edge를 선호하며 전역 기본 브라우저 설정은 변경하지 않는다.
