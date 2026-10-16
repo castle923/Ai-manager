@@ -8,14 +8,15 @@ from .config import SettingsStore, private_home
 from .security import SecretStore
 
 
-def services():
-    home = private_home()
+def services(home=None):
+    home = private_home(home)
     settings = SettingsStore(home).load()
     return home, settings, AuthManager(settings, SecretStore(home / "credentials"))
 
 
 def main():
     parser = argparse.ArgumentParser(description="Ai-manager: 읽기 전용 모델 조회와 선정 자산 준비")
+    parser.add_argument("--home", help="명시적 절대경로의 별도 앱 홈; 기존 홈을 복사하지 않음")
     sub = parser.add_subparsers(dest="command", required=True)
     init = sub.add_parser("init", help="명시 지정된 입력으로 새 앱 설정 생성")
     init.add_argument("--allowlist", required=True)
@@ -24,19 +25,40 @@ def main():
         p = sub.add_parser(name)
         p.add_argument("account", choices=["A", "B"])
     sub.add_parser("prepare", help="승인된 첫 모델의 새 로컬 준비")
+    local = sub.add_parser("prepare-local", help="명시 지정한 모델 파일만 새 준비 실행으로 복사·해시 검증")
+    from .models import model_ids
+    local.add_argument("--model-id", choices=model_ids(), required=True)
+    local.add_argument("--source", required=True)
     sub.add_parser("runtime-check", help="독립 추론 환경 import/CUDA 검사, 추론 없음")
     sub.add_parser("preparation-status")
     sub.add_parser("status")
-    sub.add_parser("serve", help="로컬 모델 조회·준비 대시보드")
+    backup = sub.add_parser("db-backup", help="SQLite backup API로 새 파일에만 일관 스냅샷 생성")
+    backup.add_argument("--destination", required=True)
+    restore = sub.add_parser("db-restore", help="검증한 DB를 새 대상에만 복원; 기존 DB 보존")
+    restore.add_argument("--source", required=True)
+    restore.add_argument("--destination", required=True)
+    server_parser = sub.add_parser("serve", help="로컬 모델 조회·준비 대시보드")
+    server_parser.add_argument("--port", type=int, default=0, help="loopback 포트; 기본값은 자동 선택")
+    server_parser.add_argument("--no-browser", action="store_true", help="브라우저 자동 열기 생략")
     args = parser.parse_args()
     try:
-        if args.command == "init":
+        selected_home = private_home(args.home)
+        if args.command == "serve" and not 0 <= args.port <= 65535:
+            raise ValueError("Invalid loopback port")
+        if args.command in ("db-backup", "db-restore"):
+            from .db_recovery import copy_database_to_new_target
+            result = copy_database_to_new_target(selected_home / "inventory.sqlite3" if args.command == "db-backup" else args.source, args.destination)
+        elif args.command == "init":
             client_config(args.client)
-            SettingsStore(private_home()).initialize(args.allowlist, args.client)
+            SettingsStore(selected_home).initialize(args.allowlist, args.client)
             result = {"status": "initialized", "settings_version": 1}
         else:
-            home, settings, auth = services()
-            if args.command in ("prepare", "runtime-check", "preparation-status"):
+            home, settings, auth = services(selected_home)
+            if args.command == "prepare-local":
+                from .preparation import Preparation
+                state = Preparation(home, settings, auth, model_id=args.model_id).prepare_local(args.source)
+                result = {key: state[key] for key in ("id", "status", "files_verified", "downloaded_bytes", "integrity")}
+            elif args.command in ("prepare", "runtime-check", "preparation-status"):
                 from .preparation import Preparation
                 prep = Preparation(home, settings, auth)
                 result = prep.prepare() if args.command == "prepare" else prep.probe_runtime() if args.command == "runtime-check" else prep.snapshot()
@@ -56,7 +78,10 @@ def main():
                 result = {"credential_saved": {a: bool(auth.store.get(a)) for a in ("A", "B")}, "inventory": Inventory(home).summary()}
             else:
                 from .server import serve
-                serve(home, settings, auth)
+                options = {"port": args.port}
+                if args.no_browser:
+                    options["browser"] = lambda url: None
+                serve(home, settings, auth, **options)
                 return
         print(json.dumps(result, ensure_ascii=False))
     except KeyboardInterrupt:
@@ -65,8 +90,10 @@ def main():
     except AuthError as error:
         print(json.dumps({"error": str(error)}))
         sys.exit(1)
-    except (ValueError, KeyError, OSError):
-        print(json.dumps({"error": "configuration_or_local_io_failed"}))
+    except (ValueError, KeyError, OSError) as error:
+        safe_errors = {"database_integrity_failed", "database_schema_unsupported", "database_source_missing", "database_destination_exists", "database_unreadable_or_corrupt", "database_backup_timeout", "absolute_database_paths_required", "unsafe_local_path"}
+        code = str(error)
+        print(json.dumps({"error": code if code in safe_errors else "configuration_or_local_io_failed"}))
         sys.exit(1)
     except Exception:
         # requests exceptions can contain request URLs. Never expose raw details.

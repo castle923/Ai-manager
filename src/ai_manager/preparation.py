@@ -213,6 +213,62 @@ class Preparation:
             if str(item.get('size'))!=str(expected):raise PreparationError('source_changed')
         return mapping
 
+    def prepare_local(self, source_directory):
+        """Explicit designated model files only; new bytes, hashes and provenance."""
+        from .inference import FileOwner, regular
+        if not ACTIVE.acquire(False): raise PreparationError('operation_running')
+        owner = None; run = None; state = None
+        try:
+            source = Path(source_directory)
+            if not source.is_absolute() or '..' in source.parts: raise PreparationError('unsafe_local_path')
+            regular(source, Path(source.anchor))
+            if not source.is_dir(): raise PreparationError('source_missing')
+            regular(self.base, self.home)
+            self.base.mkdir(parents=True, exist_ok=True)
+            owner = FileOwner(self.base/'preparation.lock')
+            if not owner.handle: raise PreparationError('operation_running')
+            m = manifest(self.model_id); run_id = uuid.uuid4().hex
+            run = self.base/run_id; run.mkdir(exist_ok=False)
+            state = dict(id=run_id,pid=os.getpid(),status='verifying',downloaded_bytes=0,total_bytes=sum(f['size'] for f in m['files']),current_file=None,files_verified=0,files=[dict(f,downloaded_bytes=0,status='pending',origin='designated_local_model_component') for f in m['files']],configuration='unverified',integrity='unverified',runtime='unverified',execution='not_run',error=None,started_at=now())
+            self._save(state,run)
+            provenance = dict(run_id=run_id,model=m['name'],revision=m['revision'],source=m['source'],kind='explicit_designated_local_model_components',source_directory=str(source),files=[])
+            for item in state['files']:
+                relative = safe_relative(item['path']); original = regular(source/relative, Path(source.anchor))
+                if not original.is_file(): raise PreparationError('missing_component')
+                before = original.stat()
+                if before.st_size != item['size']: raise PreparationError('size_mismatch')
+                target = regular(run/'assets'/relative,self.home); target.parent.mkdir(parents=True,exist_ok=True)
+                part = target.with_name(target.name+'.part')
+                state['current_file'] = item['path']; self._save(state,run)
+                sha = hashlib.sha256(); count = 0
+                with original.open('rb') as incoming, part.open('xb') as outgoing:
+                    for block in iter(lambda: incoming.read(1024*1024), b''):
+                        count += len(block)
+                        if count > item['size']: raise PreparationError('size_mismatch')
+                        outgoing.write(block); sha.update(block)
+                    outgoing.flush(); os.fsync(outgoing.fileno())
+                after = original.stat(); regular(original,Path(source.anchor))
+                if (before.st_size,before.st_mtime_ns) != (after.st_size,after.st_mtime_ns): raise PreparationError('source_changed')
+                if count != item['size']: raise PreparationError('size_mismatch')
+                if sha.hexdigest() != item['sha256']: raise PreparationError('hash_mismatch')
+                os.link(part,target); part.unlink()
+                stat = target.stat(); item.update(status='verified',downloaded_bytes=count,verified_stat=[stat.st_size,stat.st_mtime_ns])
+                state['downloaded_bytes'] += count; state['files_verified'] += 1
+                provenance['files'].append(dict(path=item['path'],size=count,sha256=sha.hexdigest(),origin='designated_local_model_component'))
+                atomic_text(run/'inputs.json',json.dumps(provenance,indent=2)); self._save(state,run)
+            state.update(status='ready',configuration='complete',integrity='matched',current_file=None,finished_at=now())
+            self._save(state,run)
+            return state
+        except Exception as error:
+            if state is not None:
+                code = str(error)
+                state.update(status='failed',error=code if re.fullmatch('[a-z0-9_]+',code) else 'preparation_io_failed',finished_at=now())
+                self._save(state,run)
+            raise
+        finally:
+            if owner: owner.close()
+            ACTIVE.release()
+
     def prepare(self,cancel=None):
         if not ACTIVE.acquire(False):raise PreparationError('operation_running')
         try:

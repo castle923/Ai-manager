@@ -5,7 +5,15 @@ import os
 from pathlib import Path
 
 
-def private_home():
+def private_home(override=None):
+    if override is not None:
+        value = Path(override)
+        if not value.is_absolute() or '..' in value.parts:
+            raise ValueError("App home must be an absolute path without traversal")
+        for item in (value, *value.parents):
+            if item.is_symlink() or (item.exists() and getattr(item.lstat(), 'st_file_attributes', 0) & 0x400):
+                raise ValueError("App home cannot use reparse paths")
+        return value.resolve()
     return Path(os.environ["LOCALAPPDATA"]) / "AiManager" / "m1-20261016"
 
 

@@ -5,7 +5,7 @@
   font-synthesis: none;
   font-size: 14px;
   line-height: 1.55;
-  --muted: #69768b;
+  --muted: #5e6d82;
   --line: #e4e9f0;
   --blue: #3164dd;
   --navy: #101c2c;
@@ -427,7 +427,7 @@ main {
   white-space: nowrap;
 }
 .green {
-  color: #2f876c;
+  color: #246c55;
   background: #edf8f3;
   border-color: #d6ece2;
 }
@@ -438,7 +438,7 @@ main {
 }
 .neutral {
   background: #f2f5f9;
-  color: #6f819a;
+  color: #526889;
   border-color: #e7ecf3;
 }
 .panel {
@@ -2856,4 +2856,20 @@ th {
   border-radius: 7px;
   padding: 10px 12px;
   margin: 14px 0;
+}
+@media (max-width: 600px) {
+  .library-top {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding-bottom: 12px;
+  }
+  .library-top .tabs {
+    min-height: 50px;
+  }
+  .library-top .live-note {
+    align-self: flex-start;
+    text-align: left;
+    white-space: normal;
+  }
 }

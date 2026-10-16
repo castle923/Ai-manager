@@ -42,7 +42,7 @@ def regular(path, root):
     if not path.is_relative_to(root):
         raise InferenceError('unsafe_local_path')
     for item in (path, *path.parents):
-        if item.is_symlink() or (item.exists() and getattr(item.stat(), 'st_file_attributes', 0) & 0x400):
+        if item.is_symlink() or (item.exists() and getattr(item.lstat(), 'st_file_attributes', 0) & 0x400):
             raise InferenceError('unsafe_local_path')
         if item == root:
             break

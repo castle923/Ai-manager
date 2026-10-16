@@ -13,6 +13,20 @@ import uuid
 
 from .drive import Cancelled, Drive, DriveError, FOLDER, SHORTCUT, valid_id
 
+SCHEMA_SQL = """
+                CREATE TABLE IF NOT EXISTS scans (
+                    scan_id TEXT PRIMARY KEY, account TEXT NOT NULL, settings_version INTEGER NOT NULL,
+                    settings_json TEXT NOT NULL, started_at TEXT NOT NULL, finished_at TEXT,
+                    status TEXT NOT NULL, pid INTEGER NOT NULL, files_count INTEGER NOT NULL DEFAULT 0,
+                    folders_count INTEGER NOT NULL DEFAULT 0, excluded_count INTEGER NOT NULL DEFAULT 0,
+                    pages_count INTEGER NOT NULL DEFAULT 0, errors_json TEXT NOT NULL DEFAULT '[]');
+                CREATE TABLE IF NOT EXISTS files (
+                    scan_id TEXT NOT NULL REFERENCES scans(scan_id), file_id TEXT NOT NULL,
+                    root_alias TEXT NOT NULL, path TEXT NOT NULL, kind TEXT NOT NULL,
+                    metadata_json TEXT NOT NULL, PRIMARY KEY(scan_id,file_id));
+                CREATE UNIQUE INDEX IF NOT EXISTS one_running_per_account ON scans(account) WHERE status='running';
+            """
+
 _ACTIVE = set()
 _LOCK = threading.RLock()
 DENIED_FOLDERS = {".cache", "cache", "caches", "output", "outputs", "results", "result", "runs", "logs", "backup", "backups", ".git", "__pycache__", "node_modules", ".venv"}
@@ -71,19 +85,7 @@ class Inventory:
         self.session = session
         self.sleep = sleep
         with self.connect() as db, _LOCK:
-            db.executescript("""
-                CREATE TABLE IF NOT EXISTS scans (
-                    scan_id TEXT PRIMARY KEY, account TEXT NOT NULL, settings_version INTEGER NOT NULL,
-                    settings_json TEXT NOT NULL, started_at TEXT NOT NULL, finished_at TEXT,
-                    status TEXT NOT NULL, pid INTEGER NOT NULL, files_count INTEGER NOT NULL DEFAULT 0,
-                    folders_count INTEGER NOT NULL DEFAULT 0, excluded_count INTEGER NOT NULL DEFAULT 0,
-                    pages_count INTEGER NOT NULL DEFAULT 0, errors_json TEXT NOT NULL DEFAULT '[]');
-                CREATE TABLE IF NOT EXISTS files (
-                    scan_id TEXT NOT NULL REFERENCES scans(scan_id), file_id TEXT NOT NULL,
-                    root_alias TEXT NOT NULL, path TEXT NOT NULL, kind TEXT NOT NULL,
-                    metadata_json TEXT NOT NULL, PRIMARY KEY(scan_id,file_id));
-                CREATE UNIQUE INDEX IF NOT EXISTS one_running_per_account ON scans(account) WHERE status='running';
-            """)
+            db.executescript(SCHEMA_SQL)
             for row in db.execute("SELECT scan_id,pid FROM scans WHERE status='running'").fetchall():
                 if row["scan_id"] not in _ACTIVE and (row["pid"] == os.getpid() or not _alive(row["pid"])):
                     db.execute("UPDATE scans SET status='interrupted',finished_at=?,errors_json=? WHERE scan_id=?",
