@@ -1,16 +1,16 @@
 # 실행 전 준비 안내
 
-현재 판정: **조사·설계·OAuth 파일 준비 완료 / 앱 실인증 미검증(전체 PASS 아님)**. OAuth 파일의 로컬 구조 검사는 통과했다. M1 구현·검증·저장소 반영이 승인되어 진행 중이다. 실계정 로그인·동의는 앱 준비 후 사용자가 직접 수행한다.
+현재 상태: **M1 두 계정 실인증·강제 갱신·지정 범위 수집 성공 / 승인된 M1 범위 완료**. 사용자가 두 계정 로그인·동의를 완료했고 새 앱에서 실제 읽기 전용 scope·계정 일치·DPAPI 저장을 확인했다. M0 당시 정적 준비 기록과 이후 실검증을 구분한다. [실제 집계와 확인 범위](M1_REPORT.md)
 
 ## OAuth 준비 현황
 
 | 항목 | 현재 근거와 상태 |
 |---|---|
 | 전용 Cloud 프로젝트·Drive API | 사용자 완료 보고; 콘솔 직접 확인 미수행 |
-| External / Testing·계정 A/B test users·`drive.readonly` | 사용자 완료 보고; 실제 토큰 권한 미검증 |
+| External / Testing·계정 A/B test users·`drive.readonly` | Cloud 설정은 사용자 보고; M1에서 두 계정 실제 tokeninfo scope 확인 |
 | Desktop OAuth client·저장소 외부 JSON 다운로드 | 사용자 완료 보고 |
 | 지정 JSON | 별도 검사 에이전트의 읽기 전용 검사에서 존재·파싱·`installed`·필수 필드·프로젝트 일치·Google endpoint·loopback redirects 통과 |
-| 앱 로그인·동의·토큰 발급/갱신·Drive API | 미구현·미검증; M1에서 실제 확인 필요 |
+| 앱 로그인·동의·토큰 발급/갱신·Drive API | M1에서 두 계정 실인증·DPAPI 저장·강제 갱신·지정 범위 수집 성공 |
 
 검사는 파일 복사·수정·외부 전송·로그인 없이 수행했다. 실제 경로·프로젝트 ID·client 값·JSON 원문은 이 공개 문서에 기록하지 않는다.
 
@@ -27,14 +27,14 @@
 7. client JSON을 다운로드하여 **저장소와 Git 추적 범위 밖의 개인 보안 위치**에 보관한다. 두 계정용으로 client를 두 개 만들 필요는 없다.
 8. 준비가 끝나면 JSON이 있는 **로컬 경로만** 작업 채팅에 알려준다. JSON 내용, client secret, token, 인증 코드를 채팅·공개 저장소에 붙여넣지 않는다. 실제 경로도 공개 문서에 기록하지 않는다.
 
-Google 설정은 사용자 보고, JSON 형식은 로컬 구조 검사로 구분한다. 지금 앱 로그인을 미리 수행할 필요는 없다. M1 앱 인증 구현 후 각 계정의 동의·실제 scope·조회와 갱신을 확인한다. External / Testing에서는 refresh token 만료에 따른 재로그인이 필요할 수 있다. [공식 만료 조건](https://developers.google.com/identity/protocols/oauth2#expiration)
+Google 콘솔 설정은 사용자 보고, JSON 형식은 로컬 구조 검사, 이후 앱 인증·실제 scope·조회·강제 갱신은 M1 실검증으로 구분한다. 두 계정은 현재 인증·수집을 완료했으므로 동일 준비를 반복할 필요는 없다. External / Testing에서는 refresh token 만료에 따른 재로그인이 필요할 수 있다. [공식 만료 조건](https://developers.google.com/identity/protocols/oauth2#expiration)
 
 ## 단계별 준비
 
 | 단계 | 준비·실행할 항목 | 완료 판단 |
 |---|---|---|
-| M0 현재 | 조사·설계, OAuth JSON 로컬 구조 검사 | 조사·설계·파일 준비 완료; 앱 실인증 미검증 |
-| M1 승인됨·진행 중 | 신규 앱/API 환경, 두 계정 로그인, 보안 토큰 저장, 읽기 전용 스캔 | 실제 계정별 조회·갱신·범위 차단·부분 실패 검증 |
+| M0 당시 | 조사·설계, OAuth JSON 로컬 구조 검사 | 조사·설계·파일 준비 완료; 앱 실인증 미검증 |
+| M1 승인 범위 완료 | 신규 앱/API 환경, 두 계정 로그인, 보안 토큰 저장, 읽기 전용 스캔 | 실제 계정별 조회·갱신·범위 차단·부분 실패 검증 |
 | M2 | React + TypeScript 조회 화면 | 실제 새 인벤토리와 상태 구분 검증 |
 | M3 | 새 Python 3.12 추론 환경 권장, 검증한 PyTorch/CUDA 조합, 선택 모델 다운로드·해시 검증 | 설치·장치·파일·쓰기 경로를 실제 검증한 준비 상태 |
 | M4 | 이번 실행의 새 한국어 문장, Korean / Sohee / batch 1 | 새 WAV 생성·디코딩 검사·UI 재생 |
