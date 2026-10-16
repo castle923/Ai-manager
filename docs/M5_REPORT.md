@@ -80,7 +80,7 @@ A 성공 오디오를 보존하고 B는 WAV 파일·성공 output·audio URL이 
 
 공식 Chromium `155.0.8059.80` 소스도 읽기 전용으로 대조했다. [DownloadItemImpl의 target interrupt 처리](https://chromium.googlesource.com/chromium/src/+/refs/tags/155.0.8059.80/components/download/internal/common/download_item_impl.cc#1845)는 위험 분류를 갱신하기 전에 반환할 수 있으므로 DB danger 4가 초기 상태로 남았을 가능성이 있다. 이 숫자만으로 Safe Browsing·악성 콘텐츠 원인을 판정하지 않는다. [다운로드 delegate](https://chromium.googlesource.com/chromium/src/+/refs/tags/155.0.8059.80/chrome/browser/download/chrome_download_manager_delegate.cc#2267)는 정책 차단에도 FILE_BLOCKED를 사용한다. [insecure download 처리](https://chromium.googlesource.com/chromium/src/+/refs/tags/155.0.8059.80/chrome/browser/download/insecure_download_blocking.cc#275)는 localhost를 제외하므로 localhost HTTP라는 사실만으로 불안전 다운로드 차단 원인을 확정하지 않는다. 이는 가능한 코드 경로의 구분이며 이번 원인이 해당 경로였다는 실행 증거는 아니다. 같은 버전의 [DevTools 다운로드 delegate](https://chromium.googlesource.com/chromium/src/+/refs/tags/155.0.8059.80/content/browser/devtools/protocol/devtools_download_manager_delegate.cc#101)는 deny 경로에서 USER_CANCELED를 사용하며 이번 FILE_BLOCKED와 달라 이를 원인으로 확정하지 않는다. 검토한 확장 다운로드 API와 다운로드 limiter 파일에서는 직접 FILE_BLOCKED를 만드는 경로를 찾지 못했지만 확장 전체 동작이나 외부 보안 경로를 배제한 것은 아니다. 당시 target 결정·security callback 로그가 보존되지 않아 현재 승인된 읽기 전용 조사 범위에서 근본 원인을 확정할 수 없다.
 
-사용자는 자동검증 timeout 수정과 새 발견의 문서·저장소 반영, 추가 다운로드 없이 원인을 조사하는 범위를 승인했다. 이후 조사는 기존 기록만 읽고 추가 다운로드 재시도·다른 도구로 파일 저장·파일명 변경 우회·보안 설정 변경 없이 진행한다. timeout 수정의 자체 검증과 기존 브라우저 기록 진단을 분리하며 신규 브라우저 다운로드 검증은 수행하지 않는다.
+사용자는 자동검증 timeout 수정과 새 발견의 문서·저장소 반영, 추가 다운로드 없이 원인을 조사하는 범위를 승인했다. 앞선 읽기 전용 단계에서는 기존 기록만 읽고 추가 다운로드 재시도·다른 도구로 파일 저장·파일명 변경 우회·보안 설정 변경을 하지 않았다. timeout 수정의 자체 검증과 기존 브라우저 기록 진단을 분리했으며 당시 신규 브라우저 다운로드 검증은 수행하지 않았다. 이후 별도 승인된 한정 재현은 아래에 구분한다.
 
 이번 정상·부분 취소 증거는 해당 기능 검증에만 사용한다. M4 WAV·로그·측정값을 현재 비교 성공 근거로 사용하지 않았다. **구현·핵심 A/B GPU 실행·재생·부분 취소와 최초 A 저장을 확인했으며, 후속 A/B 다운로드 차단 원인은 미해결이다. M5 전체 PASS나 모든 기능 검증 완료로 단정하지 않는다.** M6 이후는 미승인이다.
 
@@ -89,6 +89,18 @@ A 성공 오디오를 보존하고 B는 WAV 파일·성공 output·audio URL이 
 기존 자동검증 호출은 저장소의 앱 코드가 아닌 채팅 CUA 호출이었다. 이번 수정은 production 앱을 바꾸지 않고 새 오프라인 헬퍼 `scripts/download_validation.mjs`, 모의 테스트 `tests/download_validation.test.mjs`, [호출 계약 안내](DOWNLOAD_VALIDATION.md)를 추가한 것이다. 내부 `downloadMedia` 제한 120,000ms·외부 CUA `timeout_ms` 150,000ms를 명시하고 최소 30초 여유를 둔다. A/B는 각각 별도 단일 호출이며 기본값은 실행 차단이다. 현재 브라우저 adapter와 연결되지 않은 오프라인 호출 구성이다. 30초 여유는 호출 예산이며 브라우저 대화상자·사용자 확인 대기 시간을 보장하지 않는다.
 
 영속 ledger의 in_flight를 동작 전에 저장하고 timeout·도구 오류·응답 누락 후 결과를 indeterminate로 기록한다. 같은 세션에서 A 재클릭과 B 진행을 중단하며 경로 반환만으로 무결성 PASS를 선언하지 않는다. 이번 6개 오프라인 mock 테스트는 이 계약만 검증했다. CUA의 150,000ms 인자 수용은 단순 출력으로만 확인했으며 150초 지속 실행·브라우저 동작·다운로드·GPU 실행은 수행하지 않았다. 이것은 추가 다운로드 권한이나 Chrome 차단 해결의 근거가 아니다.
+
+## 최신 제한 재현 승인과 실제 결과
+
+사용자는 앞선 읽기 전용 조사 후 보안 설정을 유지하고 원인 로그를 먼저 준비한 제한 다운로드 재현·검증·문서·저장소 반영을 별도로 승인했다. 이번 지정 진단에 한해 기존 추가 다운로드 중단 지시를 대체하며 자동 반복·다른 방식 저장·정책/보안/확장/CDP 설정 변경을 허용하지 않는다. 같은 M5 기존 WAV는 이 재현의 지정 원본으로만 사용하고 새 TTS 성공 근거로 사용하지 않는다.
+
+새 진단 `download-diagnosis-20261017T010601-61560c19`에서 기준 기록과 원본 A 파일 해시를 먼저 보존하고 원래 A 저장 링크를 한 번 클릭했다. 외부 150,000ms·내부 클릭 120,000ms 제한을 명시했으며 클릭 호출은 약 0.31초에 정상 반환했다. 이번 호출에는 wrapper timeout이 없었다. `downloadMedia`의 저장 성공을 시험한 호출로 바꾸어 해석하지 않는다.
+
+읽기 전용 지원 이벤트에서 A 다운로드 시작과 progress canceled·0 bytes를 확인했고 같은 항목의 새 브라우저 기록은 state 4·FILE_BLOCKED 11·danger 4·0 bytes·빈 MIME이었다. 기준 해당 기록은 3개에서 4개가 됐으며 대상 파일은 없었다. 이벤트와 새 기록의 연결은 비공개 식별값으로 확인하고 공개하지 않는다. A 클릭 1회·B 0회·재시도 0회·보안/정책/확장/CDP 설정 변경 0회·새 모델 추론 0회다.
+
+읽기 전용 Network 이벤트 조회에서는 해당 요청·응답·loadingFailed·ExtraInfo 이벤트를 얻지 못했고, 확인한 서버 실행 stdout/stderr도 비어 있었다. 앱 handler는 요청 로그를 남기지 않는 현재 구현이다. 따라서 GET의 서버 도달 여부는 미확정이며 0 bytes·빈 MIME만으로 HTTP 응답 이전에 차단됐다고 확정하지 않는다.
+
+**명시 timeout을 적용한 정상 클릭 반환 뒤에도 FILE_BLOCKED가 재현됐으므로 timeout 수정은 현재 차단의 해결이 아니다.** 보안 callback·대상 결정의 발신 원인 로그는 포착하지 못해 근본 원인은 여전히 미확정이다. 이번 결과는 기존 원본의 다운로드 진단이며 새 TTS 성공이나 M5 전체 PASS가 아니다. 독립 읽기 전용 검토에서 기존 3개 기록의 모든 기존 필드 불변·새 항목 정확히 1개·이벤트와 새 브라우저 항목의 연결·대상 파일 부재를 확인했다. 이벤트 결과는 hasMore=false·truncated=false였고 클릭은 313ms 정상 반환이었다. 비공개에는 baseline·단일 시도 ledger·이벤트·사후 기록·독립 검토를 보존한다. [한정 승인](APPROVALS.md) · [호출 계약](DOWNLOAD_VALIDATION.md)
 
 ## 보존·재사용·공개 범위
 
