@@ -110,5 +110,7 @@ class Dashboard:
         data = self.snapshot(scan)
         for row in data["models"] + data["files"]:
             if row["id"] == identifier:
+                from .preparation import supported
+                row["supports_preparation"] = supported(row)
                 return row
         raise KeyError("not found")

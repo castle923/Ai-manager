@@ -24,6 +24,7 @@ import {
   ArrowRight,
 } from "lucide-react";
 import "./style.css";
+import { PreparationPanel } from "./PreparationPanel";
 
 type Scan = {
   scan_id: string;
@@ -54,6 +55,7 @@ type Item = {
     shards_missing: number | null;
   };
   files?: Item[];
+  supports_preparation?: boolean;
 };
 type Data = {
   rows: Item[];
@@ -99,6 +101,8 @@ const actionLabels: Record<string, string> = {
   refresh: "인증 갱신 확인",
   scan: "허용 폴더 수집",
   disconnect: "연결 해제",
+  prepare: "선정 모델 준비",
+  runtime_check: "별도 환경 점검",
 };
 const errorLabels: Record<string, string> = {
   not_connected: "로그인이 필요합니다.",
@@ -375,25 +379,36 @@ function App() {
             <Link2 size={19} />
             계정 및 수집
           </button>
+          <button
+            className={section === "preparation" ? "nav active" : "nav"}
+            aria-label="선정 모델 준비"
+            onClick={() => setSection("preparation")}
+          >
+            <HardDrive size={19} /> 모델 준비
+          </button>
         </nav>
         <div className="sidebar-note">
           <ShieldCheck size={20} />
           <strong>로컬 · 읽기 전용</strong>
           <p>
-            허용한 폴더의 메타데이터만
-            <br />이 PC에서 확인합니다.
+            허용한 폴더를 읽고 선정 모델을
+            <br />이 PC에서 준비합니다.
           </p>
         </div>
         <div className="sidebar-foot">
           <span className="dot" /> 개인 PC에서 실행 중
-          <small>M2 · 조회 대시보드</small>
+          <small>M3 · 선정 모델 준비</small>
         </div>
       </aside>
       <div className="workspace">
         <header className="topbar">
           <span>
             Ai-manager <span className="slash">/</span>{" "}
-            {section === "library" ? "모델 라이브러리" : "계정 및 수집"}
+            {section === "library"
+              ? "모델 라이브러리"
+              : section === "preparation"
+                ? "모델 준비"
+                : "계정 및 수집"}
           </span>
           <div className="top-meta">
             <ShieldCheck size={15} /> Drive 읽기 전용{" "}
@@ -405,12 +420,18 @@ function App() {
             <div>
               <div className="eyebrow">YOUR MODELS, CLEARLY ORGANIZED</div>
               <h1>
-                {section === "library" ? "모델 라이브러리" : "계정 및 수집"}
+                {section === "library"
+                  ? "모델 라이브러리"
+                  : section === "preparation"
+                    ? "모델 준비"
+                    : "계정 및 수집"}
               </h1>
               <p>
                 {section === "library"
                   ? "흩어져 있는 모델 파일을 모으고, 현재 확인 수준을 한눈에 살펴보세요."
-                  : "두 계정의 연결과 허용 폴더 수집을 관리하세요."}
+                  : section === "preparation"
+                    ? "선정한 첫 모델의 파일과 환경을 준비하고, 확인 근거를 단계별로 살펴보세요."
+                    : "두 계정의 연결과 허용 폴더 수집을 관리하세요."}
               </p>
             </div>
             <button
@@ -437,7 +458,7 @@ function App() {
               <span>
                 계정 {status.task.account} ·{" "}
                 {actionLabels[status.task.action || ""] || "작업"} 진행
-                중입니다. 수집 중인 목록은 아직 전체가 아닙니다.
+                중입니다. 진행 중인 작업은 아직 완료된 결과가 아닙니다.
               </span>
               <button onClick={() => act("cancel")} disabled={pending}>
                 작업 취소
@@ -450,7 +471,16 @@ function App() {
               {err(status.task.error || "operation_failed_check_connection")}
             </div>
           )}
-          {section === "connections" ? (
+          {section === "preparation" ? (
+            <PreparationPanel
+              busy={Boolean(busy)}
+              canCancel={
+                status?.task.status === "running" &&
+                status?.task.action === "prepare"
+              }
+              csrf={csrf}
+            />
+          ) : section === "connections" ? (
             <>
               <div className="connection-grid">
                 {["A", "B"].map((a) => (
@@ -606,8 +636,8 @@ function App() {
                 <div>
                   <strong>발견과 실행 준비는 서로 다른 상태입니다.</strong>
                   <p>
-                    목록은 실제 Drive 메타데이터입니다. 구성 충족 · 파일 무결성
-                    · 런타임 · 실제 실행은 아직 미확인입니다.
+                    목록은 실제 Drive 메타데이터입니다. 구성 · 무결성 · 런타임 ·
+                    실행 검증 결과는 모델 준비 화면에서 구분해 확인합니다.
                   </p>
                 </div>
                 <span className="badge neutral">조회용 MVP</span>
@@ -1053,11 +1083,40 @@ function App() {
                 <div className="detail-callout">
                   <CircleHelp size={18} />
                   <p>
-                    이 항목은 파일 메타데이터에서 발견했습니다. 실제 모델 구성과
-                    실행 가능성을 검증한 결과가 아닙니다.
+                    이 항목은 선택한 수집 기록의 파일 메타데이터에서
+                    발견했습니다. 이 기록만으로 현재 로컬 파일이나 환경의 준비
+                    상태를 판정하지 않습니다.
                   </p>
                 </div>
-                <h3>확인 수준</h3>
+                <div className="detail-prepare-link">
+                  <HardDrive size={20} />
+                  <div>
+                    <strong>
+                      {detail.supports_preparation
+                        ? "첫 준비 대상 후보"
+                        : "이 항목의 준비 어댑터는 미지원"}
+                    </strong>
+                    <p>
+                      현재 준비 기능은 Qwen3-TTS 0.6B CustomVoice 한 모델에만
+                      제공됩니다. 준비 화면에서 선정 출처와 현재 검증 결과를
+                      확인하세요.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      close();
+                      setSection("preparation");
+                    }}
+                  >
+                    준비 화면
+                  </button>
+                </div>
+                <h3>이 수집 기록의 메타데이터 확인 수준</h3>
+                <p className="caption">
+                  이 수집 기록의 메타데이터만으로는 구성·무결성·환경·실행 상태를
+                  판정하지 않습니다. 다운로드한 파일의 검증 결과는 모델 준비
+                  화면에서 확인하세요.
+                </p>
                 <div className="verification-list">
                   {[
                     [
@@ -1065,10 +1124,26 @@ function App() {
                       labels[detail.scan_status] || detail.scan_status,
                       "Drive 메타데이터 관찰",
                     ],
-                    ["구성 충족", "미확인", "모델별 필수 파일 계약 미검증"],
-                    ["파일 무결성", "미확인", "파일 바이트·해시 검증 미실시"],
-                    ["런타임 준비", "미확인", "환경·의존성·로딩 미검증"],
-                    ["실제 실행", "미확인", "다운로드·추론 미실시"],
+                    [
+                      "구성 충족",
+                      "미확인",
+                      "수집 메타데이터만으로 필수 구성 충족 판정 불가",
+                    ],
+                    [
+                      "파일 무결성",
+                      "미확인",
+                      "메타데이터로 바이트·해시 검증 불가",
+                    ],
+                    [
+                      "런타임 준비",
+                      "미확인",
+                      "수집 메타데이터만으로 현재 환경 상태 판정 불가",
+                    ],
+                    [
+                      "실제 실행",
+                      "미확인",
+                      "메타데이터는 실제 출력의 검증 근거가 아님",
+                    ],
                   ].map(([title, state, note], i) => (
                     <div key={title}>
                       <span
@@ -1185,7 +1260,7 @@ function App() {
                 <div className="detail-footer">
                   <ShieldCheck size={17} />
                   <span>
-                    조회 단계 · 파일 다운로드와 모델 실행은 이후 단계입니다.
+                    모델 발견과 준비·실행 검증은 서로 다른 확인 단계입니다.
                   </span>
                 </div>
               </>

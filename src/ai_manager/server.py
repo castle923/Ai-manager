@@ -1,4 +1,4 @@
-"""Loopback-only M1 connection screen; no model execution or workspace product."""
+"""Loopback dashboard and approved asset preparation; no model inference."""
 import json
 import secrets
 import threading
@@ -14,6 +14,8 @@ from .auth import AuthError
 def serve(home, settings, auth, browser=webbrowser.open):
     from .inventory import Inventory
     from .dashboard import Dashboard
+    from .preparation import Preparation
+    preparation = Preparation(home, settings, auth)
     csrf = secrets.token_urlsafe(32)
     job_lock = threading.Lock()
     cancel = threading.Event()
@@ -25,7 +27,11 @@ def serve(home, settings, auth, browser=webbrowser.open):
 
     def work(action, account):
         try:
-            if action == "connect":
+            if action == "prepare":
+                result = preparation.prepare(cancel)
+            elif action == "runtime_check":
+                result = preparation.probe_runtime()
+            elif action == "connect":
                 result = auth.connect(account, cancel=cancel)
             elif action == "refresh":
                 auth.access(account, force_refresh=True)
@@ -76,6 +82,8 @@ def serve(home, settings, auth, browser=webbrowser.open):
                 if asset.parent != base or not asset.is_file() or asset.suffix not in {".js", ".css", ".svg"}:
                     return self.reply(404, {"error": "not_found"})
                 return self.reply(200, asset.read_text(encoding="utf-8"), mimetypes.guess_type(str(asset))[0] or "text/plain")
+            if path == "/api/preparation":
+                return self.reply(200, preparation.snapshot())
             if path == "/api/session":
                 return self.reply(200, {"csrf": csrf})
             if path in {"/api/dashboard", "/api/detail"}:
@@ -122,9 +130,11 @@ def serve(home, settings, auth, browser=webbrowser.open):
                 action, account = data["action"], data.get("account")
                 if account is not None and not isinstance(account, str):
                     raise ValueError()
-                if self.path != "/api/action" or action not in ("connect", "refresh", "scan", "disconnect", "cancel") or (action != "cancel" and account not in ("A", "B")):
+                if self.path != "/api/action" or action not in ("connect", "refresh", "scan", "disconnect", "cancel", "prepare", "runtime_check") or (action != "cancel" and account not in ("A", "B")):
                     raise ValueError()
             except (ValueError, KeyError):
+                return self.reply(400, {"error": "invalid_request"})
+            if action in ("prepare", "runtime_check") and account != "B":
                 return self.reply(400, {"error": "invalid_request"})
             if action == "cancel":
                 cancel.set()

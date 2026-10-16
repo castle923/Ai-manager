@@ -1779,3 +1779,330 @@ th {
     font-size: 11px;
   }
 }
+.preparation-page {
+  display: grid;
+  gap: 20px;
+}
+.preparation-hero {
+  padding: 25px 28px;
+  border-top: 3px solid #3164dd;
+}
+.preparation-hero-top,
+.preparation-files-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+.preparation-hero h2 {
+  margin: 12px 0 7px;
+  overflow-wrap: anywhere;
+  font-size: 24px;
+}
+.preparation-intro {
+  color: #63758e;
+  font-size: 13px;
+}
+.preparation-intro span {
+  display: inline-block;
+  margin-left: 12px;
+  color: #315eac;
+}
+.preparation-source {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 13px 25px;
+  margin: 23px 0;
+  padding: 19px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.preparation-source dt,
+.preparation-environment dt {
+  color: #63758e;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+.preparation-source dd {
+  margin: 0;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.preparation-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.preparation-actions p {
+  color: #63758e;
+  font-size: 12px;
+  margin-left: auto;
+}
+.preparation-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 15px;
+}
+.preparation-metric {
+  padding: 18px 20px;
+}
+.preparation-metric > span {
+  font-size: 12px;
+  color: #526889;
+}
+.preparation-metric strong {
+  display: block;
+  font-size: 25px;
+  margin: 7px 0 3px;
+  letter-spacing: -0.6px;
+}
+.preparation-metric p {
+  font-size: 11px;
+  color: #63758e;
+}
+.preparation-columns {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 20px;
+}
+.preparation-checks,
+.preparation-environment {
+  padding: 22px 24px;
+  min-width: 0;
+}
+.preparation-checks .verification-list {
+  margin: 15px 0 0;
+}
+.preparation-checks .verification-list small {
+  max-width: 270px;
+}
+.preparation-checks .verification-list > div {
+  align-items: flex-start;
+}
+.preparation-checks .verification-list > div > span:last-child {
+  max-width: 110px;
+  white-space: normal;
+  text-align: right;
+}
+.preparation-environment > p {
+  font-size: 12px;
+  color: #63758e;
+  margin: 8px 0 15px;
+}
+.preparation-environment dl {
+  margin: 0;
+}
+.preparation-environment dl > div {
+  padding: 9px 0;
+  border-bottom: 1px solid #edf0f5;
+}
+.preparation-environment dd {
+  margin: 0;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.preparation-files {
+  min-width: 0;
+  overflow: hidden;
+}
+.preparation-files-heading {
+  padding: 22px 24px 16px;
+}
+.preparation-files-heading p {
+  font-size: 12px;
+  color: #63758e;
+  margin-top: 5px;
+}
+.preparation-progress {
+  margin: 0 24px 18px;
+  padding: 15px;
+  border-radius: 8px;
+  background: #f5f8fe;
+}
+.preparation-progress > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+}
+.preparation-progress progress {
+  width: 100%;
+  height: 10px;
+  accent-color: #3164dd;
+  margin: 9px 0 3px;
+}
+.preparation-progress p {
+  font-size: 12px;
+  color: #63758e;
+  overflow-wrap: anywhere;
+}
+.preparation-files table {
+  min-width: 780px;
+}
+.preparation-files th:first-child {
+  width: 40%;
+}
+.preparation-files th:nth-child(2) {
+  width: 12%;
+}
+.preparation-files th:nth-child(3) {
+  width: 22%;
+}
+.preparation-files th:last-child {
+  width: 26%;
+}
+.preparation-files td {
+  font-size: 12px;
+}
+.preparation-files td:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.preparation-files td code {
+  display: block;
+  width: auto;
+  min-width: 0;
+  max-width: 100%;
+  font-size: 11px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  user-select: text;
+  color: #63758e;
+}
+.preparation-preservation {
+  display: flex;
+  gap: 12px;
+  color: #526889;
+  padding: 3px 5px 10px;
+}
+.preparation-preservation strong {
+  font-size: 13px;
+}
+.preparation-preservation p {
+  font-size: 12px;
+  margin-top: 4px;
+  line-height: 1.8;
+}
+.preparation-blockers {
+  align-items: flex-start;
+}
+.preparation-blockers ul {
+  margin: 7px 0 0;
+  padding-left: 18px;
+}
+.preparation-blockers li {
+  margin: 4px 0;
+}
+.preparation-empty {
+  display: grid;
+  justify-items: center;
+  gap: 16px;
+  padding: 65px 20px;
+  text-align: center;
+}
+.detail-prepare-link {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid #dce6f6;
+  background: #f4f8ff;
+  border-radius: 9px;
+  margin: 18px 0;
+}
+.detail-prepare-link strong {
+  font-size: 12px;
+}
+.detail-prepare-link p {
+  color: #536b8d;
+  font-size: 12px;
+  margin-top: 5px;
+}
+.detail-prepare-link button {
+  align-self: center;
+  font-size: 12px;
+}
+@media (max-width: 1200px) {
+  .preparation-columns {
+    grid-template-columns: 1fr;
+  }
+  .preparation-metric {
+    padding: 16px;
+  }
+  .preparation-metric strong {
+    font-size: 22px;
+  }
+}
+@media (max-width: 900px) {
+  .preparation-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .preparation-hero {
+    padding: 20px;
+  }
+  .preparation-source {
+    grid-template-columns: 1fr;
+  }
+  .preparation-hero h2 {
+    font-size: 21px;
+  }
+  .preparation-actions p {
+    margin-left: 0;
+    width: 100%;
+  }
+  .preparation-files-heading {
+    align-items: flex-start;
+  }
+  .preparation-files-heading > .badge {
+    display: none;
+  }
+  .detail-prepare-link {
+    flex-wrap: wrap;
+  }
+}
+
+.preparation-page .badge.neutral,
+.preparation-progress p {
+  color: #526889;
+}
+
+.preparation-hero .preparation-progress {
+  margin: 18px 0 16px;
+  padding: 14px 16px;
+  border: 1px solid #dce6f7;
+}
+.preparation-hero .preparation-progress > div {
+  font-size: 14px;
+}
+.preparation-hero .preparation-progress strong {
+  color: #315eac;
+}
+.preparation-provenance {
+  margin-top: 18px;
+  border-top: 1px solid var(--line);
+  padding-top: 13px;
+}
+.preparation-provenance summary {
+  cursor: pointer;
+  color: #526889;
+  font-size: 12px;
+  width: fit-content;
+}
+.preparation-provenance summary:focus-visible {
+  outline: 3px solid #3575ee;
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+.preparation-provenance .preparation-source {
+  margin: 12px 0 0;
+  padding: 12px 0 0;
+  border-bottom: 0;
+}
+@media (max-width: 900px) {
+  .preparation-hero .preparation-progress > div {
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+}
