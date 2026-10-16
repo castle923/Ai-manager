@@ -3,6 +3,8 @@ import json
 import secrets
 import threading
 import webbrowser
+from pathlib import Path
+import mimetypes
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlsplit, parse_qs
 
@@ -11,6 +13,7 @@ from .auth import AuthError
 
 def serve(home, settings, auth, browser=webbrowser.open):
     from .inventory import Inventory
+    from .dashboard import Dashboard
     csrf = secrets.token_urlsafe(32)
     job_lock = threading.Lock()
     cancel = threading.Event()
@@ -63,7 +66,28 @@ def serve(home, settings, auth, browser=webbrowser.open):
                 return self.reply(403, {"error": "forbidden"})
             path = urlsplit(self.path).path
             if path == "/":
-                return self.reply(200, HTML, "text/html; charset=utf-8")
+                entry = Path(__file__).parent / "static" / "index.html"
+                if not entry.is_file():
+                    return self.reply(503, "화면 빌드가 필요합니다. frontend에서 npm ci와 npm run build를 실행하세요.", "text/plain; charset=utf-8")
+                return self.reply(200, entry.read_text(encoding="utf-8"), "text/html; charset=utf-8")
+            if path.startswith("/assets/"):
+                base = (Path(__file__).parent / "static" / "assets").resolve()
+                asset = (base / path.removeprefix("/assets/")).resolve()
+                if asset.parent != base or not asset.is_file() or asset.suffix not in {".js", ".css", ".svg"}:
+                    return self.reply(404, {"error": "not_found"})
+                return self.reply(200, asset.read_text(encoding="utf-8"), mimetypes.guess_type(str(asset))[0] or "text/plain")
+            if path == "/api/session":
+                return self.reply(200, {"csrf": csrf})
+            if path in {"/api/dashboard", "/api/detail"}:
+                try:
+                    query = parse_qs(urlsplit(self.path).query)
+                    dashboard = Dashboard(home)
+                    result = dashboard.query(query) if path == "/api/dashboard" else dashboard.detail(query["id"][0], query.get("scan", [None])[0])
+                    return self.reply(200, result)
+                except ValueError:
+                    return self.reply(400, {"error": "invalid_request"})
+                except KeyError:
+                    return self.reply(404, {"error": "not_found"})
             if path == "/app.js":
                 return self.reply(200, "const csrf=" + json.dumps(csrf) + ";\n" + SCRIPT, "application/javascript; charset=utf-8")
             if path == "/style.css":
@@ -93,7 +117,11 @@ def serve(home, settings, auth, browser=webbrowser.open):
                 if not 0 < length <= 1024:
                     raise ValueError()
                 data = json.loads(self.rfile.read(length))
+                if not isinstance(data, dict) or not isinstance(data.get("action"), str):
+                    raise ValueError()
                 action, account = data["action"], data.get("account")
+                if account is not None and not isinstance(account, str):
+                    raise ValueError()
                 if self.path != "/api/action" or action not in ("connect", "refresh", "scan", "disconnect", "cancel") or (action != "cancel" and account not in ("A", "B")):
                     raise ValueError()
             except (ValueError, KeyError):
