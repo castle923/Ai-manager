@@ -4,6 +4,8 @@
 
 ## M7 독립 앱 현황
 
+후속 사용자 요청으로 0.7.1 후보에서 모델 원본 경로·실패 크기 표시를 보완하고 새 0.6B/1.7B A/B·재생·정상 native 저장을 검증했다. [새 A/B 보고서](M7_AB_REPORT.md)에 기록하며 공개 배포는 아래 v0.7.0을 유지한다. 0.7.1은 로컬 검증 후보로서 새 Release·태그 게시와 구분한다.
+
 사용자가 Python 별도 설치 없는 독립 창을 명시 승인해 v0.7.0을 PyInstaller 6.22.3 onedir/windowed·pywebview 6.2.1 edgechromium으로 구현했다. 앱 Python과 python-build-standalone CPython 3.10.22 기반을 포함하며 추론 Torch 등 의존성은 앱에서 온라인으로 별도 준비한다. 현재 Windows의 WebView2 Runtime을 사용하고 없는 PC의 자동 전역 설치는 하지 않는다. [명령 없는 시작 안내](M7_INSTALL.md)를 따른다.
 
 desktop5 ZIP은 58,405,026 bytes·SHA-256 `661d8bd5b58edfa4e2ba811338fce787fb1744149c98caacd7deac4489eae4d0`이다. 새 GUI 설치·독립 창·새 인증·CUDA·새 0.6B TTS·native 저장을 확인했으며 정상 종료/재시작의 상태·해시 보존도 확인했다. 재시작 후 독립 창 재생·두 계정 실제 갱신을 확인했으며 정상 [v0.7.0 Release](https://github.com/castle923/Ai-manager/releases/tag/v0.7.0)와 [첨부 ZIP](https://github.com/castle923/Ai-manager/releases/download/v0.7.0/AiManager-0.7.0-windows.zip)의 uploaded 상태·크기·GitHub SHA-256 digest를 검증한 로컬 ZIP과 대조했다. 이번 새 TTS는 0.6B 한 모델 범위이며 1.7B 새 추론은 미검증이다. 모델과 자격 증명은 포함하지 않는다. 모든 PC 호환성이나 전면 native widget 재작성으로 해석하지 않는다. 큰 ZIP은 정상 Release asset으로 배포했고 Git blob에 추가하지 않았다. 태그는 소스 `066e62d286cb50fee1755bd0146c3ddbd3188526`에 고정하며 이후 main 문서 갱신과 구분한다.

@@ -14,6 +14,75 @@ from ai_manager.external_process import isolated_environment, spawn_external
 
 
 class DesktopTests(unittest.TestCase):
+    def model_bridge(self):
+        bridge = DesktopBridge(self.home, self.root, self.root)
+        bridge._guard_ready = True
+        bridge._application = Mock(url='http://127.0.0.1:54321/')
+        bridge._application.inference.active = None
+        bridge._window = Mock()
+        bridge._window.get_current_url.return_value = bridge._application.url
+        return bridge
+
+    def test_model_direct_path_rejects_invalid_and_untrusted_before_preparation(self):
+        bridge = self.model_bridge()
+        file = self.root / 'not-folder'; file.write_bytes(b'new synthetic')
+        for value in ('relative', '', str(file), str(self.root/'missing'), str(self.root/'..'/'escape'), 7, 'C:\\bad\npath'):
+            bridge._model_state = {'status':'ready','source_directory':'old-synthetic-folder'}
+            result = bridge.prepare_model('qwen3-tts-1.7b-customvoice', value)
+            self.assertEqual(result['error'], 'model_folder_absolute_directory_required')
+            self.assertEqual(bridge.model_status(),result)
+            self.assertNotIn('source_directory',result)
+        bridge._window.get_current_url.return_value = 'https://foreign.invalid/'
+        self.assertEqual(bridge.prepare_model('qwen3-tts-1.7b-customvoice', str(self.root)), {'status':'denied'})
+        self.assertIsNone(bridge._model_thread)
+        bridge._window.create_file_dialog.assert_not_called()
+
+    def test_model_native_dialog_malformed_return_never_starts_preparation(self):
+        bridge = self.model_bridge()
+        for selected in (str(self.root), [str(self.root), str(self.root)], [7]):
+            bridge._model_state = {'status':'ready','source_directory':'old-synthetic-folder'}
+            bridge._window.create_file_dialog.return_value = selected
+            result = bridge.prepare_model('qwen3-tts-1.7b-customvoice')
+            self.assertEqual(result['error'], 'model_folder_selection_invalid')
+            self.assertEqual(bridge.model_status(),result)
+        self.assertIsNone(bridge._model_thread)
+
+    def test_model_direct_path_matches_visible_model_and_records_without_picker(self):
+        bridge = self.model_bridge()
+        source = self.root/'지정 모델 새 원본'; source.mkdir()
+        state = {'status':'ready','files_verified':1,'preflight':{'component':'config.json','expected_bytes':3,'observed_bytes':3}}
+        with patch('ai_manager.desktop.SettingsStore') as store, patch('ai_manager.desktop.SecretStore'), patch('ai_manager.desktop.DesktopAuth'), patch('ai_manager.preparation.Preparation') as preparation:
+            store.return_value.load.return_value = {'synthetic_secret':'must-not-return'}
+            preparation.return_value.prepare_local.return_value = state
+            bridge.prepare_model('qwen3-tts-1.7b-customvoice', str(source))
+            bridge._model_thread.join(5)
+            self.assertFalse(bridge._model_thread.is_alive())
+            self.assertEqual(preparation.call_args.kwargs['model_id'], 'qwen3-tts-1.7b-customvoice')
+            self.assertEqual(preparation.return_value.prepare_local.call_args.args[0], source.resolve())
+        result = bridge.model_status()
+        self.assertEqual(result['source_directory'], str(source.resolve()))
+        self.assertEqual(result['model_id'], 'qwen3-tts-1.7b-customvoice')
+        self.assertNotIn('must-not-return', json.dumps(result))
+        bridge._window.create_file_dialog.assert_not_called()
+
+    def test_first_component_size_failure_retains_private_source_and_exact_stat(self):
+        from ai_manager.preparation import Preparation, PreparationError
+        source = self.root/'new synthetic model';source.mkdir()
+        original = source/'README.md';original.write_bytes(b'new bytes')
+        manifest = {'name':'synthetic/new','revision':'new-test','source':'https://example.invalid/new','files':[{'path':'README.md','size':27,'sha256':'0'*64}]}
+        prep = Preparation(self.home, {'sources':[]})
+        with patch('ai_manager.preparation.manifest', return_value=manifest), self.assertRaisesRegex(PreparationError,'size_mismatch'):
+            prep.prepare_local(source)
+        state = prep.snapshot()['preparation']
+        self.assertEqual(state['preflight'], {'component':'README.md','expected_bytes':27,'observed_bytes':9})
+        self.assertEqual(state['source_directory'], str(source))
+        self.assertEqual(state['files_verified'],0)
+        provenance = json.loads((prep.base/state['id']/'inputs.json').read_text(encoding='utf-8'))
+        self.assertEqual(provenance['source_directory'],str(source))
+        self.assertEqual(provenance['files'],[])
+        self.assertNotIn('new bytes',json.dumps(state)+json.dumps(provenance))
+        self.assertEqual(original.read_bytes(),b'new bytes')
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.root = Path(self.temp.name)
@@ -133,7 +202,7 @@ class DesktopTests(unittest.TestCase):
         package = self.package()
         parent = self.root / 'new-user-install'
         parent.mkdir()
-        target = parent / 'AiManager-0.7.0'
+        target = parent / 'AiManager-0.7.1'
         target.mkdir()
         bridge = DesktopBridge(self.home, self.root, package)
         bridge._guard_ready = True
@@ -153,7 +222,7 @@ class DesktopTests(unittest.TestCase):
         package = self.root / 'portable'
         package.mkdir()
         (package / 'AiManager.exe').write_bytes(b'new synthetic executable placeholder')
-        manifest = {'version': '0.7.0', 'files': {'AiManager.exe': hashlib.sha256((package / 'AiManager.exe').read_bytes()).hexdigest()}}
+        manifest = {'version': '0.7.1', 'files': {'AiManager.exe': hashlib.sha256((package / 'AiManager.exe').read_bytes()).hexdigest()}}
         (package / 'DESKTOP-MANIFEST.json').write_text(json.dumps(manifest))
         return package
 
@@ -239,6 +308,9 @@ class DesktopTests(unittest.TestCase):
         try:
             self.assertTrue(junction.lstat().st_file_attributes & 0x400)
             self.assertFalse(junction.exists())
+            bridge = self.model_bridge()
+            self.assertEqual(bridge.prepare_model('qwen3-tts-1.7b-customvoice', str(junction))['error'], 'model_folder_absolute_directory_required')
+            self.assertIsNone(bridge._model_thread)
             for operation in (lambda: private_home(junction / 'child'), lambda: safe_destination(junction / 'child'), lambda: regular(junction / 'child', self.root)):
                 with self.assertRaises(ValueError):
                     operation()

@@ -2,7 +2,7 @@
 
 기준일: 2026-10-17 · 상태: 승인된 M7 구현·실검증·v0.7.0 출시 완료(확인한 Windows 로컬·0.6B 범위)
 
-v0.7.0은 Python을 포함한 Windows 독립 앱이다. PyInstaller onedir/windowed·pywebview edgechromium을 사용하며 앱과 추론에 별도 전역 Python 설치가 필요하지 않도록 구성했다. desktop5 새 설치·독립 창·별도 런타임과 CUDA, 새 0.6B TTS·재생·native 저장·취소·종료/재시작을 확인했다. 재시작 후 성공 음성 재생·두 계정 갱신까지 확인했고 소스 게시·태그·정상 Release ZIP 첨부를 검증했다. [v0.7.0 Release](https://github.com/castle923/Ai-manager/releases/tag/v0.7.0) · [계획과 완료 게이트](M7_PLAN.md) · [시작 안내](M7_INSTALL.md)
+v0.7.0은 Python을 포함한 Windows 독립 앱이다. PyInstaller onedir/windowed·pywebview edgechromium을 사용하며 앱과 추론에 별도 전역 Python 설치가 필요하지 않도록 구성했다. desktop5 새 설치·독립 창·별도 런타임과 CUDA, 새 0.6B TTS·재생·native 저장·취소·종료/재시작을 확인했다. 재시작 후 성공 음성 재생·두 계정 갱신까지 확인했고 소스 게시·태그·정상 Release ZIP 첨부를 검증했다. [v0.7.0 Release](https://github.com/castle923/Ai-manager/releases/tag/v0.7.0) · [계획과 완료 게이트](M7_PLAN.md) · [v0.7.0 시작 안내](https://github.com/castle923/Ai-manager/blob/066e62d286cb50fee1755bd0146c3ddbd3188526/docs/M7_INSTALL.md)
 
 | 구분 | 현재 기록 |
 |---|---|
@@ -34,6 +34,8 @@ desktop4의 환경 점검 요청 계약 오류와 설정 서버 동시 종료 �
 별도 새 추론의 취소와 다른 실행 중 앱 창 종료를 실제 확인했다. 종료 후 소유 프로세스 11개·listener가 사라졌고 중단 run은 cancelled·output null·해당 출력 디렉터리 WAV 0이었다. 같은 설치와 home으로 재시작한 뒤 성공 1개·취소 2개 기록과 active 없음·동일 런타임 ready를 재조회했다. 설정·DB·모델 준비·현재/이전 런타임의 지정 10개 해시와 성공 WAV/실제 저장본은 종료 전과 일치했다. DB는 새 M7 수집 2건·파일 628개를 유지했다. 재시작한 독립 창에서 성공 음성을 끝까지 재생하고 A/B 각각 실제 갱신의 refresh_verified를 확인했다. 같은 런타임 ID를 재설치 없이 사용했다. 정상 종료/재시작 확인이며 실제 GPU crash 복구를 뜻하지 않는다.
 
 ## 확인 범위와 남은 제한
+
+이 보고서는 출시된 v0.7.0의 0.6B 단일 실행 검증 이력이다. 이후 명시 승인된 **0.7.1 후보의 새 1.7B·A/B·native 저장 검증**은 [별도 보고서](M7_AB_REPORT.md)에 기록한다. 아래 1.7B 미검증은 v0.7.0 당시 범위이며 후속 결과와 섞지 않는다. v0.7.0 태그·ZIP은 그대로 보존한다.
 
 [배포 ZIP](https://github.com/castle923/Ai-manager/releases/download/v0.7.0/AiManager-0.7.0-windows.zip)은 정상 Release asset으로 첨부됐다. GitHub API에서 2026-10-17T03:46:56Z 공개·draft false·prerelease false, asset 이름·uploaded 상태·58,405,026 bytes·SHA-256 digest를 확인했다. 추가 ZIP 다운로드는 하지 않았으며 이미 검증한 로컬 ZIP 해시와 API digest를 대조했다. v0.7.0 태그는 소스 커밋 `066e62d286cb50fee1755bd0146c3ddbd3188526`에 고정한다. 후속 main 문서 보완은 릴리스 코드·ZIP 변경이 아니며 기존 v0.6.0 태그/Release를 보존한다.
 

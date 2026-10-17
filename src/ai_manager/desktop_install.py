@@ -15,7 +15,7 @@ def install_to_new_directory(source, destination, home):
     if target.exists():
         raise ValueError('installation_destination_exists')
     manifest = json.loads((source / 'DESKTOP-MANIFEST.json').read_text(encoding='utf-8'))
-    if manifest['version'] != '0.7.0':
+    if manifest['version'] != '0.7.1':
         raise ValueError('installation_version_invalid')
     checked = []
     for relative, expected in manifest['files'].items():
@@ -37,4 +37,4 @@ def install_to_new_directory(source, destination, home):
         handle.write((source / 'DESKTOP-MANIFEST.json').read_bytes())
     if not (target / 'AiManager.exe').is_file():
         raise ValueError('installation_executable_missing')
-    return {'status': 'installed', 'version': '0.7.0', 'files_verified': len(checked)}
+    return {'status': 'installed', 'version': '0.7.1', 'files_verified': len(checked)}

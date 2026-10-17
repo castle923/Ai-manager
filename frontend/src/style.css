@@ -2879,17 +2879,33 @@ th {
   border-top: 1px solid #dce6f7;
   padding-top: 14px;
 }
-.desktop-model-actions { display: flex; flex-wrap: wrap; gap: 8px; min-width: 230px; }
-@media (max-width: 900px) {
-  .desktop-runtime-row { align-items: flex-start; flex-direction: column; gap: 12px; }
+.desktop-model-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 230px;
 }
-.desktop-runtime p, .desktop-runtime small, .desktop-save small {
+@media (max-width: 900px) {
+  .desktop-runtime-row {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+}
+.desktop-runtime p,
+.desktop-runtime small,
+.desktop-save small {
   color: #526889;
   font-size: 12px;
   line-height: 1.8;
 }
-.desktop-runtime p { margin: 4px 0; }
-.desktop-save small { display: block; margin-top: 8px; }
+.desktop-runtime p {
+  margin: 4px 0;
+}
+.desktop-save small {
+  display: block;
+  margin-top: 8px;
+}
 @media (max-width: 600px) {
   .library-top {
     flex-direction: column;
@@ -2905,4 +2921,25 @@ th {
     text-align: left;
     white-space: normal;
   }
+}
+
+.desktop-source-path {
+  overflow-wrap: anywhere;
+}
+.desktop-path-entry {
+  display: grid;
+  gap: 0.6rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+.desktop-path-entry input,
+.desktop-path-entry select {
+  width: 100%;
+  min-width: 0;
+}
+.desktop-path-entry p {
+  margin: 0;
+}
+.desktop-path-entry button {
+  justify-self: start;
 }

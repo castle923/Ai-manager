@@ -12,6 +12,8 @@ PyInstaller `onedir`·`windowed` 패키지에 앱 Python을 포함하고 pywebvi
 
 ## 완료 게이트
 
+아래 표는 v0.7.0 출시 게이트 이력이다. 이후 승인된 0.7.1 후보의 새 두 모델 실행·재생·native 저장 검증은 [새 A/B 보고서](M7_AB_REPORT.md)를 따른다. 후속 검증이 기존 태그·ZIP을 변경하지 않으며 0.7.1 공개 Release는 게시하지 않았다.
+
 | 필수 항목 | 새 M7 검증 근거 | 상태 |
 |---|---|---|
 | Python 포함 실행 | 호스트 Python과 PATH/PYTHONHOME/PYTHONPATH를 분리한 앱·추론 실행, 런타임 버전·해시 | desktop5 번들 Python 격리 실행·새 환경·CUDA·0.6B 실제 TTS 확인 |

@@ -238,11 +238,19 @@ class Preparation:
             self._save(state,run)
             provenance = dict(run_id=run_id,model=m['name'],revision=m['revision'],source=m['source'],kind='explicit_designated_local_model_components',source_directory=str(source),
                               configuration_source_sha256=[s['sha256'] for s in self.settings.get('sources', [])],files=[])
+            state.update(model_id=self.model_id, source_directory=str(source))
+            atomic_text(run/'inputs.json',json.dumps(provenance,indent=2))
+            self._save(state,run)
             for item in state['files']:
                 if cancel.is_set(): raise PreparationError('cancelled')
-                relative = safe_relative(item['path']); original = regular(source/relative, Path(source.anchor))
+                relative = safe_relative(item['path'])
+                state['preflight'] = dict(component=item['path'],expected_bytes=item['size'],observed_bytes=None)
+                self._save(state,run)
+                original = regular(source/relative, Path(source.anchor))
                 if not original.is_file(): raise PreparationError('missing_component')
                 before = original.stat()
+                state['preflight']['observed_bytes'] = before.st_size
+                self._save(state,run)
                 if before.st_size != item['size']: raise PreparationError('size_mismatch')
                 target = regular(run/'assets'/relative,self.home); target.parent.mkdir(parents=True,exist_ok=True)
                 part = target.with_name(target.name+'.part')

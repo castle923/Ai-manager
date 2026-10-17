@@ -8,13 +8,19 @@ type HostResult = {
   model_id?: string;
   files_verified?: number;
   instance_id?: string;
+  source_directory?: string;
+  preflight?: {
+    component: string;
+    expected_bytes: number;
+    observed_bytes: number | null;
+  };
 };
 type HostApi = {
   save_audio: (id: string) => Promise<HostResult>;
   runtime_status: () => Promise<HostResult>;
   prepare_runtime: () => Promise<HostResult>;
   model_status: () => Promise<HostResult>;
-  prepare_model: (id: string) => Promise<HostResult>;
+  prepare_model: (id: string, source_path?: string) => Promise<HostResult>;
   cancel_model: () => Promise<HostResult>;
 };
 declare global {
@@ -104,6 +110,8 @@ export function DesktopRuntime() {
   });
   const [model, setModel] = useState<HostResult>({ status: "idle" });
   const [selecting, setSelecting] = useState(false);
+  const [modelChoice, setModelChoice] = useState("qwen3-tts-1.7b-customvoice");
+  const [sourcePath, setSourcePath] = useState("");
   useEffect(() => {
     if (!host) return;
     let active = true;
@@ -132,11 +140,11 @@ export function DesktopRuntime() {
   const running = state.status === "running";
   const modelBusy =
     selecting || model.status === "running" || model.status === "cancelling";
-  async function prepareModel(id: string) {
+  async function prepareModel(id: string, path?: string) {
     if (!host || modelBusy) return;
     setSelecting(true);
     try {
-      setModel(await host.prepare_model(id));
+      setModel(await host.prepare_model(id, path));
     } catch {
       setModel({ status: "failed" });
     } finally {
@@ -200,6 +208,28 @@ export function DesktopRuntime() {
                         ? "현재 파일 처리를 중단합니다…"
                         : "모델 폴더를 선택하거나 모델 준비 화면에서 Drive 다운로드를 사용하세요."}
           </p>
+          {model.model_id && (
+            <p>
+              선택 모델 ·{" "}
+              {model.model_id === "qwen3-tts-1.7b-customvoice"
+                ? "1.7B CustomVoice"
+                : "0.6B CustomVoice"}
+            </p>
+          )}
+          {model.source_directory && (
+            <p className="desktop-source-path">
+              선택 원본 폴더 · {model.source_directory}
+            </p>
+          )}
+          {model.status === "failed" && model.preflight && (
+            <p role="alert">
+              확인 파일 · {model.preflight.component} · 기대{" "}
+              {model.preflight.expected_bytes.toLocaleString()} bytes / 실제{" "}
+              {model.preflight.observed_bytes === null
+                ? "파일 확인 불가"
+                : `${model.preflight.observed_bytes.toLocaleString()} bytes`}
+            </p>
+          )}
         </div>
         <div className="desktop-model-actions">
           <button
@@ -227,6 +257,39 @@ export function DesktopRuntime() {
             </button>
           )}
         </div>
+      </div>
+      <div className="desktop-path-entry">
+        <label htmlFor="desktop-model-choice">직접 경로로 준비할 모델</label>
+        <select
+          id="desktop-model-choice"
+          value={modelChoice}
+          disabled={modelBusy}
+          onChange={(event) => setModelChoice(event.target.value)}
+        >
+          <option value="qwen3-tts-0.6b-customvoice">0.6B CustomVoice</option>
+          <option value="qwen3-tts-1.7b-customvoice">1.7B CustomVoice</option>
+        </select>
+        <label htmlFor="desktop-model-source">
+          지정 모델 원본 폴더 전체 절대경로
+        </label>
+        <input
+          id="desktop-model-source"
+          value={sourcePath}
+          disabled={modelBusy}
+          onChange={(event) => setSourcePath(event.target.value)}
+          placeholder="찾아보기 대신 원본 폴더의 전체 경로를 입력할 수 있습니다"
+        />
+        <p>
+          선택 모델과 입력 폴더를 확인한 뒤 준비하세요. 지정 파일만 새 준비
+          기록으로 복사하며 원본은 보존합니다.
+        </p>
+        <button
+          className="secondary"
+          disabled={modelBusy || !sourcePath.trim()}
+          onClick={() => prepareModel(modelChoice, sourcePath)}
+        >
+          이 경로로 모델 준비
+        </button>
       </div>
     </section>
   );
