@@ -13,6 +13,8 @@ from urllib.parse import urlsplit, parse_qs
 from .auth import AuthError
 from .inference import Inference, InferenceError
 import re
+import uuid
+from datetime import datetime, timezone
 
 
 class LocalApplication:
@@ -51,17 +53,23 @@ def create_application(home, settings, auth, port=0):
     inference = Inference(home)
     from .registry import Registry, RegistryError
     registry = Registry(home, settings, inference)
+    from .history import History, HistoryError
+    from .preferences import Preferences, PreferenceError
+    history, preferences = History(home), Preferences(home)
     diagnostics = DownloadDiagnostics(home, enabled=os.environ.get("AI_MANAGER_DOWNLOAD_DIAGNOSTICS") == "1")
     csrf = secrets.token_urlsafe(32)
     job_lock = threading.Lock()
+    task_state_lock = threading.RLock()
     cancel = threading.Event()
     task = {"status": "idle"}
 
     def state():
+        with task_state_lock:task_copy=dict(task)
         return {"accounts": {a: {"credential_saved": bool(auth.store.get(a)), "roots": sum(r["account"] == a for r in settings["allowlist"])} for a in ("A", "B")},
-                "task": dict(task), "inventory": Inventory(home).summary()}
+                "task": task_copy, "inventory": Inventory(home).summary()}
 
-    def work(action, account, model_id=None):
+    def work(action, account, model_id=None, history_id=None, started_at=None):
+        outcome=dict(status="failed",error="operation_failed_check_connection")
         try:
             if action == "prepare":
                 result = Preparation(home, settings, auth, model_id=model_id).prepare(cancel) if model_id else preparation.prepare(cancel)
@@ -76,13 +84,19 @@ def create_application(home, settings, auth, port=0):
                 result = auth.disconnect(account)
             else:
                 result = Inventory(home).scan(settings, account, lambda force_refresh=False: auth.access(account, force_refresh=force_refresh), cancel=cancel)
-            task.update(status="finished", result=result)
+            outcome=dict(status="finished", result=result)
         except AuthError as error:
-            task.update(status="failed", error=str(error))
+            outcome=dict(status="failed", error=str(error))
         except Exception:
-            task.update(status="failed", error="operation_failed_check_connection")
+            outcome=dict(status="failed", error="operation_failed_check_connection")
         finally:
-            job_lock.release()
+            try:
+                if history_id:
+                    history.task_record(history_id,action,account,started_at,outcome['status'],datetime.now(timezone.utc).isoformat(),outcome['status']=='failed')
+            finally:
+                with task_state_lock:
+                    job_lock.release()
+                    task.update(outcome)
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):
@@ -134,6 +148,24 @@ def create_application(home, settings, auth, port=0):
             if not self.allowed():
                 return self.reply(403, {"error": "forbidden"})
             path = urlsplit(self.path).path
+            history_match=re.fullmatch(r'/api/history/(scan|preparation|run|comparison|runtime|runtime_check|task)/([a-f0-9]{32}|runtime(?:-[a-f0-9]{16})?)',path)
+            if path=='/api/history' or history_match:
+                try:
+                    result={'item':history.detail(history_match[1],history_match[2])}if history_match else history.query(parse_qs(urlsplit(self.path).query,keep_blank_values=True))
+                    return self.reply(200,result)
+                except HistoryError as error:return self.reply(404 if str(error)=='history_not_found' else 410 if str(error)=='history_snapshot_expired' else 400,{'error':str(error)})
+            if path=='/api/preferences':
+                try:
+                    from .runtime_paths import runtime_directory
+                    paths={name:str(Path(home)/relative)for name,relative in {'home':'','settings':'settings.json','preferences':'preferences.json','inventory':'inventory.sqlite3','registry':'registry.sqlite3','outputs':'tts'}.items()}
+                    paths['runtime']=str(runtime_directory(home))
+                    return self.reply(200,{'preferences':preferences.read(),'workspace':{'paths':paths,'accounts':{a:bool(auth.store.get(a))for a in('A','B')},'allowed_folder_count':len(settings['allowlist']),'settings_mutable_fields':[],'backup_scope':'inventory_database_only','preference_scope':'this_workspace_display_only'}})
+                except PreferenceError as error:return self.reply(400,{'error':str(error)})
+            performance_match=re.fullmatch(r'/api/performance/([a-f0-9]{32})',path)
+            if performance_match:
+                try:return self.reply(200,history.performance(performance_match[1],inference))
+                except InferenceError as error:return self.reply(404,{'error':str(error)})
+                except HistoryError as error:return self.reply(400,{'error':str(error)})
             registry_match = re.fullmatch(r'/api/registry/([a-f0-9]{32})', path)
             if path == '/api/registry' or registry_match:
                 try:
@@ -227,6 +259,9 @@ def create_application(home, settings, auth, port=0):
                 if not 0 < length <= limit:
                     raise ValueError()
                 data = json.loads(self.rfile.read(length))
+                if self.path=='/api/preferences':
+                    try:return self.reply(200,{'preferences':preferences.update(data)})
+                    except PreferenceError as error:return self.reply(409 if str(error)in('preferences_stale','preferences_busy') else 400,{'error':str(error)})
                 registry_action = re.fullmatch(r'/api/registry/([a-f0-9]{32})(/runs)?',self.path)
                 if self.path == '/api/registry' or registry_action:
                     try:
@@ -290,12 +325,15 @@ def create_application(home, settings, auth, port=0):
             if action == "cancel":
                 cancel.set()
                 return self.reply(202, {"status": "cancel_requested"})
-            if not job_lock.acquire(blocking=False):
-                return self.reply(409, {"error": "operation_running"})
-            cancel.clear()
-            task.clear()
-            task.update(status="running", action=action, account=account)
-            threading.Thread(target=work, args=(action, account, model_id), daemon=True).start()
+            with task_state_lock:
+                if not job_lock.acquire(blocking=False):
+                    return self.reply(409, {"error": "operation_running"})
+                cancel.clear()
+                task.clear()
+                history_id=uuid.uuid4().hex;started_at=datetime.now(timezone.utc).isoformat()
+                task.update(status="running", action=action, account=account)
+            history.task_record(history_id,action,account,started_at,'running')
+            threading.Thread(target=work, args=(action, account, model_id,history_id,started_at), daemon=True).start()
             self.reply(202, {"status": "started"})
 
     try:

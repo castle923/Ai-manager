@@ -1,3 +1,4 @@
+import { appViewParams, replaceAppView } from "./workspace";
 import { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
@@ -23,6 +24,7 @@ import {
   Layers,
   ArrowRight,
   Play,
+  Settings2,
 } from "lucide-react";
 import "./style.css";
 import { PreparationPanel } from "./PreparationPanel";
@@ -30,6 +32,13 @@ import { TtsPanel } from "./TtsPanel";
 import { ComparisonPanel } from "./ComparisonPanel";
 import { DesktopRuntime } from "./DesktopHost";
 import { RegistryPanel, type CandidateRegistration } from "./RegistryPanel";
+import { HistoryPanel } from "./HistoryPanel";
+import { SettingsPanel } from "./SettingsPanel";
+import {
+  defaultPreferences,
+  workspaceApi,
+  type PreferenceRecord,
+} from "./workspace";
 
 type Scan = {
   scan_id: string;
@@ -169,9 +178,42 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 function App() {
+  function sourceFromUrl() {
+    const p = appViewParams(),
+      kind = p.get("source_kind"),
+      id = p.get("source_id");
+    return kind &&
+      id &&
+      ["run", "comparison", "scan"].includes(kind) &&
+      p.get("section") ===
+        (
+          { run: "tts", comparison: "comparison", scan: "library" } as Record<
+            string,
+            string
+          >
+        )[kind] &&
+      /^[a-f0-9]{32}$/.test(id)
+      ? { kind, id }
+      : null;
+  }
   const [registration, setRegistration] =
     useState<CandidateRegistration | null>(null);
-  const [section, setSection] = useState("registry"),
+  const [section, setSectionState] = useState(() => {
+      const value = appViewParams().get("section");
+      return value &&
+        [
+          "registry",
+          "history",
+          "settings",
+          "library",
+          "connections",
+          "preparation",
+          "tts",
+          "comparison",
+        ].includes(value)
+        ? value
+        : "registry";
+    }),
     [view, setView] = useState("models"),
     [q, setQ] = useState(""),
     [search, setSearch] = useState(""),
@@ -179,7 +221,13 @@ function App() {
     [kind, setKind] = useState(""),
     [family, setFamily] = useState(""),
     [sort, setSort] = useState("name"),
-    [scan, setScan] = useState(""),
+    [scan, setScan] = useState(() => {
+      const p = appViewParams(),
+        id = p.get("source_id");
+      return p.get("source_kind") === "scan" && id && /^[a-f0-9]{32}$/.test(id)
+        ? id
+        : "";
+    }),
     [page, setPage] = useState(1),
     [data, setData] = useState<Data | null>(null),
     [status, setStatus] = useState<Status | null>(null),
@@ -196,6 +244,104 @@ function App() {
     restore = useRef<HTMLElement | null>(null),
     request = useRef(0),
     detailRequest = useRef(0);
+  const navigationUsed = useRef(
+    [
+      "registry",
+      "history",
+      "settings",
+      "library",
+      "connections",
+      "preparation",
+      "tts",
+      "comparison",
+    ].includes(appViewParams().get("section") || ""),
+  );
+  const [preferences, setPreferences] = useState(defaultPreferences);
+  const [sourceSelection, setSourceSelection] = useState<{
+    kind: string;
+    id: string;
+  } | null>(sourceFromUrl);
+  const [sourceUrlError, setSourceUrlError] = useState(() =>
+    Boolean(
+      (appViewParams().has("source_kind") ||
+        appViewParams().has("source_id")) &&
+        !sourceFromUrl(),
+    ),
+  );
+  const [sourceOriginError, setSourceOriginError] = useState("");
+  const [validatedSource, setValidatedSource] = useState<string | null>(null);
+  const activeSourceKey =
+    sourceSelection &&
+    ((section === "tts" && sourceSelection.kind === "run") ||
+      (section === "comparison" && sourceSelection.kind === "comparison") ||
+      (section === "library" && sourceSelection.kind === "scan"))
+      ? sourceSelection.kind + ":" + sourceSelection.id
+      : null;
+  useEffect(() => {
+    let live = true;
+    setSourceOriginError("");
+    setValidatedSource(null);
+    if (sourceSelection && activeSourceKey) {
+      workspaceApi<{ item: { read_error: boolean } }>(
+        "/api/history/" + sourceSelection.kind + "/" + sourceSelection.id,
+      )
+        .then((r) => {
+          if (live) {
+            if (r.item.read_error)
+              setSourceOriginError(
+                "지정한 원본 기록을 읽지 못했습니다. 다른 최신 기록으로 바꾸지 않았습니다.",
+              );
+            else setValidatedSource(activeSourceKey);
+          }
+        })
+        .catch((e) => {
+          if (live) setSourceOriginError(e.message);
+        });
+    }
+    return () => {
+      live = false;
+    };
+  }, [sourceSelection, activeSourceKey]);
+  function setSection(value: string) {
+    navigationUsed.current = true;
+    setSectionState(value);
+  }
+  useEffect(() => {
+    let live = true;
+    workspaceApi<{ preferences: PreferenceRecord }>("/api/preferences")
+      .then((r) => {
+        if (live) {
+          setPreferences(r.preferences.values);
+          if (!navigationUsed.current)
+            setSectionState(r.preferences.values.default_section);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
+  useEffect(() => {
+    const view = appViewParams();
+    view.set("section", section);
+    replaceAppView(view);
+  }, [section]);
+  useEffect(() => {
+    const view = appViewParams();
+    if (
+      sourceSelection &&
+      ((section === "tts" && sourceSelection.kind === "run") ||
+        (section === "comparison" && sourceSelection.kind === "comparison") ||
+        (section === "library" && sourceSelection.kind === "scan"))
+    ) {
+      view.set("source_kind", sourceSelection.kind);
+      view.set("source_id", sourceSelection.id);
+    } else {
+      view.delete("source_kind");
+      view.delete("source_id");
+    }
+    replaceAppView(view);
+  }, [sourceSelection, section]);
   useEffect(() => {
     api<{ csrf: string }>("/api/session")
       .then((d) => (csrf.current = d.csrf))
@@ -413,6 +559,18 @@ function App() {
           >
             <Layers size={19} /> 새 A/B 비교
           </button>
+          <button
+            className={section === "history" ? "nav active" : "nav"}
+            onClick={() => setSection("history")}
+          >
+            <Database size={19} /> 통합 작업 기록
+          </button>
+          <button
+            className={section === "settings" ? "nav active" : "nav"}
+            onClick={() => setSection("settings")}
+          >
+            <Settings2 size={19} /> 설정
+          </button>
         </nav>
         <div className="sidebar-note">
           <ShieldCheck size={20} />
@@ -424,37 +582,18 @@ function App() {
         </div>
         <div className="sidebar-foot">
           <span className="dot" /> 개인 PC에서 실행 중
-          <small>M5 · 새 A/B 비교</small>
+          <small>M9 · 기록과 근거 연결</small>
         </div>
       </aside>
       <div className="workspace">
         <header className="topbar">
           <span>
             Ai-manager <span className="slash">/</span>{" "}
-            {section === "registry"
-              ? "모델 관리"
-              : section === "library"
-                ? "파일 후보 탐색"
-                : section === "preparation"
-                  ? "모델 준비"
-                  : section === "tts"
-                    ? "음성 작업실"
-                    : section === "comparison"
-                      ? "새 A/B 비교"
-                      : "계정 및 수집"}
-          </span>
-          <div className="top-meta">
-            <ShieldCheck size={15} /> Drive 읽기 전용{" "}
-            <span className="avatar">ME</span>
-          </div>
-        </header>
-        <main id="main">
-          <DesktopRuntime />
-          <div className="page-heading">
-            <div>
-              <div className="eyebrow">YOUR MODELS, CLEARLY ORGANIZED</div>
-              <h1>
-                {section === "registry"
+            {section === "history"
+              ? "통합 작업 기록"
+              : section === "settings"
+                ? "설정"
+                : section === "registry"
                   ? "모델 관리"
                   : section === "library"
                     ? "파일 후보 탐색"
@@ -465,19 +604,81 @@ function App() {
                         : section === "comparison"
                           ? "새 A/B 비교"
                           : "계정 및 수집"}
+          </span>
+          <div className="top-meta">
+            <ShieldCheck size={15} /> Drive 읽기 전용{" "}
+            <span className="avatar">ME</span>
+          </div>
+        </header>
+        <main id="main">
+          <DesktopRuntime />
+          {sourceUrlError && (
+            <div className="banner danger" role="alert">
+              URL의 원본 종류와 ID를 확인하세요. 잘못된 선택을 최신 기록으로
+              바꾸지 않았습니다.
+              <button
+                onClick={() => {
+                  setSourceUrlError(false);
+                  setSourceSelection(null);
+                  setScan("");
+                  setPage(1);
+                }}
+              >
+                원본 선택 해제 후 일반 목록 보기
+              </button>
+            </div>
+          )}
+          {sourceOriginError && (
+            <div className="banner danger" role="alert">
+              {sourceOriginError}
+              <button
+                onClick={() => {
+                  setSourceSelection(null);
+                  setSourceOriginError("");
+                  setScan("");
+                  setPage(1);
+                }}
+              >
+                원본 선택 해제 후 일반 목록 보기
+              </button>
+            </div>
+          )}
+          <div className="page-heading">
+            <div>
+              <div className="eyebrow">YOUR MODELS, CLEARLY ORGANIZED</div>
+              <h1>
+                {section === "history"
+                  ? "통합 작업 기록"
+                  : section === "settings"
+                    ? "작업실 설정"
+                    : section === "registry"
+                      ? "모델 관리"
+                      : section === "library"
+                        ? "파일 후보 탐색"
+                        : section === "preparation"
+                          ? "모델 준비"
+                          : section === "tts"
+                            ? "음성 작업실"
+                            : section === "comparison"
+                              ? "새 A/B 비교"
+                              : "계정 및 수집"}
               </h1>
               <p>
-                {section === "registry"
-                  ? "내 모델의 설명과 보관 위치를 등록하고, 확인된 근거에 따라 현재 상태를 살펴보세요."
-                  : section === "library"
-                    ? "흩어져 있는 모델 파일을 모으고, 현재 확인 수준을 한눈에 살펴보세요."
-                    : section === "preparation"
-                      ? "선정 모델의 파일과 환경을 준비하고, 확인 근거를 단계별로 살펴보세요."
-                      : section === "tts"
-                        ? "새 한국어 문장을 음성으로 만들고, 이번 실행의 검증 결과를 확인하세요."
-                        : section === "comparison"
-                          ? "같은 새 입력으로 두 모델을 실행하고, 실제 조건과 결과를 함께 비교하세요."
-                          : "두 계정의 연결과 허용 폴더 수집을 관리하세요."}
+                {section === "history"
+                  ? "수집부터 준비·실행·비교까지, 저장된 원본 기록과 확인 근거를 따라가세요."
+                  : section === "settings"
+                    ? "이 작업실의 보기 옵션과 자료 위치·적용 범위를 확인하세요."
+                    : section === "registry"
+                      ? "내 모델의 설명과 보관 위치를 등록하고, 확인된 근거에 따라 현재 상태를 살펴보세요."
+                      : section === "library"
+                        ? "흩어져 있는 모델 파일을 모으고, 현재 확인 수준을 한눈에 살펴보세요."
+                        : section === "preparation"
+                          ? "선정 모델의 파일과 환경을 준비하고, 확인 근거를 단계별로 살펴보세요."
+                          : section === "tts"
+                            ? "새 한국어 문장을 음성으로 만들고, 이번 실행의 검증 결과를 확인하세요."
+                            : section === "comparison"
+                              ? "같은 새 입력으로 두 모델을 실행하고, 실제 조건과 결과를 함께 비교하세요."
+                              : "두 계정의 연결과 허용 폴더 수집을 관리하세요."}
               </p>
             </div>
             <button
@@ -517,7 +718,46 @@ function App() {
               {err(status.task.error || "operation_failed_check_connection")}
             </div>
           )}
-          {section === "registry" ? (
+          {(sourceUrlError || sourceOriginError) &&
+          ["tts", "comparison", "library"].includes(section) ? (
+            <section className="panel">
+              <h2>원본 선택을 확인해야 합니다</h2>
+              <p>
+                잘못된 원본 ID가 지정돼 기록 화면을 열지 않았습니다. 위 버튼으로
+                선택을 명시적으로 해제하거나 통합 작업 기록에서 원본을
+                선택하세요.
+              </p>
+            </section>
+          ) : activeSourceKey && validatedSource !== activeSourceKey ? (
+            <section className="panel" role="status">
+              지정한 원본 ID를 확인합니다. 최신 기록으로 바꾸어 표시하지
+              않습니다.
+            </section>
+          ) : section === "history" ? (
+            <HistoryPanel
+              preferences={preferences}
+              onSource={(kind, id) => {
+                setSourceSelection({ kind, id });
+                if (kind === "scan") {
+                  setScan(id);
+                  setPage(1);
+                }
+                setSection(
+                  kind === "run"
+                    ? "tts"
+                    : kind === "comparison"
+                      ? "comparison"
+                      : kind === "scan"
+                        ? "library"
+                        : kind === "task"
+                          ? "connections"
+                          : "preparation",
+                );
+              }}
+            />
+          ) : section === "settings" ? (
+            <SettingsPanel csrf={csrf} onSaved={setPreferences} />
+          ) : section === "registry" ? (
             <RegistryPanel
               csrf={csrf}
               candidate={registration}
@@ -529,9 +769,20 @@ function App() {
             <ComparisonPanel
               csrf={csrf}
               onPrepare={() => setSection("preparation")}
+              initialComparisonId={
+                sourceSelection?.kind === "comparison"
+                  ? sourceSelection.id
+                  : undefined
+              }
+              preferences={preferences}
             />
           ) : section === "tts" ? (
-            <TtsPanel csrf={csrf} />
+            <TtsPanel
+              csrf={csrf}
+              initialRunId={
+                sourceSelection?.kind === "run" ? sourceSelection.id : undefined
+              }
+            />
           ) : section === "preparation" ? (
             <PreparationPanel
               busy={Boolean(busy)}

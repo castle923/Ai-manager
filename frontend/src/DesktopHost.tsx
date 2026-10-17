@@ -137,9 +137,13 @@ export function DesktopRuntime() {
     };
   }, [host]);
   if (!host) return null;
+  const denied = state.status === "denied" || model.status === "denied";
   const running = state.status === "running";
   const modelBusy =
-    selecting || model.status === "running" || model.status === "cancelling";
+    denied ||
+    selecting ||
+    model.status === "running" ||
+    model.status === "cancelling";
   async function prepareModel(id: string, path?: string) {
     if (!host || modelBusy) return;
     setSelecting(true);
@@ -157,7 +161,9 @@ export function DesktopRuntime() {
         <div>
           <strong>앱 추론 환경</strong>
           <p role="status">
-            {stages[state.stage || ""] || "준비 상태 확인"}
+            {denied
+              ? "앱 연결을 확인하지 못했습니다. 앱을 다시 열어주세요."
+              : stages[state.stage || ""] || "준비 상태 확인"}
             {state.error ? " · 연결·저장 공간·앱 무결성을 확인해주세요." : ""}
           </p>
           <small>
@@ -168,7 +174,7 @@ export function DesktopRuntime() {
         </div>
         <button
           className="secondary"
-          disabled={running || state.status === "ready"}
+          disabled={denied || running || state.status === "ready"}
           onClick={async () => {
             try {
               setState(await host.prepare_runtime());

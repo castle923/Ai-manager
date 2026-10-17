@@ -2,13 +2,13 @@
 
 두 Google Drive 계정에 보관한 AI 모델을 한곳에서 찾고, 필요한 파일을 확인하고, 새 테스트 결과를 비교하는 개인용 대시보드입니다.
 
-**전체 구상은 아직 진행 중입니다.** M0–M7의 완료는 승인한 TTS 중심 단계와 독립 앱 범위입니다. 다종 모델의 등록·통합 상태·통합 작업 기록·차트·각 실행 어댑터까지 모두 완성한 상태는 아닙니다. 현재 우선 단계는 **M8 모델 단위 등록 관리와 통합 상태 대시보드**입니다. 후보 3의 등록·편집 수리·보관/해제·새 실행 연결·재생/저장을 확인했고 성공 후 편집·정상 재시작의 상태/파일 보존도 검증했습니다. 확인한 로컬 환경의 M8 핵심 흐름이며 새 공개 Release는 아직 없습니다. [M8 현재 상태](docs/M8_REPORT.md) [남은 계획과 완료 기준](docs/M8_PLAN.md)
+**전체 구상은 아직 진행 중입니다.** M0–M7의 TTS 중심 단계·독립 앱, M8의 모델 등록·통합 상태에 이어 **M9 통합 작업 기록·보기 설정·성능 차트**를 확인한 Windows 환경에서 검증했습니다. 후보 3의 새 A/B·차트/원천 표·재생·정상 WAV 저장·설정 유지·정상 재시작을 확인했으며 이번 변경에는 검증된 M9 구현 소스와 문서를 함께 반영합니다. 로컬 0.9.0 후보와 공개 다운로드 v0.7.0은 구분합니다. M10 다종 모델 실행과 향후 자동화는 아직 완료되지 않았습니다. [M9 검증과 제한](docs/M9_REPORT.md) · [M9 사용 안내](docs/M9_INSTALL.md) · [전체 후속 계획](docs/M8_PLAN.md)
 
 처음 사용한다면 **[쉬운 실행·기능 사용 가이드](docs/USER_GUIDE.md)**에서 ZIP 실행부터 로그인·모델 준비·음성 생성·저장 순서를 확인하세요.
 
 > **현재 상태: v0.7.0 Python 포함 Windows 독립 앱 출시 완료(확인한 로컬·0.6B 범위).** 새 설치·두 계정 인증·번들 추론 환경·CUDA·새 TTS·재생·native WAV 저장·취소·종료/재시작을 검증했습니다. [v0.7.0 Release](https://github.com/castle923/Ai-manager/releases/tag/v0.7.0) · [v0.7.0 독립 앱 시작 안내](https://github.com/castle923/Ai-manager/blob/066e62d286cb50fee1755bd0146c3ddbd3188526/docs/M7_INSTALL.md) · [M7 검증 보고서](docs/M7_REPORT.md)
 
-앱과 추론용 Python 기반을 포함합니다. WebView2 Runtime은 시스템 전제이며 첫 Torch 의존성 준비에는 인터넷과 수 GB의 공간이 필요합니다. 모델·개인 인증 자료는 배포물에 포함하지 않습니다. 이번 새 실제 TTS는 0.6B 한 모델 범위이며 1.7B 새 추론·Python 미설치 별도 PC·전면 접근성은 미검증입니다.
+앱과 추론용 Python 기반을 포함합니다. WebView2 Runtime은 시스템 전제이며 첫 Torch 의존성 준비에는 인터넷과 수 GB의 공간이 필요합니다. 모델·개인 인증 자료는 배포물에 포함하지 않습니다. v0.7.0 출시 당시 실제 TTS 검증은 0.6B 한 모델 범위였으며 당시 1.7B 새 추론·Python 미설치 별도 PC·전면 접근성은 미검증이었습니다. 이후 0.7.1 및 M9의 두 모델 새 검증은 각 후속 보고서와 구분합니다.
 
 [v0.7.0 Windows 독립 앱 ZIP 받기](https://github.com/castle923/Ai-manager/releases/download/v0.7.0/AiManager-0.7.0-windows.zip) · 58,405,026 bytes · SHA-256 `661d8bd5b58edfa4e2ba811338fce787fb1744149c98caacd7deac4489eae4d0`. 공개 Release의 uploaded asset 크기·GitHub SHA-256 digest를 검증된 로컬 ZIP과 대조했습니다. 태그는 소스 커밋 `066e62d286cb50fee1755bd0146c3ddbd3188526`에 고정하며 이후 main의 문서 갱신은 앱·ZIP 변경이 아닙니다.
 

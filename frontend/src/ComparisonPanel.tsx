@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import { AudioDownload } from "./DesktopHost";
+import { PerformanceChart } from "./PerformanceChart";
+import { defaultPreferences, type ViewPreferences } from "./workspace";
 import {
   AlertTriangle,
   ArrowRight,
@@ -132,14 +134,23 @@ const preferenceLabels: Record<string, string> = {
 export function ComparisonPanel({
   csrf,
   onPrepare,
+  initialComparisonId,
+  preferences = defaultPreferences,
 }: {
   csrf: RefObject<string>;
   onPrepare: () => void;
+  initialComparisonId?: string;
+  preferences?: ViewPreferences;
 }) {
   const audioPlayers = useRef(new Map<string, HTMLAudioElement>());
   const [data, setData] = useState<Status | null>(null);
   const [text, setText] = useState("");
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(
+    initialComparisonId || null,
+  );
+  useEffect(() => {
+    if (initialComparisonId) setSelected(initialComparisonId);
+  }, [initialComparisonId]);
   const [pair, setPair] = useState<string[]>([]);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
@@ -179,7 +190,8 @@ export function ComparisonPanel({
   const chosen = ids.map((id) => models.find((model) => model.id === id));
   const comparisons = data?.comparisons || [];
   const comparison =
-    comparisons.find((item) => item.id === selected) || comparisons[0];
+    comparisons.find((item) => item.id === selected) ||
+    (!initialComparisonId ? comparisons[0] : undefined);
   const length = Array.from(text).length;
   const max = data?.defaults.max_text_length || 300;
   const ready =
@@ -241,6 +253,14 @@ export function ComparisonPanel({
   }
   return (
     <div className="comparison-page">
+      {initialComparisonId &&
+        data &&
+        !comparisons.some((item) => item.id === initialComparisonId) && (
+          <p className="banner danger" role="alert">
+            지정한 원본 비교 ID를 찾지 못했습니다. 최신 비교로 바꾸어 표시하지
+            않았습니다.
+          </p>
+        )}
       <section className="panel comparison-intro">
         <div className="tts-model-icon">
           <GitCompareArrows size={25} />
@@ -560,6 +580,13 @@ export function ComparisonPanel({
           </>
         )}
       </section>
+      {comparison && (
+        <PerformanceChart
+          comparisonId={comparison.id}
+          preferences={preferences}
+          refreshKey={comparison.status}
+        />
+      )}
       <section className="panel comparison-history">
         <div className="tts-card-heading">
           <h2>이 프로젝트의 비교 기록</h2>

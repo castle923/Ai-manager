@@ -100,10 +100,19 @@ const seconds = (value: number | undefined) =>
   value == null ? "미수집" : `${value.toFixed(2)}초`;
 const date = (value: string) => new Date(value).toLocaleString("ko-KR");
 
-export function TtsPanel({ csrf }: { csrf: RefObject<string> }) {
+export function TtsPanel({
+  csrf,
+  initialRunId,
+}: {
+  csrf: RefObject<string>;
+  initialRunId?: string;
+}) {
   const [data, setData] = useState<TtsStatus | null>(null);
   const [text, setText] = useState("");
-  const [selected, setSelected] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(initialRunId || null);
+  useEffect(() => {
+    if (initialRunId) setSelected(initialRunId);
+  }, [initialRunId]);
   const [error, setError] = useState("");
   const [stale, setStale] = useState(false);
   const [pending, setPending] = useState(false);
@@ -143,7 +152,9 @@ export function TtsPanel({ csrf }: { csrf: RefObject<string> }) {
   const length = Array.from(text).length;
   const invalid = !text.trim() || length > max;
   const runs = data?.runs || [];
-  const run = runs.find((item) => item.id === selected) || runs[0];
+  const run =
+    runs.find((item) => item.id === selected) ||
+    (!initialRunId ? runs[0] : undefined);
   const waiting = runs.filter((item) => item.status === "queued").length;
   const canSubmit =
     Boolean(data) && !stale && !pending && !invalid && waiting < 3;
@@ -192,6 +203,14 @@ export function TtsPanel({ csrf }: { csrf: RefObject<string> }) {
   const canPlay = run?.status === "succeeded" && run.output && run.audio_url;
   return (
     <div className="tts-page">
+      {initialRunId &&
+        data &&
+        !runs.some((item) => item.id === initialRunId) && (
+          <p className="banner danger" role="alert">
+            지정한 원본 실행 ID를 찾지 못했습니다. 최신 실행으로 바꾸어 표시하지
+            않았습니다. 통합 작업 기록에서 원본을 확인하세요.
+          </p>
+        )}
       <section className="panel tts-model">
         <div className="tts-model-icon">
           <AudioLines size={24} />
