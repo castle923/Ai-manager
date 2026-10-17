@@ -2,6 +2,8 @@
 
 두 Google Drive 계정에 보관한 AI 모델을 한곳에서 찾고, 필요한 파일을 확인하고, 새 테스트 결과를 비교하는 개인용 대시보드입니다.
 
+처음 사용한다면 **[쉬운 실행·기능 사용 가이드](docs/USER_GUIDE.md)**에서 ZIP 실행부터 로그인·모델 준비·음성 생성·저장 순서를 확인하세요.
+
 > **현재 상태: v0.7.0 Python 포함 Windows 독립 앱 출시 완료(확인한 로컬·0.6B 범위).** 새 설치·두 계정 인증·번들 추론 환경·CUDA·새 TTS·재생·native WAV 저장·취소·종료/재시작을 검증했습니다. [v0.7.0 Release](https://github.com/castle923/Ai-manager/releases/tag/v0.7.0) · [v0.7.0 독립 앱 시작 안내](https://github.com/castle923/Ai-manager/blob/066e62d286cb50fee1755bd0146c3ddbd3188526/docs/M7_INSTALL.md) · [M7 검증 보고서](docs/M7_REPORT.md)
 
 앱과 추론용 Python 기반을 포함합니다. WebView2 Runtime은 시스템 전제이며 첫 Torch 의존성 준비에는 인터넷과 수 GB의 공간이 필요합니다. 모델·개인 인증 자료는 배포물에 포함하지 않습니다. 이번 새 실제 TTS는 0.6B 한 모델 범위이며 1.7B 새 추론·Python 미설치 별도 PC·전면 접근성은 미검증입니다.
