@@ -1,6 +1,12 @@
 # Windows 프로그램 형태 배포 검토
 
-검토일: 2026-10-17 (Asia/Seoul) · 상태: M6 구현 방향과 후속 배포 선택의 비교. 이번 설치 스크립트·launcher·v0.6.0 package-4-final의 새 설치·격리 복구·한글/공백 CMD 시작·새 실제 Edge/GPU 흐름과 핵심 UI 표본을 검증했다. standalone exe·WebView2 desktop host를 생성하거나 검증한 문서가 아니다. [M6 진행 보고서](M6_REPORT.md) · [승인 범위](APPROVALS.md)
+검토일: 2026-10-17 (Asia/Seoul) · M6 배포 선택 비교와 M7 구현 현황. 아래 세 옵션 표는 M6 시점 검토 이력이며 현재 M7 결과는 다음 절과 [M7 보고서](M7_REPORT.md)를 따른다. [M6 보고서](M6_REPORT.md) · [승인 범위](APPROVALS.md)
+
+## M7 독립 앱 현황
+
+사용자가 Python 별도 설치 없는 독립 창을 명시 승인해 후보 0.7.0을 PyInstaller 6.22.3 onedir/windowed·pywebview 6.2.1 edgechromium으로 구현했다. 앱 Python과 python-build-standalone CPython 3.10.22 기반을 포함하며 추론 Torch 등 의존성은 앱에서 온라인으로 별도 준비한다. 현재 Windows의 WebView2 Runtime을 사용하고 없는 PC의 자동 전역 설치는 하지 않는다. [명령 없는 시작 안내](M7_INSTALL.md)를 따른다.
+
+desktop5 ZIP은 58,405,026 bytes·SHA-256 `661d8bd5b58edfa4e2ba811338fce787fb1744149c98caacd7deac4489eae4d0`이다. 새 GUI 설치·독립 창·새 인증·CUDA·새 0.6B TTS·native 저장을 확인했으며 정상 종료/재시작의 상태·해시 보존도 확인했다. 재시작 후 독립 창 재생·두 계정 실제 갱신을 확인했으며 공개 게시·Release 첨부는 대기다. 이번 새 TTS는 0.6B 한 모델 범위이며 1.7B 새 추론은 미검증이다. 모델과 자격 증명은 포함하지 않는다. 모든 PC 호환성이나 전면 native widget 재작성으로 해석하지 않는다. 큰 ZIP은 정상 Release 첨부로 배포할 계획이며 Git blob 기본 전략을 사용하지 않는다.
 
 ## 권고 방향
 

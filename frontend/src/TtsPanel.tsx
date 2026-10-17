@@ -1,4 +1,5 @@
 import { useEffect, useState, type RefObject } from "react";
+import { AudioDownload } from "./DesktopHost";
 import {
   AudioLines,
   Play,
@@ -371,14 +372,10 @@ export function TtsPanel({ csrf }: { csrf: RefObject<string> }) {
                 <div className="tts-audio">
                   <div className="tts-card-heading">
                     <strong>이번 실행의 WAV</strong>
-                    <a
-                      className="secondary"
-                      href={`${run.audio_url}?download=1`}
-                      download
-                    >
+                    <AudioDownload id={run.id} url={run.audio_url!}>
                       <Download size={15} />
                       WAV 저장
-                    </a>
+                    </AudioDownload>
                   </div>
                   <audio
                     key={run.id}

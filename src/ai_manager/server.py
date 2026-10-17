@@ -15,7 +15,35 @@ from .inference import Inference, InferenceError
 import re
 
 
-def serve(home, settings, auth, browser=webbrowser.open, port=0):
+class LocalApplication:
+    """An explicitly owned loopback server with deterministic host shutdown."""
+    def __init__(self, server, inference, cancel):
+        self.server, self.inference, self.cancel = server, inference, cancel
+        self.url = f"http://127.0.0.1:{server.server_port}/"
+        self.thread = None
+        self.closed = False
+
+    def start(self):
+        if self.closed or self.thread is not None:
+            raise RuntimeError("local_server_already_started_or_closed")
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
+        return self.url
+
+    def close(self):
+        if self.closed:
+            return
+        self.closed = True
+        self.cancel.set()
+        if self.thread is not None:
+            self.server.shutdown()
+        self.inference.close()
+        self.server.server_close()
+        if self.thread is not None:
+            self.thread.join(5)
+
+
+def create_application(home, settings, auth, port=0):
     from .inventory import Inventory
     from .dashboard import Dashboard
     from .preparation import Preparation
@@ -232,7 +260,7 @@ def serve(home, settings, auth, browser=webbrowser.open, port=0):
             model_id = data.get('model_id')
             if model_id is not None:
                 from .models import model_ids
-                if action != 'prepare' or not isinstance(model_id, str) or model_id not in model_ids():
+                if action not in ('prepare', 'runtime_check') or not isinstance(model_id, str) or model_id not in model_ids():
                     return self.reply(400, {'error': 'unsupported_model'})
             if action == "cancel":
                 cancel.set()
@@ -245,16 +273,25 @@ def serve(home, settings, auth, browser=webbrowser.open, port=0):
             threading.Thread(target=work, args=(action, account, model_id), daemon=True).start()
             self.reply(202, {"status": "started"})
 
-    with ThreadingHTTPServer(("127.0.0.1", port), Handler) as server:
-        server.daemon_threads = True
-        server.timeout = 1
-        url = f"http://127.0.0.1:{server.server_port}/"
-        print("Ai-manager 로컬 화면: " + url, flush=True)
-        browser(url)
-        try:
-            server.serve_forever()
-        finally:
-            inference.close()
+    try:
+        server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    except OSError:
+        inference.close()
+        raise
+    server.daemon_threads = True
+    server.timeout = 1
+    return LocalApplication(server, inference, cancel)
+
+
+def serve(home, settings, auth, browser=webbrowser.open, port=0):
+    application = create_application(home, settings, auth, port)
+    try:
+        application.start()
+        print("Ai-manager 로컬 화면: " + application.url, flush=True)
+        browser(application.url)
+        application.thread.join()
+    finally:
+        application.close()
 
 
 HTML = """<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ai-manager · M1</title><link rel="stylesheet" href="/style.css"><body><main><p class="eyebrow">AI-MANAGER / M1</p><h1>내 모델 목록 연결</h1><p>두 계정의 지정 폴더를 읽기 전용으로 확인합니다. 파일 내용 다운로드와 모델 실행은 이후 단계입니다.</p><section id="accounts" aria-label="계정 연결"></section><section><h2>진행 상태</h2><p id="task" role="status" aria-live="polite"></p><button id="cancel">현재 작업 취소</button></section><section><h2>이번 앱의 수집 기록</h2><p>완료·부분 실패·과거 스캔을 구분합니다. 파일 발견은 구성·무결성·실행 검증을 뜻하지 않습니다.</p><label for="scan-select">조회할 수집 기록</label><select id="scan-select"></select><p id="inventory"></p><p id="scan-errors" role="status"></p><div class="table-wrap"><table><thead><tr><th scope="col">파일 이름</th><th scope="col">후보 종류</th><th scope="col">크기</th><th scope="col">수정일</th><th scope="col">발견 위치</th></tr></thead><tbody id="files"></tbody></table></div><p id="page-info"></p><button id="previous">이전 50개</button><button id="next">다음 50개</button></section><p id="error" role="alert"></p></main><script src="/app.js"></script></body></html>"""

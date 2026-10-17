@@ -285,7 +285,11 @@ export function PreparationPanel({
           "Content-Type": "application/json",
           "X-AiManager-CSRF": csrf.current,
         },
-        body: JSON.stringify({ action, account: "B", model_id: modelId }),
+        body: JSON.stringify({
+          action,
+          account: "B",
+          ...(action === "prepare" ? { model_id: modelId } : {}),
+        }),
       });
       const body = await response.json();
       if (!response.ok) throw Error(reason(body.error || "request_failed"));

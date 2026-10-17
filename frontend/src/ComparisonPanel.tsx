@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
+import { AudioDownload } from "./DesktopHost";
 import {
   AlertTriangle,
   ArrowRight,
@@ -646,14 +647,10 @@ function ComparisonOutput({
               {seconds(run.output!.duration_seconds)} ·{" "}
               {run.output!.sample_rate.toLocaleString()} Hz
             </span>
-            <a
-              className="secondary"
-              href={`${run.audio_url}?download=1`}
-              download
-            >
+            <AudioDownload id={run.id} url={run.audio_url!}>
               <Download size={14} />
               {side} WAV 저장
-            </a>
+            </AudioDownload>
           </div>
         </div>
       ) : (

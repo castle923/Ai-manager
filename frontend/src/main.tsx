@@ -28,6 +28,7 @@ import "./style.css";
 import { PreparationPanel } from "./PreparationPanel";
 import { TtsPanel } from "./TtsPanel";
 import { ComparisonPanel } from "./ComparisonPanel";
+import { DesktopRuntime } from "./DesktopHost";
 
 type Scan = {
   scan_id: string;
@@ -436,6 +437,7 @@ function App() {
           </div>
         </header>
         <main id="main">
+          <DesktopRuntime />
           <div className="page-heading">
             <div>
               <div className="eyebrow">YOUR MODELS, CLEARLY ORGANIZED</div>

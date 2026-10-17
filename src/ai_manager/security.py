@@ -18,11 +18,12 @@ def protect_directory(directory):
     directory.mkdir(parents=True, exist_ok=True)
     if os.name != "nt":
         raise RuntimeError("Windows private storage required")
-    identity = subprocess.run(["whoami", "/user", "/fo", "csv", "/nh"], capture_output=True, text=True, check=True)
+    from .external_process import run_external
+    identity = run_external(["whoami", "/user", "/fo", "csv", "/nh"], capture_output=True, text=True, check=True)
     sid = next(csv.reader(io.StringIO(identity.stdout)))[1]
     if not re.fullmatch(r"S-1-[0-9-]+", sid):
         raise RuntimeError("Cannot identify current Windows user")
-    result = subprocess.run(["icacls", str(directory), "/inheritance:r", "/grant:r", f"*{sid}:(OI)(CI)F", "*S-1-5-18:(OI)(CI)F"], capture_output=True)
+    result = run_external(["icacls", str(directory), "/inheritance:r", "/grant:r", f"*{sid}:(OI)(CI)F", "*S-1-5-18:(OI)(CI)F"], capture_output=True)
     if result.returncode:
         raise RuntimeError("Cannot protect private storage")
 

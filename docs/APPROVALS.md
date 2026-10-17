@@ -103,3 +103,11 @@ M0 조사·설계·OAuth 파일 준비 후 M1에서 두 계정 실인증·강제
 이번 Ai-manager 프로젝트의 이후 브라우저 작업은 사용자 요청에 따라 Edge를 선호한다. 이는 프로젝트 작업 선호이며 OS·브라우저 전역 기본 설정 변경이 아니다.
 
 M6 fresh home에는 사용자가 이번 프로젝트에 지정한 OAuth client JSON·동일 allowlist 원본을 설정 입력으로 적용할 수 있다. 토큰·state·output·inventory를 기존 home에서 복사하지 않는다. 두 계정 fresh OAuth 로그인·동의는 사용자 직접행위다. 이번 구현 방향은 기존 Python이 필요한 user-scope 설치 스크립트·launcher와 v0.6.0 wheel이며 standalone exe·native host가 이미 구현됐다고 주장하지 않는다. 최종 gate 검증 전 v0.6.0 태그를 만들지 않는다.
+
+## Python 별도 설치 없는 Windows 독립 앱 (2026-10-17)
+
+사용자는 Python을 따로 설치하지 않는 Windows 프로그램·독립 앱 창의 구현과 설치, 새 인증·실제 TTS·정상 파일 저장 검증 및 비식별 저장소 반영을 새로 명시 승인했다. 후보 버전은 0.7.0이다. 앱과 추론 런타임 모두 사용자 전역 Python 설치 없이 동작해야 하며 필요한 공개 라이브러리·런타임 다운로드와 격리 설치·수정·테스트·문서가 같은 범위에 포함된다. 앞선 M6 배포 가능성 검토와 구분하며 실제 새 검증 전 독립 앱 출시 완료로 기록하지 않는다.
+
+새 고유 stage/home/runtime/output을 사용한다. 기존 M6 서버·홈·인증·DB·배포물·WAV는 보존하며 토큰·state·인벤토리·출력 복사는 하지 않는다. 같은 프로젝트 코드와 지정 모델 가중치/config/tokenizer, 지정 OAuth client/allowlist 원본은 허용한다. 두 계정의 새 로그인·동의는 사용자 직접행위다. 모델·자격 증명은 배포물에 포함하지 않는다.
+
+앱 UI는 브라우저 탭이 아닌 독립 창이고 OAuth만 시스템 브라우저를 사용할 수 있다. 정상 native SaveDialog/host API, 명시적인 런타임 준비 상태·정상 TLS, localhost Host/Origin 보호·소유 작업자 종료를 유지한다. user-scope 설치, 버전/해시, no-overwrite/reparse 경계와 PATH/PYTHONHOME/PYTHONPATH 격리 실행을 검증한다. 전역 PATH·보안 정책·관리자 설정 변경, 새 모델·원격 GPU·Drive 쓰기·공개 서비스·서명 구매는 포함하지 않는다.

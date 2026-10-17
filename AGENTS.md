@@ -84,3 +84,11 @@ Google 로그인·OAuth 동의는 사용자 직접행위다. 필요한 실제 �
 
 
 M6 fresh home에는 사용자가 이번 프로젝트에 지정한 OAuth client JSON·동일 allowlist 원본을 설정 입력으로 적용할 수 있다. 토큰·state·output·inventory를 기존 home에서 복사하지 않는다. 두 계정 fresh OAuth 로그인·동의는 사용자 직접행위다. 이번 구현 방향은 기존 Python이 필요한 user-scope 설치 스크립트·launcher와 v0.6.0 wheel이며 standalone exe·native host가 이미 구현됐다고 주장하지 않는다. 최종 gate 검증 전 v0.6.0 태그를 만들지 않는다.
+
+## 2026-10-17 Python 별도 설치 없는 Windows 독립 앱 승인
+
+사용자는 Python을 따로 설치하지 않는 Windows 프로그램과 브라우저 탭이 아닌 독립 앱 창의 구현·설치·새 인증·실제 TTS·정상 파일 저장 검증·비식별 저장소 반영을 명시 승인했다. 후보 버전은 0.7.0이며 앱뿐 아니라 추론 런타임도 사용자 전역 Python 설치 없이 준비해야 한다. 공개 라이브러리·런타임의 필요한 다운로드와 격리 설치, 같은 범위의 수정·테스트·문서는 승인 범위다. 독립 창의 실제 표시와 저장, 호스트 Python과 분리된 실행, 새 모델 실행 결과를 확인하기 전 완료로 판정하지 않는다.
+
+같은 프로젝트 코드는 계속 사용할 수 있고 지정 모델 가중치·직접 필요한 config/tokenizer 및 지정 OAuth client/allowlist 원본만 기존 입력으로 사용할 수 있다. 새 고유 stage/home/runtime/output을 만들며 기존 M6 서버·홈·인증·DB·배포물·WAV는 보존한다. 기존 토큰·state·인벤토리·출력은 복사하지 않고 두 계정 로그인·동의는 사용자가 새로 직접 수행한다. 모델과 자격 증명은 배포 패키지에 포함하지 않는다.
+
+OAuth의 시스템 브라우저 사용은 허용하되 앱 UI는 독립 창으로 제공한다. 파일 저장은 정상 native SaveDialog/host API를 사용한다. 런타임 다운로드·준비 상태와 실패를 앱에 명시하고 정상 TLS, localhost Host/Origin 보호와 소유 작업자 종료를 유지한다. user-scope 설치·버전/해시·새 대상/no-overwrite·reparse 경계를 검증한다. PATH/PYTHONHOME/PYTHONPATH를 격리한 검증은 허용하지만 전역 PATH·보안 정책·관리자 설정을 바꾸지 않는다. 새 모델·원격 GPU·Drive 쓰기·공개 서비스·서명 구매를 자동 승인하지 않는다.

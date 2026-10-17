@@ -42,7 +42,11 @@ def regular(path, root):
     if not path.is_relative_to(root):
         raise InferenceError('unsafe_local_path')
     for item in (path, *path.parents):
-        if item.is_symlink() or (item.exists() and getattr(item.lstat(), 'st_file_attributes', 0) & 0x400):
+        try:
+            info = item.lstat()
+        except FileNotFoundError:
+            continue
+        if item.is_symlink() or getattr(info, 'st_file_attributes', 0) & 0x400:
             raise InferenceError('unsafe_local_path')
         if item == root:
             break
@@ -457,14 +461,16 @@ class Inference:
         if actual != {item['path'] for item in m['files']}:
             raise InferenceError('model_integrity_failed')
         run['model']['preparation_id'] = state['id']
-        python = regular(self.home / 'runtime' / 'venv' / 'Scripts' / 'python.exe', self.home)
+        from .runtime_paths import runtime_directory
+        runtime = runtime_directory(self.home)
+        python = regular(runtime / 'venv' / 'Scripts' / 'python.exe', self.home)
         if not python.is_file(): raise InferenceError('runtime_not_ready')
         worker = Path(__file__).with_name('tts_worker.py')
         provenance = dict(run_id=run['id'], checked_at=now(), inputs=[dict(item, kind='official_model_component' if item.get('official_supplement') else 'designated_model_component', local_path=str(assets / safe_relative(item['path'])), source=item.get('official_supplement',{}).get('url',m['source'])) for item in verified],
                           input_sha256=run['input_sha256'], preparation_provenance_sha256=digest(prep.base / state['id'] / 'inputs.json') if (prep.base / state['id'] / 'inputs.json').is_file() else None, manifest_sha256=digest(manifest_path(model_id)),
-                          code_sha256={p.name: digest(p) for p in (Path(__file__), worker, Path(__file__).with_name('models.py'), Path(__file__).with_name('preparation.py'), Path(__file__).with_name('server.py'))},
+                          code_sha256={p.name: digest(p) for p in (Path(__file__), worker, *[Path(__file__).with_name(name) for name in ('models.py', 'preparation.py', 'server.py', 'external_process.py', 'runtime_bootstrap.py', 'runtime_paths.py', 'desktop.py', 'security.py', 'config.py')])},
                           comparison_id=run.get('comparison_id'), comparison_side=run.get('comparison_side'),
-                          runtime=prep.environment(), runtime_lock_sha256=digest(self.home / 'runtime' / 'requirements.lock') if (self.home / 'runtime' / 'requirements.lock').is_file() else None,
+                          runtime=prep.environment(), runtime_directory=str(runtime),runtime_lock_sha256=digest(runtime / 'requirements.lock') if (runtime / 'requirements.lock').is_file() else None,
                           cold_loading=True, timeout_seconds=self.timeout, offline=True)
         directory = self._path(run['id'])
         atomic_text(directory / 'provenance.json', json.dumps(provenance, ensure_ascii=False, indent=2))
@@ -482,7 +488,8 @@ class Inference:
             env.update(HF_HUB_OFFLINE='1', TRANSFORMERS_OFFLINE='1', HF_DATASETS_OFFLINE='1', HF_HUB_DISABLE_TELEMETRY='1', DO_NOT_TRACK='1', TOKENIZERS_PARALLELISM='false', HF_HOME=str(directory / 'model-cache'), HF_MODULES_CACHE=str(directory / 'modules-cache'))
             for key in ('HF_TOKEN', 'HUGGING_FACE_HUB_TOKEN'): env.pop(key, None)
             with (directory / 'worker.log').open('wb') as log:
-                process = self.popen([str(python), str(worker), str(directory / 'request.json')], stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT, cwd=directory, env=env,
+                from .external_process import spawn_external
+                process = spawn_external([str(python), str(worker), str(directory / 'request.json')], popen=self.popen, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT, cwd=directory, env=env,
                                      creationflags=(subprocess.CREATE_NO_WINDOW | 0x4) if os.name == 'nt' else 0)
                 child = OwnedChild(process); self.child = child
                 while process.poll() is None:

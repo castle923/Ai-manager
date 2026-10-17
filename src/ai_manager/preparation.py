@@ -136,13 +136,17 @@ class Preparation:
         return dict(status='blocked' if blockers else 'available',files=[dict(f,origin='official_model_component' if f.get('official_supplement') else 'designated_drive_component') for f in m['files']],total_bytes=total,required_bytes=required,free_bytes=free,blockers=blockers)
 
     def environment(self):
-        record=self.home/'runtime'/'environment.json'
+        from .runtime_paths import runtime_directory
+        runtime=runtime_directory(self.home)
+        record=runtime/'environment.json'
         if not record.is_file():return dict(status='unverified',blockers=['runtime_not_checked'])
         try:
             value=json.loads(record.read_text(encoding='utf8'))
-            if not (self.home/'runtime'/'venv'/'Scripts'/'python.exe').is_file():
+            if runtime.name != 'runtime' and value.get('runtime_instance_id') != runtime.name:
+                value.update(status='blocked',blockers=['runtime_record_invalid'])
+            if not (runtime/'venv'/'Scripts'/'python.exe').is_file():
                 value.update(status='blocked',blockers=['runtime_dependency_missing'])
-            return {k:v for k,v in value.items() if k in ('status','python','packages','cuda_available','device','blockers','checked_at','probe_sha256')}
+            return {k:v for k,v in value.items() if k in ('status','python','packages','cuda_available','device','blockers','checked_at','probe_sha256','runtime_instance_id')}
         except (OSError,ValueError):return dict(status='blocked',blockers=['runtime_record_invalid'])
 
     def snapshot(self):
@@ -213,9 +217,10 @@ class Preparation:
             if str(item.get('size'))!=str(expected):raise PreparationError('source_changed')
         return mapping
 
-    def prepare_local(self, source_directory):
+    def prepare_local(self, source_directory, cancel=None):
         """Explicit designated model files only; new bytes, hashes and provenance."""
         from .inference import FileOwner, regular
+        cancel = cancel or threading.Event()
         if not ACTIVE.acquire(False): raise PreparationError('operation_running')
         owner = None; run = None; state = None
         try:
@@ -231,8 +236,10 @@ class Preparation:
             run = self.base/run_id; run.mkdir(exist_ok=False)
             state = dict(id=run_id,pid=os.getpid(),status='verifying',downloaded_bytes=0,total_bytes=sum(f['size'] for f in m['files']),current_file=None,files_verified=0,files=[dict(f,downloaded_bytes=0,status='pending',origin='designated_local_model_component') for f in m['files']],configuration='unverified',integrity='unverified',runtime='unverified',execution='not_run',error=None,started_at=now())
             self._save(state,run)
-            provenance = dict(run_id=run_id,model=m['name'],revision=m['revision'],source=m['source'],kind='explicit_designated_local_model_components',source_directory=str(source),files=[])
+            provenance = dict(run_id=run_id,model=m['name'],revision=m['revision'],source=m['source'],kind='explicit_designated_local_model_components',source_directory=str(source),
+                              configuration_source_sha256=[s['sha256'] for s in self.settings.get('sources', [])],files=[])
             for item in state['files']:
+                if cancel.is_set(): raise PreparationError('cancelled')
                 relative = safe_relative(item['path']); original = regular(source/relative, Path(source.anchor))
                 if not original.is_file(): raise PreparationError('missing_component')
                 before = original.stat()
@@ -243,6 +250,7 @@ class Preparation:
                 sha = hashlib.sha256(); count = 0
                 with original.open('rb') as incoming, part.open('xb') as outgoing:
                     for block in iter(lambda: incoming.read(1024*1024), b''):
+                        if cancel.is_set(): raise PreparationError('cancelled')
                         count += len(block)
                         if count > item['size']: raise PreparationError('size_mismatch')
                         outgoing.write(block); sha.update(block)
@@ -256,13 +264,14 @@ class Preparation:
                 state['downloaded_bytes'] += count; state['files_verified'] += 1
                 provenance['files'].append(dict(path=item['path'],size=count,sha256=sha.hexdigest(),origin='designated_local_model_component'))
                 atomic_text(run/'inputs.json',json.dumps(provenance,indent=2)); self._save(state,run)
+            if cancel.is_set(): raise PreparationError('cancelled')
             state.update(status='ready',configuration='complete',integrity='matched',current_file=None,finished_at=now())
             self._save(state,run)
             return state
         except Exception as error:
             if state is not None:
                 code = str(error)
-                state.update(status='failed',error=code if re.fullmatch('[a-z0-9_]+',code) else 'preparation_io_failed',finished_at=now())
+                state.update(status='cancelled' if code == 'cancelled' else 'failed',error=code if re.fullmatch('[a-z0-9_]+',code) else 'preparation_io_failed',finished_at=now())
                 self._save(state,run)
             raise
         finally:
@@ -380,16 +389,19 @@ class Preparation:
             raise PreparationError('official_component_unavailable') from None
 
     def probe_runtime(self):
-        python=self.home/'runtime'/'venv'/'Scripts'/'python.exe'
+        from .runtime_paths import runtime_directory
+        runtime=runtime_directory(self.home)
+        python=runtime/'venv'/'Scripts'/'python.exe'
         probe=Path(__file__).with_name('runtime_probe.py')
         if not python.is_file():
             value=dict(status='blocked',blockers=['runtime_dependency_missing'])
         else:
             try:
                 env=os.environ.copy();env.update(HF_HUB_OFFLINE='1',TRANSFORMERS_OFFLINE='1')
-                result=subprocess.run([str(python),str(probe)],capture_output=True,text=True,timeout=120,env=env)
+                from .external_process import run_external
+                result=run_external([str(python),str(probe)],capture_output=True,text=True,timeout=120,env=env)
                 value=json.loads(result.stdout) if result.returncode==0 else dict(status='blocked',blockers=['runtime_probe_failed'])
             except (OSError,ValueError,subprocess.TimeoutExpired):value=dict(status='blocked',blockers=['runtime_probe_failed'])
-        value.update(checked_at=now(),probe_sha256=hashlib.sha256(probe.read_bytes()).hexdigest())
-        record=self.home/'runtime'/'environment.json';atomic_text(record,json.dumps(value,indent=2))
+        value.update(checked_at=now(),probe_sha256=hashlib.sha256(probe.read_bytes()).hexdigest(),runtime_instance_id=runtime.name)
+        record=runtime/'environment.json';atomic_text(record,json.dumps(value,indent=2))
         return value
