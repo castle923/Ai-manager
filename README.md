@@ -2,11 +2,15 @@
 
 두 Google Drive 계정에 보관한 AI 모델을 한곳에서 찾고, 필요한 파일을 확인하고, 새 테스트 결과를 비교하는 개인용 대시보드입니다.
 
-> **현재 상태: v0.6.0 개인용 Windows 로컬 출시 완료(확인한 Edge·두 지정 모델 범위).** 최신 설치 패키지·한글/공백 경로 launcher·격리 복구·fresh 인증/수집·새 GPU A/B 실행·재생·저장·핵심 UI 표본을 확인했습니다. 기존 Python 3.10이 필요한 설치형이며 standalone exe는 아닙니다. [v0.6.0 Release](https://github.com/castle923/Ai-manager/releases/tag/v0.6.0)와 [M6 보고서](docs/M6_REPORT.md)에서 배포 해시·증거·알려진 제한을 확인하세요.
+> **현재 상태: v0.7.0 Python 포함 Windows 독립 앱 출시 완료(확인한 로컬·0.6B 범위).** 새 설치·두 계정 인증·번들 추론 환경·CUDA·새 TTS·재생·native WAV 저장·취소·종료/재시작을 검증했습니다. [v0.7.0 Release](https://github.com/castle923/Ai-manager/releases/tag/v0.7.0) · [독립 앱 시작 안내](docs/M7_INSTALL.md) · [M7 검증 보고서](docs/M7_REPORT.md)
 
-**M7 후보 0.7.0은 별도 Python 설치 없이 실행하는 Windows 독립 앱입니다.** 새 설치·두 계정 인증·번들 추론 환경·새 0.6B TTS·재생·native WAV 저장과 취소/종료를 확인했습니다. 정상 종료/재시작의 기록·해시 보존을 확인했고 독립 창에서 재시작 후 재생·두 계정 실제 갱신까지 확인했습니다. 공개 소스·태그·Release 첨부는 대기입니다. 이번 새 실제 TTS는 0.6B 한 모델 범위이며 1.7B 새 추론은 미검증입니다. [독립 앱 시작 안내](docs/M7_INSTALL.md) · [M7 검증 보고서](docs/M7_REPORT.md). WebView2 Runtime은 시스템 전제이며 모델·개인 인증 자료는 배포물에 포함하지 않습니다. 기존 v0.6.0 배포는 보존합니다.
+앱과 추론용 Python 기반을 포함합니다. WebView2 Runtime은 시스템 전제이며 첫 Torch 의존성 준비에는 인터넷과 수 GB의 공간이 필요합니다. 모델·개인 인증 자료는 배포물에 포함하지 않습니다. 이번 새 실제 TTS는 0.6B 한 모델 범위이며 1.7B 새 추론·Python 미설치 별도 PC·전면 접근성은 미검증입니다.
 
-[Windows 배포 ZIP 받기](https://github.com/castle923/Ai-manager/raw/899cf8a5b9616d3773caf2fb7ebf47db99544002/releases/v0.6.0/ai-manager-0.6.0-windows.zip) · 157,240 bytes · SHA-256 `b1626bc374196984033b56d5eeaf89f2cfc30b0e6baa762dd32744f0cd865133`. [설치 안내](docs/INSTALL.md)를 먼저 확인합니다. 태그는 소스·ZIP 커밋 `899cf8a5…`에 고정하며 이후 main의 문서 상태 보완과 구분합니다.
+[v0.7.0 Windows 독립 앱 ZIP 받기](https://github.com/castle923/Ai-manager/releases/download/v0.7.0/AiManager-0.7.0-windows.zip) · 58,405,026 bytes · SHA-256 `661d8bd5b58edfa4e2ba811338fce787fb1744149c98caacd7deac4489eae4d0`. 공개 Release의 uploaded asset 크기·GitHub SHA-256 digest를 검증된 로컬 ZIP과 대조했습니다. 태그는 소스 커밋 `066e62d286cb50fee1755bd0146c3ddbd3188526`에 고정하며 이후 main의 문서 갱신은 앱·ZIP 변경이 아닙니다.
+
+기존 Python 3.10이 필요한 v0.6.0 launcher 배포와 검증 이력은 [v0.6.0 Release](https://github.com/castle923/Ai-manager/releases/tag/v0.6.0) · [M6 보고서](docs/M6_REPORT.md)에 보존합니다.
+
+[이전 v0.6.0 배포 ZIP](https://github.com/castle923/Ai-manager/raw/899cf8a5b9616d3773caf2fb7ebf47db99544002/releases/v0.6.0/ai-manager-0.6.0-windows.zip) · 157,240 bytes · SHA-256 `b1626bc374196984033b56d5eeaf89f2cfc30b0e6baa762dd32744f0cd865133`. [v0.6.0 설치 안내](docs/INSTALL.md)를 따릅니다. 해당 태그는 소스·ZIP 커밋 `899cf8a5…`에 고정해 보존합니다.
 
 ## 현재 조회 기능과 후속 계획
 

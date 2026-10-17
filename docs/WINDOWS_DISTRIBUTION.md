@@ -4,17 +4,17 @@
 
 ## M7 독립 앱 현황
 
-사용자가 Python 별도 설치 없는 독립 창을 명시 승인해 후보 0.7.0을 PyInstaller 6.22.3 onedir/windowed·pywebview 6.2.1 edgechromium으로 구현했다. 앱 Python과 python-build-standalone CPython 3.10.22 기반을 포함하며 추론 Torch 등 의존성은 앱에서 온라인으로 별도 준비한다. 현재 Windows의 WebView2 Runtime을 사용하고 없는 PC의 자동 전역 설치는 하지 않는다. [명령 없는 시작 안내](M7_INSTALL.md)를 따른다.
+사용자가 Python 별도 설치 없는 독립 창을 명시 승인해 v0.7.0을 PyInstaller 6.22.3 onedir/windowed·pywebview 6.2.1 edgechromium으로 구현했다. 앱 Python과 python-build-standalone CPython 3.10.22 기반을 포함하며 추론 Torch 등 의존성은 앱에서 온라인으로 별도 준비한다. 현재 Windows의 WebView2 Runtime을 사용하고 없는 PC의 자동 전역 설치는 하지 않는다. [명령 없는 시작 안내](M7_INSTALL.md)를 따른다.
 
-desktop5 ZIP은 58,405,026 bytes·SHA-256 `661d8bd5b58edfa4e2ba811338fce787fb1744149c98caacd7deac4489eae4d0`이다. 새 GUI 설치·독립 창·새 인증·CUDA·새 0.6B TTS·native 저장을 확인했으며 정상 종료/재시작의 상태·해시 보존도 확인했다. 재시작 후 독립 창 재생·두 계정 실제 갱신을 확인했으며 공개 게시·Release 첨부는 대기다. 이번 새 TTS는 0.6B 한 모델 범위이며 1.7B 새 추론은 미검증이다. 모델과 자격 증명은 포함하지 않는다. 모든 PC 호환성이나 전면 native widget 재작성으로 해석하지 않는다. 큰 ZIP은 정상 Release 첨부로 배포할 계획이며 Git blob 기본 전략을 사용하지 않는다.
+desktop5 ZIP은 58,405,026 bytes·SHA-256 `661d8bd5b58edfa4e2ba811338fce787fb1744149c98caacd7deac4489eae4d0`이다. 새 GUI 설치·독립 창·새 인증·CUDA·새 0.6B TTS·native 저장을 확인했으며 정상 종료/재시작의 상태·해시 보존도 확인했다. 재시작 후 독립 창 재생·두 계정 실제 갱신을 확인했으며 정상 [v0.7.0 Release](https://github.com/castle923/Ai-manager/releases/tag/v0.7.0)와 [첨부 ZIP](https://github.com/castle923/Ai-manager/releases/download/v0.7.0/AiManager-0.7.0-windows.zip)의 uploaded 상태·크기·GitHub SHA-256 digest를 검증한 로컬 ZIP과 대조했다. 이번 새 TTS는 0.6B 한 모델 범위이며 1.7B 새 추론은 미검증이다. 모델과 자격 증명은 포함하지 않는다. 모든 PC 호환성이나 전면 native widget 재작성으로 해석하지 않는다. 큰 ZIP은 정상 Release asset으로 배포했고 Git blob에 추가하지 않았다. 태그는 소스 `066e62d286cb50fee1755bd0146c3ddbd3188526`에 고정하며 이후 main 문서 갱신과 구분한다.
 
-## 권고 방향
+## M6 시점 권고 방향(이력)
 
 이번 M6는 **기존 Python이 필요한 사용자 범위 설치 스크립트·launcher + Edge UI**를 먼저 새 환경에서 검증한다. 그 다음 배포 편의 개선 후보는 **Python을 포함한 PyInstaller one-folder 실행 프로그램**, 독립 앱 창이 필요한 경우는 **WebView2 host**다. 형식 검토 결과를 후속 구현 의사결정에 사용하고, 현재 결과에 미구현 exe·독립 창 성공을 포함하지 않는다.
 
 현재 앱은 Python 로컬 서비스가 API와 React 정적 UI를 제공한다. HTML 파일을 단독으로 열어 실행하는 구조가 아니다. 실행 아이콘으로 시작하는 프로그램과 UI를 표시하는 브라우저/창은 별개의 선택이다. WebView2 창에서도 현재 React UI를 표시할 수 있으며, Windows native widget으로 화면 전체를 다시 작성하는 것과는 다르다.
 
-## 세 가지 선택 비교
+## M6 시점 세 가지 선택 비교(이력)
 
 | 항목 | 이번 M6: wheel·설치 스크립트·launcher + Edge | 후속 후보: PyInstaller one-folder exe + Edge | 후속 후보: 독립 WebView2 창 |
 |---|---|---|---|
