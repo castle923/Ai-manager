@@ -33,8 +33,8 @@ def observations(files):
 
 
 class Dashboard:
-    def __init__(self, home):
-        self.inventory = Inventory(home)
+    def __init__(self, home, read_only=False):
+        self.inventory = Inventory(home, read_only=read_only)
 
     def snapshot(self, scan=None):
         with self.inventory.connect() as db:
@@ -56,7 +56,7 @@ class Dashboard:
                                   "scan_id": s["scan_id"], "account": s["account"], "name": m.get("name", "미수집"), "path": path,
                                   "folder": path.rsplit("/", 1)[0], "root": row["root_alias"], "kind": row["kind"],
                                   "size": size, "modified": m.get("modifiedTime"), "format": m.get("name", "").rsplit(".", 1)[-1].lower(),
-                                  "family": family(path), "scan_status": s["status"], "parent_identity": m.get("parents", [])})
+                                  "family": family(path), "scan_status": s["status"], "file_id": row["file_id"], "parent_identity": m.get("parents", [])})
         groups = {}
         for f in files:
             parents = f.pop("parent_identity")
@@ -65,7 +65,7 @@ class Dashboard:
             key = f["account"] + ":" + identity
             if key not in groups:
                 groups[key] = {"id": hashlib.sha256((f["scan_id"] + key).encode()).hexdigest()[:24], "name": f["folder"].rsplit("/", 1)[-1],
-                               "path": f["folder"], "account": f["account"], "family": family(f["folder"]), "scan_id": f["scan_id"], "scan_status": f["scan_status"], "files": []}
+                               "path": f["folder"], "folder_id": identity, "account": f["account"], "family": family(f["folder"]), "scan_id": f["scan_id"], "scan_status": f["scan_status"], "files": []}
             groups[key]["files"].append(f)
         models = []
         for group in groups.values():

@@ -29,6 +29,7 @@ import { PreparationPanel } from "./PreparationPanel";
 import { TtsPanel } from "./TtsPanel";
 import { ComparisonPanel } from "./ComparisonPanel";
 import { DesktopRuntime } from "./DesktopHost";
+import { RegistryPanel, type CandidateRegistration } from "./RegistryPanel";
 
 type Scan = {
   scan_id: string;
@@ -168,7 +169,9 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 function App() {
-  const [section, setSection] = useState("library"),
+  const [registration, setRegistration] =
+    useState<CandidateRegistration | null>(null);
+  const [section, setSection] = useState("registry"),
     [view, setView] = useState("models"),
     [q, setQ] = useState(""),
     [search, setSearch] = useState(""),
@@ -369,11 +372,18 @@ function App() {
         <p className="nav-label">내 라이브러리</p>
         <nav aria-label="주 탐색">
           <button
+            className={section === "registry" ? "nav active" : "nav"}
+            onClick={() => setSection("registry")}
+          >
+            <Boxes size={19} />
+            모델 관리
+          </button>
+          <button
             className={section === "library" ? "nav active" : "nav"}
             onClick={() => setSection("library")}
           >
             <Layers size={19} />
-            모델 라이브러리
+            파일 후보 탐색
             <ArrowRight size={15} />
           </button>
           <button
@@ -421,15 +431,17 @@ function App() {
         <header className="topbar">
           <span>
             Ai-manager <span className="slash">/</span>{" "}
-            {section === "library"
-              ? "모델 라이브러리"
-              : section === "preparation"
-                ? "모델 준비"
-                : section === "tts"
-                  ? "음성 작업실"
-                  : section === "comparison"
-                    ? "새 A/B 비교"
-                    : "계정 및 수집"}
+            {section === "registry"
+              ? "모델 관리"
+              : section === "library"
+                ? "파일 후보 탐색"
+                : section === "preparation"
+                  ? "모델 준비"
+                  : section === "tts"
+                    ? "음성 작업실"
+                    : section === "comparison"
+                      ? "새 A/B 비교"
+                      : "계정 및 수집"}
           </span>
           <div className="top-meta">
             <ShieldCheck size={15} /> Drive 읽기 전용{" "}
@@ -442,26 +454,30 @@ function App() {
             <div>
               <div className="eyebrow">YOUR MODELS, CLEARLY ORGANIZED</div>
               <h1>
-                {section === "library"
-                  ? "모델 라이브러리"
-                  : section === "preparation"
-                    ? "모델 준비"
-                    : section === "tts"
-                      ? "음성 작업실"
-                      : section === "comparison"
-                        ? "새 A/B 비교"
-                        : "계정 및 수집"}
+                {section === "registry"
+                  ? "모델 관리"
+                  : section === "library"
+                    ? "파일 후보 탐색"
+                    : section === "preparation"
+                      ? "모델 준비"
+                      : section === "tts"
+                        ? "음성 작업실"
+                        : section === "comparison"
+                          ? "새 A/B 비교"
+                          : "계정 및 수집"}
               </h1>
               <p>
-                {section === "library"
-                  ? "흩어져 있는 모델 파일을 모으고, 현재 확인 수준을 한눈에 살펴보세요."
-                  : section === "preparation"
-                    ? "선정 모델의 파일과 환경을 준비하고, 확인 근거를 단계별로 살펴보세요."
-                    : section === "tts"
-                      ? "새 한국어 문장을 음성으로 만들고, 이번 실행의 검증 결과를 확인하세요."
-                      : section === "comparison"
-                        ? "같은 새 입력으로 두 모델을 실행하고, 실제 조건과 결과를 함께 비교하세요."
-                        : "두 계정의 연결과 허용 폴더 수집을 관리하세요."}
+                {section === "registry"
+                  ? "내 모델의 설명과 보관 위치를 등록하고, 확인된 근거에 따라 현재 상태를 살펴보세요."
+                  : section === "library"
+                    ? "흩어져 있는 모델 파일을 모으고, 현재 확인 수준을 한눈에 살펴보세요."
+                    : section === "preparation"
+                      ? "선정 모델의 파일과 환경을 준비하고, 확인 근거를 단계별로 살펴보세요."
+                      : section === "tts"
+                        ? "새 한국어 문장을 음성으로 만들고, 이번 실행의 검증 결과를 확인하세요."
+                        : section === "comparison"
+                          ? "같은 새 입력으로 두 모델을 실행하고, 실제 조건과 결과를 함께 비교하세요."
+                          : "두 계정의 연결과 허용 폴더 수집을 관리하세요."}
               </p>
             </div>
             <button
@@ -501,7 +517,15 @@ function App() {
               {err(status.task.error || "operation_failed_check_connection")}
             </div>
           )}
-          {section === "comparison" ? (
+          {section === "registry" ? (
+            <RegistryPanel
+              csrf={csrf}
+              candidate={registration}
+              onCandidateUsed={() => setRegistration(null)}
+              onExplore={() => setSection("library")}
+              onPrepare={() => setSection("preparation")}
+            />
+          ) : section === "comparison" ? (
             <ComparisonPanel
               csrf={csrf}
               onPrepare={() => setSection("preparation")}
@@ -1118,6 +1142,22 @@ function App() {
                   <span className="badge amber">실행 미확인</span>
                 </div>
                 <div className="detail-callout">
+                  <button
+                    className="primary"
+                    onClick={() => {
+                      setRegistration({
+                        id: detail.id,
+                        scan_id: detail.scan_id,
+                        name: detail.name,
+                        path: detail.path,
+                        family: detail.family,
+                      });
+                      close();
+                      setSection("registry");
+                    }}
+                  >
+                    이 후보를 모델로 등록
+                  </button>
                   <CircleHelp size={18} />
                   <p>
                     이 항목은 선택한 수집 기록의 파일 메타데이터에서

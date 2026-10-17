@@ -167,6 +167,18 @@ class IndependentInferenceTests(unittest.TestCase):
             provenance=json.loads((self.manager._path(run['id'])/'provenance.json').read_text())
             self.assertEqual(provenance['run_id'],run['id'])
             self.assertEqual(provenance['inputs'][0]['sha256'],model['files'][0]['sha256'])
+            # A catalogue binding must prove both the registered source and prepared copy.
+            registered=self.home/'registered-original';registered.mkdir();(registered/'config.json').write_bytes(content)
+            from ai_manager.registry import sha
+            from ai_manager.models import manifest_path
+            run['registry_binding']=dict(id='e'*32,generation='f'*32,fingerprint='a'*64,
+                manifest_sha256=hashlib.sha256(manifest_path(model['model_id']).read_bytes()).hexdigest(),
+                asset_sha256=sha([{k:i[k] for k in ('path','size','sha256')} for i in model['files']]),registered_source=str(registered))
+            self.manager._prepare(run)
+            self.assertEqual(json.loads((self.manager._path(run['id'])/'provenance.json').read_text())['registry_binding'],run['registry_binding'])
+            (registered/'config.json').write_bytes(b'changed registered source')
+            with self.assertRaisesRegex(InferenceError,'registered_artifact_mismatch'):self.manager._prepare(run)
+            (registered/'config.json').write_bytes(content)
             (assets/'config.json').write_bytes(b'changed')
             with self.assertRaisesRegex(InferenceError,'model_integrity_failed'):self.manager._prepare(run)
             (assets/'config.json').write_bytes(content)

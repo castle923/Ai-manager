@@ -78,12 +78,15 @@ def _alive(pid):
 
 
 class Inventory:
-    def __init__(self, home: Path, session=None, sleep=None):
+    def __init__(self, home: Path, session=None, sleep=None, read_only=False):
         self.home = Path(home)
         self.home.mkdir(parents=True, exist_ok=True)
         self.db = self.home / "inventory.sqlite3"
         self.session = session
         self.sleep = sleep
+        self.read_only = read_only
+        if read_only:
+            return
         with self.connect() as db, _LOCK:
             db.executescript(SCHEMA_SQL)
             for row in db.execute("SELECT scan_id,pid FROM scans WHERE status='running'").fetchall():
@@ -93,7 +96,7 @@ class Inventory:
 
     @contextmanager
     def connect(self):
-        db = sqlite3.connect(self.db, timeout=15)
+        db = sqlite3.connect(self.db.as_uri()+'?mode=ro',uri=True,timeout=15) if self.read_only else sqlite3.connect(self.db, timeout=15)
         db.row_factory = sqlite3.Row
         db.execute("PRAGMA foreign_keys=ON")
         try:

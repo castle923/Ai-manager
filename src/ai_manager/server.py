@@ -49,6 +49,8 @@ def create_application(home, settings, auth, port=0):
     from .preparation import Preparation
     preparation = Preparation(home, settings, auth)
     inference = Inference(home)
+    from .registry import Registry, RegistryError
+    registry = Registry(home, settings, inference)
     diagnostics = DownloadDiagnostics(home, enabled=os.environ.get("AI_MANAGER_DOWNLOAD_DIAGNOSTICS") == "1")
     csrf = secrets.token_urlsafe(32)
     job_lock = threading.Lock()
@@ -132,6 +134,14 @@ def create_application(home, settings, auth, port=0):
             if not self.allowed():
                 return self.reply(403, {"error": "forbidden"})
             path = urlsplit(self.path).path
+            registry_match = re.fullmatch(r'/api/registry/([a-f0-9]{32})', path)
+            if path == '/api/registry' or registry_match:
+                try:
+                    query = parse_qs(urlsplit(self.path).query)
+                    result = {'model':registry.get(registry_match[1])} if registry_match else registry.query(query.get('q',[''])[0],query.get('status',[''])[0],query.get('archived',['0'])[0]=='1')
+                    return self.reply(200,result)
+                except RegistryError as error:
+                    return self.reply(404 if str(error)=='model_not_found' else 400,{'error':str(error)})
             if path == "/api/diagnostics/health":
                 return self.reply(200 if diagnostics.enabled else 404, diagnostics.health() if diagnostics.enabled else {"error": "not_found"})
             if path == "/api/tts/status":
@@ -213,9 +223,24 @@ def create_application(home, settings, auth, port=0):
                 return self.reply(415, {"error": "json_required"})
             try:
                 length = int(self.headers.get("Content-Length", "0"))
-                if not 0 < length <= 4096:
+                limit = 65536 if self.path == '/api/registry' or re.fullmatch(r'/api/registry/[a-f0-9]{32}(/runs)?',self.path) else 4096
+                if not 0 < length <= limit:
                     raise ValueError()
                 data = json.loads(self.rfile.read(length))
+                registry_action = re.fullmatch(r'/api/registry/([a-f0-9]{32})(/runs)?',self.path)
+                if self.path == '/api/registry' or registry_action:
+                    try:
+                        if self.path == '/api/registry':
+                            result = {'model':registry.create(data)}
+                        elif registry_action[2]:
+                            if not isinstance(data,dict) or set(data)!={'row_version','text'}: raise RegistryError('invalid_request')
+                            result = {'run':registry.create_run(registry_action[1],data['row_version'],data['text'])}
+                        else:
+                            result = {'model':registry.update(registry_action[1],data)}
+                        return self.reply(202 if registry_action and registry_action[2] else 200,result)
+                    except (RegistryError,InferenceError) as error:
+                        code=str(error)
+                        return self.reply(404 if code=='model_not_found' else 409 if code in {'stale_edit','duplicate_reference','operation_running','queue_full','model_archived','configuration_required'} else 400,{'error':code})
                 comparison_action = re.fullmatch(r'/api/comparisons/([a-f0-9]{32})/(cancel|evaluation)', self.path)
                 if self.path == '/api/comparisons' or comparison_action:
                     if not isinstance(data, dict): raise ValueError()
