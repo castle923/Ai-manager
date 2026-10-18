@@ -208,3 +208,53 @@ worker 로그에는 checkpoint shard 2/2와 weights 750/750 로딩, CPU/disk off
 마지막 해당 Pod 전용 billing 조회는 HTTP 200이나 record가 아직 없어 **확정 청구 금액은 미집계**다. 마지막 별도 확인 시각까지 보수적으로 계산한 새 재개 비용 상한 추정은 **$0.423334**, 앞선 $0.096825를 합친 **누적 추정은 $0.520159**다. 이를 최종 invoice나 실제 비용 $0으로 표현하지 않는다. 최초 origin부터 약 27분 이내에 종료 확인을 마쳤으며, 남은 시간은 사용하지 않았다.
 
 최종적으로 기반 환경과 모델 준비는 확인했고 실패 근거를 보존·검토한 뒤 새 Pod를 삭제했다. 실제 Qwen 이미지 생성 검증은 미완료이며 다른 모델·Windows 로컬 8GB·앱 원격 통합·일반 품질에 대한 성공 판정으로 확대하지 않는다. 원시 로그·계정·개인 경로·Pod/호스트 식별값·키는 공개하지 않는다.
+
+## 2026-10-18 로딩 실패 진단과 로컬 수정 후보
+
+이 절은 앞선 실패 기록을 진단 입력으로 읽어 조사하고, 새 로컬 수정 후보를 검증한 결과다. 이 변경을 위해 새 Pod, 원격 실행, 모델 다운로드 또는 GPU 추론을 수행하지 않았다. 앞선 `loading` 실패가 실제 GPU에서 해결됐다는 판정은 아니다. 다른 모델 검수는 보류한다.
+
+### 확인된 결함과 원인 확정의 한계
+
+원래 worker는 허용된 오류 코드 외의 예외를 `inference_failed`로 바꾸면서 원예외의 타입·원인·스택을 보존하지 않았다. 회수 로그의 transformer/text encoder 가중치 진행 뒤에 VAE 로드·offload, processor 로드, scheduler/pipeline 생성과 첫 CUDA 동기화가 남아 있어 정확한 과거 실패 위치는 확정할 수 없다. CPU/disk offload의 meta 안내 자체는 오류 증거가 아니다.
+
+다만 **필수 processor 의존성 누락**은 확인했다. 지정된 fresh venv 설치 보고서에 `torchvision`이 없지만, 고정 모델의 processor 구성은 `Qwen3VLVideoProcessor`를 포함한다. Transformers 5.17은 텍스트 이미지 생성 요청에서도 processor의 기본 모달리티 구성요소를 로드하며, AutoVideoProcessor는 vision/torchvision backend를 요구한다. 이미지 processor만의 PIL 대체 가능성은 이 video processor 계약을 없애지 않는다. [고정 모달리티 로딩 코드](https://github.com/huggingface/transformers/blob/v5.17.0/src/transformers/processing_utils.py#L1820-L1878), [AutoVideoProcessor backend guard](https://github.com/huggingface/transformers/blob/v5.17.0/src/transformers/models/auto/video_processing_auto.py#L229).
+
+공식 고정 revision에서 다시 읽은 image/video processor 구성의 SHA-256은 회수된 모델 검증 기록과 각각 일치했다.
+
+- image 구성: `93585062a80db5e8ca038efc7726a3e6411d9db948472d81d63c6303993be8c5`
+- video 구성: `59c5c9eb52182eb14c06ffb10ca9effd29adce5f238a95de23ca14a38dbd2cb1`
+
+[모델 processor 고정 원본](https://huggingface.co/Qwen/Qwen-Image-2.1/tree/d26bb61231c349cf6b7896fa83353113880e1ba3/processor). 이 누락은 관측된 실패 구간과 일치하는 준비 결함이며, 앞선 실행의 유일한 원인이라고 단정하지 않는다. 다른 offload·메모리·호환성 오류의 존재도 아직 배제하지 않았다.
+
+### 검토 중인 최소 수정
+
+- 공식 호환 조합인 `torchvision==0.24.1+cu128`을 `torch==2.9.1+cu128` 옆에 고정하고 정확한 버전·누락 검사를 추가했다. [PyTorch 공식 버전 표](https://pytorch.org/get-started/previous-versions/#v291).
+- 작은 local-only processor를 가중치보다 먼저 로드해 backend 실패를 일찍 확인한다. 모델 revision, placement, VAE offload 및 생성 조건은 유지한다. 로드 실패 시 `tempfile.tempdir`도 복구한다.
+- 명시적 opt-in `AI_MANAGER_IMAGE_DIAGNOSTICS=1`에서만 private 구조화 진단을 남긴다. 세부 로딩 단계·고정 라이브러리 버전·자원 카운터·device map 범주·제한된 예외 체인과 스택 구조를 수집한다. 예외 message, 소스 코드, 함수명, locals, 입력, 경로, URL, 환경 변수 원문은 저장하지 않는다. 최대 64개 이벤트·128 KiB이며 기존 파일은 덮어쓰지 않는다. 진단 쓰기 실패가 원래 결과와 오류를 바꾸지 않게 한다.
+- 새 private Linux harness는 실제 worker 자식 환경에 opt-in을 명시하고 성공·실패 모두에서 bounded 진단과 failure 기록을 회수 목록에 넣는다. 원래 번들과 회수 증거는 보존했다.
+
+현재 소스 후보 해시:
+
+| 항목 | SHA-256 |
+| --- | --- |
+| worker | `7f5569e85c0d6a5d7da3fdd75c0303fd92e9872001b29c6fa6c85eff6e9573f8` |
+| 진단 모듈 | `3038ac948ea56426bd445fc7cdd916a7dcdc1235ba26212c5adafcc5621007b8` |
+| image runtime lock | `cdf8c00ba403be82320063558555706e284df67de2cd9d814c625d26a7290392` |
+| 새 private bundle manifest | `9ebb9d17ec74e752250e1c4668c5187f272d264a3c946edf142c0d759e6776b5` |
+
+### 새 로컬 검증과 범위
+
+- 구현 담당의 변경 관련 4개 모듈 focused CPU 테스트 27개가 통과했다. 전체 기능 회귀 suite는 이번에 실행하지 않았다. 모의 구성요소의 단계별 실패, 체인 구조, 개인정보 sentinel, opt-in·크기·파일 보존·쓰기 실패를 확인했다.
+- 같은 새 missing-backend stub을 원본 worker와 후보에 주입한 CPU 순서 비교에서, 원본은 transformer/text encoder/VAE 호출 뒤 실패했지만 후보는 processor 단계에서 가중치 호출 없이 실패했다. 임시 디렉터리 설정의 복구도 확인했다. 실제 Transformers processor나 모델 가중치를 로드한 실험은 아니다.
+- 고정 upstream의 실제 backend guard 함수를 AST로 추출한 소형 CPU 실험은 torchvision 가용성 stub이 없으면 `ImportError`, 있으면 guard 통과를 확인했다. 전체 processor의 before/after 실환경 성공을 뜻하지 않는다.
+- 새 wheel의 모듈 포함·격리 import·합성 invalid request 실패 동작을 확인했다. 새 private bundle은 11개 파일 해시와 worker/진단 import·compile·placement 보존 등 10개 검사를 통과했다. harness 환경·회수·원실패 보존 8개 검사와 WSL의 Linux stdlib guardian 8개 검사도 통과했다.
+
+이 테스트들은 GPU 로딩·이미지 생성·실GPU 취소·화질·Windows 8GB 또는 앱 원격 통합을 검증하지 않았다. 변경된 runtime의 실제 설치 보고서와 wheel 해시는 향후 새 환경에서 다시 수집해야 한다. 공개 main에는 M10 제품 코드의 전체 의존 구성이 아직 없으므로 이번 코드는 검토된 로컬 후보이며, 이 문서만으로 실행 가능한 새 공개 릴리스가 제공된다고 해석하지 않는다.
+
+### 새 Pod 생성 전 제시할 재실행 계획
+
+1. 진단 privacy·의존성·새 source/bundle 해시의 독립 검토 결과와 실행 계획을 사용자에게 먼저 보고한다. 이 조사·로컬 검증은 새 Pod 생성 승인이 아니다.
+2. 재실행이 승인되면 지정 Secure A100 SXM4 80GB/GPU 1개 범위에서 새 견적·잔액·시간 및 총비용 한도를 확인하고, 기존 비용·종료 이력을 보존한다. 작업 중단·회수·삭제 deadline과 lease/controller를 먼저 검증하며 다른 GPU·Cloud로 임의 대체하지 않는다.
+3. 엄격한 SSH 신원 확인 및 해당 Pod의 CPU fixture를 먼저 통과시킨 뒤 새 runtime을 격리 설치한다. torchvision을 포함한 실제 설치 보고서·해시, 고정 pipeline·processor config를 확인한다. 가중치 로드 전 **실제 local-only processor 로드**가 통과해야 한다.
+4. 그다음 동일 placement와 조건으로 한 번의 bounded Qwen smoke를 진행한다. 실패하면 새 세부 단계와 bounded 오류 구조·자원 기록을 회수하고 반복하지 않는다. 성공하면 새 PNG·metadata와 원격/로컬 full SHA를 확인한다.
+5. 필수 결과를 회수하고 한 번 검토한 직후 신규 immutable Pod만 삭제하며, 404·목록 부재·신규 잔여 스토리지·비용 근거를 확인한다. 이전 실패나 CPU mock을 새 GPU 성공 근거로 사용하지 않는다.
