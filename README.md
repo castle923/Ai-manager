@@ -1,5 +1,9 @@
 # Ai-manager
 
+## M12 후속: 실제 관찰과 영속 제어
+
+명시 local/읽기 전용 Drive metadata intake, 영속 계획·CLI 확인 승인·one-use 소비, 기존 same-home slot을 쓰는 bounded CPU 제어 조정기를 추가했다. [M12 보고서](docs/M12_REPORT.md)·[계약과 사용법](docs/M12_CONTRACT.md)을 따른다. 작은 config의 지원 후보와 전체 weight/revision 무결성·실모델 정상 작동을 구분하며, 실모델 adapter/새 입력·receipt는 M13, 새 검수 UI는 M14, 부분 재개 완성은 M15에 남는다. 기존 v0.10.0 설치본·Release를 바꾸지 않는 source-only 후속 구현이다.
+
 ## M11 후속: 비실행 계약 원형
 
 6개 고정 프로필·다축 상태·immutable 계획/snapshot·dry-run 승인·새 입력 계보의 독립 CLI 원형을 추가했다. [M11 구현·검증·잔여 공수](docs/M11_REPORT.md)와 [계약/CLI](docs/M11_CONTRACT.md)를 따른다. 실제 발견·설치·worker 실행·인증·영속 승인 소비/replay 차단은 미구현이며 모델 정상 작동 검사 PASS가 아니다. 기존 v0.10.0 ZIP/태그·앱 API/UI는 바꾸지 않는다. 아래 ‘설계 반영’은 당시 기록이다.

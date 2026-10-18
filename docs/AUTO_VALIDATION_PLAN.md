@@ -1,5 +1,9 @@
 # 보유 모델 자동 검수 프로그램 — M11 이후 설계
 
+## M12 제어 구현 checkpoint
+
+[M12 보고서](M12_REPORT.md)에 실제 local 원본 metadata·새 read-only OAuth/Drive 관찰과 영속 승인·순차 CPU 조정기 검증을 구분해 기록한다. 지원 metadata 후보는 full artifact/revision·모델 정상 작동 PASS가 아니다. partial Drive·깊이 밖 관찰 제한, 미구현 모델 adapter/M13 fixtures·receipt, M14 UI와 M15 부분 재개를 남긴다. 후속 사람 참고 공수는 약23–38인일이며 이전 설계·M11 공수와 역사를 보존한다.
+
 ## M11 계약 원형 checkpoint
 
 후속 source-only M11에서 6개 pinned catalogue·상태/전이·immutable plan/snapshot·dry-run 승인·입력 계보 선언과 stdlib CLI를 구현했다. [M11 보고서](M11_REPORT.md)·[원형 계약](M11_CONTRACT.md)을 따른다. 아래 ‘신규 기능 구현 전’과 최초 28–46인일은 설계 당시 범위로 보존하며, 이번 원형은 실제 discovery/설치/worker/receipt/사용자 인증·영속 승인 소비를 구현한 것이 아니다. 후속 참고 공수는 약 26–43인일이며 AI 시간/납기 약속이 아니다.

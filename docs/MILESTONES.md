@@ -1,5 +1,9 @@
 # 마일스톤과 검증 기준
 
+## M12 후속 구현 기록
+
+읽기 전용 local/live Drive intake·metadata 후보 판정·영속 plan/승인 소비·bounded CPU 제어 조정기를 구현했다. 실원본 관찰과 실제 CPU child의 순차·취소·timeout·owner 종료 검증을 [M12 보고서](M12_REPORT.md)에 기록한다. 실제 model worker/환경·full hash·새 시험·receipt는 M13, 새 UI는 M14, 부분 재개·새 배포는 M15다. 아래 설계 당시 표와 이전 완료/미검증 이력은 보존한다.
+
 ## M11 후속 구현 기록
 
 독립 비실행 계약 원형과 CPU 반례를 추가했다. [M11 보고서](M11_REPORT.md)에 실제 검증과 후속 약 26–43 참고 인일의 가정을 기록한다. M12–M15·6프로필 실추론은 완료하지 않았으며 아래 설계 당시의 표/최초 공수는 역사로 보존한다. 현재 원형은 caller 선언 clock/ledger를 검사하고 실제 사용자 인증·trusted clock·durable replay 방지를 제공하지 않는다.
