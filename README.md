@@ -1,5 +1,16 @@
 # Ai-manager
 
+## Windows v0.10.0 배포 패키지
+
+[v0.10.0 Release](https://github.com/castle923/Ai-manager/releases/tag/v0.10.0)의 소스는 `5a336cd0522fadda68f179ed4b8c5b0d4059aa5f`다. `AiManager-0.10.0-windows.zip`은 **113,228,585 bytes**, SHA-256 `a05e47f512b728a3241df5b504014f716a759962707093b5f5d972bb5f2ce730`이며 별도 `SHA256SUMS.txt`로 확인할 수 있다.
+
+새 ZIP의 별도 설치·8,327개 payload 해시·독립 창 진입, 새 0.6B TTS 한 번과 재생, 정상 재시작 후 기록 31개 및 새 결과 유지, 선정 기존 파일 190개·DB·runtime 상태 보존을 확인했다. 동일 PC·기존 home/runtime 재참조와 process PATH의 전역 Python 제외 범위이며 Python 미설치 별도 PC 검증은 아니다. EXE는 **NotSigned**다.
+
+ZIP 전체를 기존 설치를 덮어쓰지 않는 새 폴더에 푼다. Python 기반은 동봉하지만 모델·모델별 라이브러리 환경·인증·DB·출력은 포함하지 않는다. 기존 환경을 쓰면 원래 Python 기반과 venv를 보존한다. 새 인증 UI는 “연결 정보 없음”이며 표시 원인·회귀 여부와 새 OAuth 연결·갱신은 미검증이다. 이번 native 저장 대화상자·다종 모델 전체 행렬도 다시 검증하지 않았다.
+
+이전 candidate6의 TTS 취소/저장·Whisper·합성 TAPIR·A/B 검증과 이번 새 패키지의 선별 TTS 검증을 구분한다. 이전 C6의 LLM 자원 gate 실패·Whisper 전사 차이·합성 TAPIR 표본, 로컬 이미지 미준비·앱 원격 provider 통합 미완과 품질·미검증 변형의 제한은 유지한다. 상세는 [M10 설치 안내](docs/M10_INSTALL.md)와 [M10 보고서](docs/M10_REPORT.md)를 따른다. 후속 docs commit은 ZIP·태그 소스를 바꾸지 않으며 아래 v0.7.0/candidate6 설명은 당시 기록이다.
+
+
 > C6 후속 결과: 동일 새 조건의 TTS A/B 양쪽 생성·재생과 새 8개 기록의 정상 재시작 후 유지까지 확인했다. 상세 선택은 재선택 검증이며 자동 복원 판정이 아니다. 기존 22개 이력 전체 UI ID·모든 필터 검증은 하지 않았다. 최종 전체 완료나 이미지 로컬 성공으로 확대하지 않는다.
 
 > 현재 candidate6 실제 사용 갱신: 이번 새 TTS 생성·running 취소·소유 자식 정리, 사용자 수동 native 저장/취소와 저장본 SHA 일치, 새 Whisper 전사 및 16프레임 합성 TAPIR 추적을 확인했다. Whisper는 원문 차이가 있어 정확도 PASS가 아니며, TAPIR는 실물 영상 검증이 아니다. LLM은 RAM/GPU/disk 공통 자원 gate에서 실패해 출력이 없었다. 새 TTS A/B 양쪽 cold 생성·native 재생 완료와 정상 종료·재시작 후 새 8개 기록 유지까지 확인했다. 기존 DB 행 fingerprint·환경 보존과 대표 STT JSON의 사용자 수동 native 저장·해시 일치도 확인했다. 추가 TAPIR PNG·A/B 저장 변형은 미검증으로 남긴다. 아래 남은 검증/초기 상태와 최신 항목별 결과를 [M10 보고서](docs/M10_REPORT.md)에서 구분한다.
@@ -151,4 +162,5 @@ powershell.exe -NoProfile -File .\scripts\setup_runtime.ps1
 - 실제 실행 데이터는 로컬에 보관하며, 공개 예시는 별도 생성하고 예시임을 표시합니다.
 
 작성일: 2026-10-16 (Asia/Seoul)
+
 

@@ -1,5 +1,40 @@
 # M10 Windows 후보 설치·사용 안내
 
+## v0.10.0 최종 Windows 배포 패키지
+
+[v0.10.0 Release](https://github.com/castle923/Ai-manager/releases/tag/v0.10.0)의 태그 대상 소스는 `5a336cd0522fadda68f179ed4b8c5b0d4059aa5f`다. 이 소스에서 새 frontend/static과 native 패키지를 빌드하고 새 ZIP으로 별도 설치·실행을 검증했다. 아래 이전 candidate6의 기능 검증과 이번 새 ZIP의 선별 검증을 구분하며 M10 모든 모델·환경 PASS로 확대하지 않는다.
+
+| 항목 | 새 패키지 값 |
+|---|---|
+| 파일 | `AiManager-0.10.0-windows.zip` |
+| 크기 | 113,228,585 bytes |
+| ZIP SHA-256 | `a05e47f512b728a3241df5b504014f716a759962707093b5f5d972bb5f2ce730` |
+| EXE SHA-256 | `7b87e532c7871f882b316ad869b4229dc7809e126219a6fcd11177f39aea7b47` |
+| DESKTOP-MANIFEST SHA-256 | `478f021de146b4cb0132be550fd2cdf291d2ad111dfb441c4dea9521537d54c5` |
+| SOURCE-PROVENANCE SHA-256 | `b0c04d1a6f6420b300b95e689bbb7ce1da0d8b7c17dbb0db079b2ef18d6fd385` |
+
+ZIP 8,328개 항목·manifest 대상 8,327개 파일 SHA 전량 일치, 추가 항목·CRC 오류 없음이다. EXE Authenticode는 **NotSigned**다. 서명된 앱으로 표시하거나 보안 설정 변경·보호 해제를 안내하지 않는다. ZIP은 동결 뒤 수정하지 않으며 `SHA256SUMS.txt`는 별도 asset이다.
+
+### 이번 새 패키지의 검증
+
+- 새 대상 설치에서 payload 8,327개 해시·실제 파일 8,328개·EXE/manifest 일치와 독립 창 진입을 확인했다. 동일 PC·기존 home과 검증된 library runtime을 참조했으며 전역 Python을 process PATH에서 제외했다. 추가 Python을 설치하지 않았지만 Python 미설치 별도 PC 검증은 아니다.
+- 새 한국어 TTS 0.6B 단일 실행이 24kHz mono WAV 276,524 bytes·5.76초, SHA-256 `60215706f9cf6ef54f723f7356eafa449f887d8ff13dec8429f4f0b16c009aad`로 성공했다. 설치된 worker와 실행 소스 13개 해시 일치·native 재생 완료를 확인했다. CUDA 로딩 2.656초·추론 19.531초·전체 35.015초와 peak allocation 2,344,240,640 bytes는 단일 표본 실측이며 일반 성능·품질 우열이 아니다.
+- 정상 종료 후 소유 자식 0, 같은 EXE/home 재시작·기록 30→31개·새 성공 실행 유지를 확인했다. 상세는 수동 재선택해 입력 SHA와 원래 작업 화면의 결과 복구를 확인했다. 자동 상세 선택 복원이 아니다.
+- 선정 기존 파일 190개 SHA, DB 기존 행 fingerprint, runtime 10개 경로의 기존 존재/부재·cfg 상태가 유지됐다. 이미지 Python 부재도 유지되며 10개 모두 존재한다는 뜻이 아니다. 원래 Python 기반을 보존했고 runtime 설치·모델 다운로드는 0이다. 모든 모델 가중치 재해시나 PC 전체 보존 전수 검증은 아니며 ephemeral lock은 제외했다.
+
+public tracked 153개 raw bytes와 패키지 source/static/vendor 61개가 검증 소스와 일치한다. source 회귀 274 통과·6 skip, 162 subtest 통과와 새 frontend/native 빌드를 확인했다. 6개 skip을 실제 GPU 검증으로 계산하지 않는다. 초기 clone의 autocrlf 줄바꿈 변환 실패본은 보존하고 최종 ZIP에 사용하지 않았다. 새 clone에만 `core.autocrlf=false`를 적용해 Git blob bytes를 맞췄으며 전역 Git/보안 설정이나 vendor manifest 해시를 변경하지 않았다. Windows 재현에서도 checkout bytes와 pinned source 해시를 먼저 확인한다.
+
+### 설치·검증의 경계
+
+ZIP 전체를 기존 설치를 덮어쓰지 않는 새 폴더에 푼다. WebView2가 필요하고 Python 기반은 동봉하지만 모델·모델별 라이브러리 환경·개인 인증·DB·출력은 포함하지 않는다. 기존 library runtime을 참조할 때 원래 candidate3 Python 기반과 환경 폴더를 삭제·이동·수정하지 않는다.
+
+이전 candidate6 별도 설치본의 TTS 취소·수동 native 저장/해시·Whisper·합성 TAPIR·A/B·재시작은 아래 역사 기록으로 보존한다. 이번 ZIP은 그 전체 행렬을 다시 실행하지 않았고 **이번 native 저장 대화상자는 미검증**이다. 이전 candidate6 동일 PC 검증의 Llama는 RAM/GPU/disk 공통 gate 실패였고, Whisper는 전사 차이가 있었으며 TAPIR는 16프레임 합성 영상·점 1개였다. 이들을 이번 ZIP의 새 실행 성공·정확도·실물 검증으로 쓰지 않는다. 로컬 이미지는 미준비/차단이고 앱 원격 GPU provider 통합도 완료 기능이 아니다.
+
+이번 인증 UI는 “연결 정보 없음”이며 기존 인증 bytes만 보존했다. 이전 UI baseline이 없어 회귀 여부·표시 원인은 미확정이다. 새 OAuth 연결·갱신·Drive 조회는 미검증이며 과거 OAuth 성과로 대신하지 않는다. 추가 TAPIR PNG·A/B 저장 변형, 모든 필터·과거 UI ID 전수·전면 접근성·장시간 stress/crash·다른 PC·품질 순위도 미검증이다.
+
+태그는 검증 소스에 고정하고 후속 docs commit은 ZIP·EXE를 바꾸지 않는다. ZIP 안의 docs/README는 고정 소스 시점 안내이며 후속 공개 문서의 Release 상태와 다를 수 있다. 아래 v0.7.0/candidate6 설명은 당시 기록이다.
+
+
 > C6 후속 결과: 동일 새 조건의 TTS A/B 양쪽 생성·재생과 새 8개 기록의 정상 재시작 후 유지까지 확인했다. 상세 선택은 재선택 검증이며 자동 복원 판정이 아니다. 기존 22개 이력 전체 UI ID·모든 필터 검증은 하지 않았다. 최종 전체 완료나 이미지 로컬 성공으로 확대하지 않는다.
 
 > 현재 candidate6 실제 사용 갱신: 이번 새 TTS 생성·running 취소·소유 자식 정리, 사용자 수동 native 저장/취소와 저장본 SHA 일치, 새 Whisper 전사 및 16프레임 합성 TAPIR 추적을 확인했다. Whisper는 원문 차이가 있어 정확도 PASS가 아니며, TAPIR는 실물 영상 검증이 아니다. LLM은 RAM/GPU/disk 공통 자원 gate에서 실패해 출력이 없었다. 새 TTS A/B 양쪽 cold 생성·native 재생 완료와 정상 종료·재시작 후 새 8개 기록 유지까지 확인했다. 기존 DB 행 fingerprint·환경 보존과 대표 STT JSON의 사용자 수동 native 저장·해시 일치도 확인했다. 추가 TAPIR PNG·A/B 저장 변형은 미검증으로 남긴다. 아래 남은 검증/초기 상태와 최신 항목별 결과를 [M10 보고서](M10_REPORT.md)에서 구분한다.
@@ -102,3 +137,4 @@ candidate6 동결 snapshot에서 TypeScript/Vite와 native build는 통과했다
 현재 초기 개발 소스에서 새 Whisper 전사와 단순 합성 영상의 TAPIR GPU 추적, 짧은 Llama 응답 생성을 확인했으며, 이는 동결한 0.10.0 설치본의 독립 창·정상 저장·오류/취소·재시작 완료를 뜻하지 않는다. Llama 모델 자산의 전체 통합 검증은 완료했지만 실제 응답 확인은 짧은 초기 표본이며, 선행 자원 감시 실패의 원인은 아직 미확정이다. 이미지는 초기 별도 환경의 의존성/import 점검을 마쳤지만 자원 gate·모델 다운로드·실제 생성이 남아 있다. 설치·runtime 준비·네 유형 E2E·새 TTS A/B 회귀·재시작·저장 검증과 독립 검토가 끝나기 전 M10 전체 PASS를 선언하지 않는다.
 
 후보 설치·진단은 기존 설치본·home·모델 원본·인증·DB·출력·실패 환경을 보존하며 진행한다. 이 안내는 기존 자료 삭제·이동·정리 권한이 아니다. 새 모델·원격 GPU·Drive 쓰기·공개 서비스·보안 설정 변경으로 범위를 자동 확대하지 않는다.
+

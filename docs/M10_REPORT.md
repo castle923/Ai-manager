@@ -1,5 +1,40 @@
 # M10 다종 모델 실행 진행 보고서
 
+## v0.10.0 최종 Windows 배포 패키지
+
+[v0.10.0 Release](https://github.com/castle923/Ai-manager/releases/tag/v0.10.0)의 태그 대상 소스는 `5a336cd0522fadda68f179ed4b8c5b0d4059aa5f`다. 이 소스에서 새 frontend/static과 native 패키지를 빌드하고 새 ZIP으로 별도 설치·실행을 검증했다. 아래 이전 candidate6의 기능 검증과 이번 새 ZIP의 선별 검증을 구분하며 M10 모든 모델·환경 PASS로 확대하지 않는다.
+
+| 항목 | 새 패키지 값 |
+|---|---|
+| 파일 | `AiManager-0.10.0-windows.zip` |
+| 크기 | 113,228,585 bytes |
+| ZIP SHA-256 | `a05e47f512b728a3241df5b504014f716a759962707093b5f5d972bb5f2ce730` |
+| EXE SHA-256 | `7b87e532c7871f882b316ad869b4229dc7809e126219a6fcd11177f39aea7b47` |
+| DESKTOP-MANIFEST SHA-256 | `478f021de146b4cb0132be550fd2cdf291d2ad111dfb441c4dea9521537d54c5` |
+| SOURCE-PROVENANCE SHA-256 | `b0c04d1a6f6420b300b95e689bbb7ce1da0d8b7c17dbb0db079b2ef18d6fd385` |
+
+ZIP 8,328개 항목·manifest 대상 8,327개 파일 SHA 전량 일치, 추가 항목·CRC 오류 없음이다. EXE Authenticode는 **NotSigned**다. 서명된 앱으로 표시하거나 보안 설정 변경·보호 해제를 안내하지 않는다. ZIP은 동결 뒤 수정하지 않으며 `SHA256SUMS.txt`는 별도 asset이다.
+
+### 이번 새 패키지의 검증
+
+- 새 대상 설치에서 payload 8,327개 해시·실제 파일 8,328개·EXE/manifest 일치와 독립 창 진입을 확인했다. 동일 PC·기존 home과 검증된 library runtime을 참조했으며 전역 Python을 process PATH에서 제외했다. 추가 Python을 설치하지 않았지만 Python 미설치 별도 PC 검증은 아니다.
+- 새 한국어 TTS 0.6B 단일 실행이 24kHz mono WAV 276,524 bytes·5.76초, SHA-256 `60215706f9cf6ef54f723f7356eafa449f887d8ff13dec8429f4f0b16c009aad`로 성공했다. 설치된 worker와 실행 소스 13개 해시 일치·native 재생 완료를 확인했다. CUDA 로딩 2.656초·추론 19.531초·전체 35.015초와 peak allocation 2,344,240,640 bytes는 단일 표본 실측이며 일반 성능·품질 우열이 아니다.
+- 정상 종료 후 소유 자식 0, 같은 EXE/home 재시작·기록 30→31개·새 성공 실행 유지를 확인했다. 상세는 수동 재선택해 입력 SHA와 원래 작업 화면의 결과 복구를 확인했다. 자동 상세 선택 복원이 아니다.
+- 선정 기존 파일 190개 SHA, DB 기존 행 fingerprint, runtime 10개 경로의 기존 존재/부재·cfg 상태가 유지됐다. 이미지 Python 부재도 유지되며 10개 모두 존재한다는 뜻이 아니다. 원래 Python 기반을 보존했고 runtime 설치·모델 다운로드는 0이다. 모든 모델 가중치 재해시나 PC 전체 보존 전수 검증은 아니며 ephemeral lock은 제외했다.
+
+public tracked 153개 raw bytes와 패키지 source/static/vendor 61개가 검증 소스와 일치한다. source 회귀 274 통과·6 skip, 162 subtest 통과와 새 frontend/native 빌드를 확인했다. 6개 skip을 실제 GPU 검증으로 계산하지 않는다. 초기 clone의 autocrlf 줄바꿈 변환 실패본은 보존하고 최종 ZIP에 사용하지 않았다. 새 clone에만 `core.autocrlf=false`를 적용해 Git blob bytes를 맞췄으며 전역 Git/보안 설정이나 vendor manifest 해시를 변경하지 않았다. Windows 재현에서도 checkout bytes와 pinned source 해시를 먼저 확인한다.
+
+### 설치·검증의 경계
+
+ZIP 전체를 기존 설치를 덮어쓰지 않는 새 폴더에 푼다. WebView2가 필요하고 Python 기반은 동봉하지만 모델·모델별 라이브러리 환경·개인 인증·DB·출력은 포함하지 않는다. 기존 library runtime을 참조할 때 원래 candidate3 Python 기반과 환경 폴더를 삭제·이동·수정하지 않는다.
+
+이전 candidate6 별도 설치본의 TTS 취소·수동 native 저장/해시·Whisper·합성 TAPIR·A/B·재시작은 아래 역사 기록으로 보존한다. 이번 ZIP은 그 전체 행렬을 다시 실행하지 않았고 **이번 native 저장 대화상자는 미검증**이다. 이전 candidate6 동일 PC 검증의 Llama는 RAM/GPU/disk 공통 gate 실패였고, Whisper는 전사 차이가 있었으며 TAPIR는 16프레임 합성 영상·점 1개였다. 이들을 이번 ZIP의 새 실행 성공·정확도·실물 검증으로 쓰지 않는다. 로컬 이미지는 미준비/차단이고 앱 원격 GPU provider 통합도 완료 기능이 아니다.
+
+이번 인증 UI는 “연결 정보 없음”이며 기존 인증 bytes만 보존했다. 이전 UI baseline이 없어 회귀 여부·표시 원인은 미확정이다. 새 OAuth 연결·갱신·Drive 조회는 미검증이며 과거 OAuth 성과로 대신하지 않는다. 추가 TAPIR PNG·A/B 저장 변형, 모든 필터·과거 UI ID 전수·전면 접근성·장시간 stress/crash·다른 PC·품질 순위도 미검증이다.
+
+태그는 검증 소스에 고정하고 후속 docs commit은 ZIP·EXE를 바꾸지 않는다. ZIP 안의 docs/README는 고정 소스 시점 안내이며 후속 공개 문서의 Release 상태와 다를 수 있다. 아래 v0.7.0/candidate6 설명은 당시 기록이다.
+
+
 ### candidate4·5의 시작 실패와 candidate6 수정
 
 candidate4는 새 대상 설치 8,291개 파일 무결성을 통과했으나 앱 창 시작에 실패했다. 진단만 보강한 candidate5에서도 시작 실패를 보존했다. candidate5의 opt-in trace는 `home → SettingsStore → protect_directory → icacls`의 30초 timeout 호출 위치를 확인했다. WebView 초기화 전 단계이며, 채워진 디렉터리에 상속 ACL을 다시 적용하면서 자식으로 전파된 것이 정확한 지연 원인인지는 별도로 측정하지 않았으므로 가설로 남긴다.
@@ -150,3 +185,4 @@ Llama의 gated 접근·인증 성공은 필요한 파일을 받을 권한의 확
 동일 probe의 RAM 여유는 12,148,547,584 bytes(약 12.15 GB)로 18 GiB(19,327,352,832 bytes)에 못 미치고 GPU 여유도 7,459,569,664 bytes로 7 GiB(7,516,192,768 bytes)에 못 미쳐 실제 자원 gate는 false다. import 성공만으로 모델 로딩·실제 이미지 생성을 완료 처리하지 않으며 모델 가중치 다운로드·실제 생성은 0이다. 초기 별도 환경과 최종 독립 배포의 증거를 구분하고 기존 TTS 환경을 보존한다.
 
 현재 보고서는 M10 중간 결과를 검토하기 위한 초안이다. 소스 반영·프로그램 Release·M10 전체 완료를 각각 구분한다. 기존 공개 v0.7.0 Release와 이전 검증 이력은 보존하며 새 태그·Release는 이 초안 작성으로 생성하지 않는다.
+
