@@ -1,6 +1,6 @@
 # M10 Runpod 원격 검증 보고
 
-최신 상태: 승인된 재개 환경·모델 무결성과 안전 정리는 확인했으나 Qwen 이미지 생성은 로딩 중 실패했다. PNG는 0개이며 두 새 Secure Pod는 모두 삭제 확인했다. 아래 세 시도는 분리한 기록이다.
+최신 상태: 수정본으로 Secure Cloud A100 SXM4 80GB에서 Qwen-Image-2.1의 실제 로딩·단일 이미지 smoke와 PNG 회수·전체 해시 검증을 완료했다. 필수 결과를 한 번 독립 검토한 직후 새 Pod를 삭제했으며 404·목록 부재를 확인했다. 이전 두 Secure 실패 시도와 이번 성공 시도의 세 새 Pod는 모두 삭제 확인했다. 실제 화질·Windows 8GB·앱 원격 통합·실GPU 취소는 이번 성공 범위에 포함하지 않는다. 아래 과거 시도와 로컬 준비 기록은 각각 당시의 판정으로 보존한다.
 
 ## 1차: Community Cloud 재고 조사
 
@@ -258,3 +258,85 @@ worker 로그에는 checkpoint shard 2/2와 weights 750/750 로딩, CPU/disk off
 3. 엄격한 SSH 신원 확인 및 해당 Pod의 CPU fixture를 먼저 통과시킨 뒤 새 runtime을 격리 설치한다. torchvision을 포함한 실제 설치 보고서·해시, 고정 pipeline·processor config를 확인한다. 가중치 로드 전 **실제 local-only processor 로드**가 통과해야 한다.
 4. 그다음 동일 placement와 조건으로 한 번의 bounded Qwen smoke를 진행한다. 실패하면 새 세부 단계와 bounded 오류 구조·자원 기록을 회수하고 반복하지 않는다. 성공하면 새 PNG·metadata와 원격/로컬 full SHA를 확인한다.
 5. 필수 결과를 회수하고 한 번 검토한 직후 신규 immutable Pod만 삭제하며, 404·목록 부재·신규 잔여 스토리지·비용 근거를 확인한다. 이전 실패나 CPU mock을 새 GPU 성공 근거로 사용하지 않는다.
+
+## 4차: 수정본 Secure Cloud 실제 단일 이미지 생성과 즉시 종료
+
+판정: **확인한 Secure A100 SXM4 80GB 환경에서 수정 worker의 로딩·단일 smoke·PNG 무결성 회수 PASS**. 이미지 내용의 시각적 품질 평가, 다른 모델의 대체 검수, Windows 8GB 로컬 성공, 앱 원격 통합 또는 전체 M10 완료 판정은 아니다. 과거 로딩 실패의 원예외가 사후 확정된 것도 아니다.
+
+### 승인과 시간·비용 통제
+
+사용자가 수정본의 동일 Qwen 검증 재개를 명시 승인했다. 기존 사용분을 포함한 총 $5 한도, 성공·실패 근거 회수와 한 번의 검토 직후 즉시 삭제, 기존 자료·보안 설정 보존을 적용했다. 다른 모델은 보류했다.
+
+최초 origin `06:06:40.380 UTC`와 기존 절대 work-stop `07:36:40.380 UTC`, terminate 시작 `07:41:40.380 UTC`, hard-policy `08:06:40.380 UTC`를 유지했다. 시계를 새로 시작하지 않았다. 생성 전 work-stop까지 20분 이상 남아 있어야 한다는 추가 gate를 통과했다. 이전 비용은 청구 미집계 상태여서 보수 추정 **$0.520159**를 합산했다. 240초 operator lease, detached controller, UTC/monotonic 중 보수 경과 시간, 관측 GET의 제한된 transient retry, 신규 immutable ID 고정 삭제와 단일 POST 원칙을 유지했다.
+
+생성 전 새 조회는 Secure SXM4 재고 `MEDIUM`, GPU `$1.79/시간`, 예산 충족을 확인했다. 새 Pod의 실제 응답도 `cloud=SECURE`, `NVIDIA A100-SXM4-80GB ×1`, container 20GB + Pod volume 150GB였다. 새 network volume은 만들지 않았다. GPU 실제 단가에 storage를 보수적으로 추가한 계산 요율은 **$1.815298/시간**으로 $2/시간 방어 상한 아래였다. 카탈로그만으로 실제 배치 성공을 주장하지 않았으며 이번에는 실제 응답을 확인했다.
+
+| 사건 | UTC | KST |
+| --- | --- | --- |
+| 새 Pod 생성 | 2026-10-18 07:11:01.518 | 2026-10-18 16:11:01.518 |
+| 실제 processor gate 통과, 가중치 0개 | 07:14:45 | 16:14:45 |
+| 모델 24개 파일 해시 확인 완료 | 07:15:59.796 | 16:15:59.796 |
+| 새 worker run 출처 기록 | 07:16:56 | 16:16:56 |
+| 필수 결과 회수·검토 후 삭제 요청 | 07:19:31.954 | 16:19:31.954 |
+| controller의 404·목록 부재 확인 | 07:19:40.467 | 16:19:40.467 |
+| 별도 최종 읽기 확인 | 07:19:47.576 | 16:19:47.576 |
+
+### 새 환경과 로딩 검증
+
+새 task 전용 SSH client/host key를 사용하고 사전에 고정한 host public key와 `StrictHostKeyChecking=yes`로 연결했다. 계정 global SSH 설정은 바꾸지 않았다. 계정 API key는 로컬 controller 메모리에만 두었고 PIN은 controller·Pod에 전달하지 않았다. 원격에서 API key와 임시 host-private-key 환경 변수의 잔류가 없음을 확인했다.
+
+Python 3.11.10, A100 SXM4 80GB, driver 570.172.08과 새 disk를 확인했다. 해당 Pod에서 bundle manifest와 11개 파일 해시를 확인하고 Linux stdlib 프로세스 fixture 8개를 실제 실행해 통과했다. 해당 호스트의 cgroup 경계는 이번 표본에서 노출되지 않았으므로 host RAM 수치를 Pod의 강제 메모리 quota로 주장하지 않는다. worker의 18GiB sampled RSS guard와 최소 3GiB available guard는 그대로 유지했다.
+
+고정 runtime을 새 venv에 설치하고 `pip check` 및 runtime audit를 통과했다. 주요 pins는 torch `2.9.1+cu128`, torchvision `0.24.1+cu128`, Transformers `5.17.0`, Accelerate `1.12.0`, safetensors `0.8.0`, Pillow `11.3.0`, psutil `7.2.2`다. diffusers commit과 pipeline SHA는 앞 절의 고정값과 일치했다. 이번 설치 보고서와 wheel/source archive 해시를 새로 회수했으며, 이전 설치 보고서로 변경 runtime을 대신 검증하지 않았다.
+
+먼저 processor 구성·tokenizer **9개 파일 / 15,884,996 bytes**만 공개 고정 revision에서 직접 준비했다. 가중치 safetensors가 **0개**인 상태에서 `Qwen3VLProcessor`와 image/video processor의 실제 `local_files_only=True`, `trust_remote_code=False` 로드가 통과했다. 그 뒤에만 동일 모델 24개 파일 **33,131,601,593 bytes**를 다운로드했다. 공식 revision·size·LFS SHA 또는 Git blob을 대조하고 stream/readback full SHA-256 및 regular file을 전수 확인했다. 이전 Pod나 모델 캐시를 연결하지 않았다.
+
+현재 실행 source/bundle 해시는 앞 절의 후보와 그대로 일치한다. worker `7f5569e85c0d6a5d7da3fdd75c0303fd92e9872001b29c6fa6c85eff6e9573f8`, 진단 모듈 `3038ac948ea56426bd445fc7cdd916a7dcdc1235ba26212c5adafcc5621007b8`, lock `cdf8c00ba403be82320063558555706e284df67de2cd9d814c625d26a7290392`, bundle manifest `9ebb9d17ec74e752250e1c4668c5187f272d264a3c946edf142c0d759e6776b5`다. 원래 GPU/CPU placement와 모델·pipeline은 바꾸지 않았다.
+
+### 실제 생성 조건과 결과
+
+이번 새 run은 `image-success-59ab9bce3c94412ea025f5f20a0cba4d`다. 승인된 고정 harness의 smoke 입력 상수를 이번 새 run 디렉터리의 새 요청·입력 파일에 기록했다. 아래 문구는 이전 시도와 동일한 고정 주전자 prompt이며 새로 고안한 장면이라는 뜻은 아니다. 이전 input 파일이나 생성 이미지를 복사하지 않았고, 실제 입력은 아래와 같다.
+
+> A small yellow ceramic teapot on a blue wooden table beside a single white flower, soft daylight, simple studio photograph, no text.
+
+파란 나무 탁자 위의 작은 노란 도자기 주전자와 흰 꽃 한 송이를 자연광의 단순한 스튜디오 사진처럼 생성하는 요청이다. 입력 SHA-256은 `6368dc479347370182a0521c7be3a0c64d20cc5457b30f9a7136183e4aed7b9a`다.
+
+| 조건 | 실제 값 |
+| --- | --- |
+| 크기 / 이미지 수 | 512×512 / 1개 |
+| seed / dtype | 0 / bfloat16 |
+| steps | 4, 기본 동작 확인용 smoke |
+| true_cfg_scale / negative prompt | 4.0 / 빈 문자열 |
+| use_kv_cache | false |
+| 모델·코드 | 고정 Qwen-Image-2.1 revision / QwenImage21Pipeline |
+| 실행 결과 | loading → running → validating, worker exit 0, `generated` |
+| 구조 검증 | `generated_verified`, 512×512 RGBA, 8-bit, non-interlaced |
+| PNG | 185,256 bytes |
+| PNG SHA-256 | `6977f1ac24974f7bc00400314de337619a5c1b27359699862e334e71727d1462` |
+
+4 steps는 품질 평가용 설정이 아니다. 공식 예시의 40 steps·2048 크기와 같은 품질이나 공식 권장 VRAM 달성을 뜻하지 않는다. PNG 내용을 시각적으로 열어보지 않고 정규 파일·PNG CRC/decode·구조·메타데이터·run ID·입력 및 출력 hash를 검증했다.
+
+| 측정 항목 | 값과 한계 |
+| --- | --- |
+| worker 콜드 로딩 | 16.176초 |
+| worker 추론 | 49.072초 |
+| 전체 harness 실행 | 71.631초 |
+| GPU peak allocated | 4,197,161,984 bytes |
+| GPU peak reserved | 4,938,792,960 bytes |
+| 외부 sampled RSS 최대 | 13,801,709,568 bytes, 142개 표본의 소유 프로세스 그룹 RSS 합 |
+| 프로세스 정리 | group terminated=true, live members after=0 |
+| opt-in 진단 | 24개 이벤트 / 7,612 bytes, failure 이벤트 0개 |
+
+GPU allocated/reserved는 CUDA context나 시스템 전체 VRAM과 같지 않으며, sampled RSS는 강제 OS quota나 연속 최대치가 아니다. 이 수치로 8GB GPU·32GB RAM의 Windows 로컬 성공을 추론하지 않는다.
+
+### 회수·한 번의 검토·즉시 삭제
+
+PNG·metadata·request·provenance·resource·diagnostic·runtime·processor·model hash·프로세스 정리 근거를 포함한 소형 원본 **25개**를 회수했다. archive는 **371,155 bytes**, SHA-256 `e50516fd3c67b710403add45c9beae3abc9c38bea13c5b0e3dc1cc6d8d708add`다. 원격 manifest와 로컬의 파일 크기·full SHA-256이 25개 모두 일치했다.
+
+독립 reviewer가 회수 원본과 PNG 구조·metadata·조건·모델 SHA·후손 0을 한 번 검토해 필수 결과를 확인했다. 별도 감독도 정상 실행과 종료를 읽기 전용으로 확인했다. 추가 실험·오류 재현·GPU 취소 실행·반복 추론 없이 즉시 삭제 요청했다.
+
+삭제 후 controller가 대상 `GET 404`와 v2 목록 부재를 확인했으며 별도 읽기 조회에서도 `GET 404`, v2/v1 목록의 대상 부재를 확인했다. 새 network volume은 0개이고 새 Pod volume은 해당 Pod 종료 수명을 따른다. 종료 뒤 남겨둔 별도 신규 storage는 없다. 다른 기존 Pod·storage와 Windows 앱·자료·인증·DB는 제어하지 않았다.
+
+마지막 Pod별 billing 조회는 HTTP 200이지만 기록 0개로 **청구 미집계**였다. 확정 비용이 0이라는 뜻이 아니다. 최종 읽기 시점까지의 보수 추정은 이번 **$0.265265**, 이전 **$0.520159**, 합계 **$0.785424**다. 제공자 청구가 집계되면 그 값이 우선하며 이 수치는 확정 invoice가 아니다. Pod는 최대 2시간을 채우지 않고 약 8분 39초 만에 삭제 확인했다.
+
+이번에 실제 수정본의 processor·모델 로딩과 단일 GPU 생성은 검증했지만, 원래 실패 예외가 보존되지 않았으므로 과거 실패의 유일 원인 확정, 실제 GPU 오류·취소, 장시간 안정성·품질 평가, Windows 8GB 또는 앱 원격 통합은 미검증으로 유지한다. 제품 코드·태그·Release를 이번 결과 보고와 함께 게시하지 않는다.
