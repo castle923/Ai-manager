@@ -1,6 +1,6 @@
 # M10 Runpod 원격 검증 보고
 
-최신 상태: 수정본으로 Secure Cloud A100 SXM4 80GB에서 Qwen-Image-2.1의 실제 로딩·단일 이미지 smoke와 PNG 회수·전체 해시 검증을 완료했다. 필수 결과를 한 번 독립 검토한 직후 새 Pod를 삭제했으며 404·목록 부재를 확인했다. 이전 두 Secure 실패 시도와 이번 성공 시도의 세 새 Pod는 모두 삭제 확인했다. 실제 화질·Windows 8GB·앱 원격 통합·실GPU 취소는 이번 성공 범위에 포함하지 않는다. 아래 과거 시도와 로컬 준비 기록은 각각 당시의 판정으로 보존한다.
+최신 상태: 공식 권장 예시의 2048×2048·40 steps·guidance 1.0 설정으로 새 full-GPU Qwen-Image-2.1 profile에서 이미지 1장을 생성하고 회수·해시 검증을 완료했다. 한 번의 독립 검토 직후 새 Pod를 삭제했으며 404·목록 부재를 확인했다. 앞선 세 Secure Pod와 이번 HQ Pod의 총 네 새 Pod는 모두 삭제 확인했다. 이는 공식 권장 고품질 조건 1회 실행 성공이며 절대 최고 화질 보장·품질 점수·Windows 8GB·앱 원격 통합·실GPU 취소의 검증은 아니다. 아래 모든 과거 시도와 준비 기록은 당시의 판정으로 보존한다.
 
 ## 1차: Community Cloud 재고 조사
 
@@ -340,3 +340,94 @@ PNG·metadata·request·provenance·resource·diagnostic·runtime·processor·mo
 마지막 Pod별 billing 조회는 HTTP 200이지만 기록 0개로 **청구 미집계**였다. 확정 비용이 0이라는 뜻이 아니다. 최종 읽기 시점까지의 보수 추정은 이번 **$0.265265**, 이전 **$0.520159**, 합계 **$0.785424**다. 제공자 청구가 집계되면 그 값이 우선하며 이 수치는 확정 invoice가 아니다. Pod는 최대 2시간을 채우지 않고 약 8분 39초 만에 삭제 확인했다.
 
 이번에 실제 수정본의 processor·모델 로딩과 단일 GPU 생성은 검증했지만, 원래 실패 예외가 보존되지 않았으므로 과거 실패의 유일 원인 확정, 실제 GPU 오류·취소, 장시간 안정성·품질 평가, Windows 8GB 또는 앱 원격 통합은 미검증으로 유지한다. 제품 코드·태그·Release를 이번 결과 보고와 함께 게시하지 않는다.
+
+## 5차: 공식 권장 2K·40 steps 고품질 1장과 즉시 종료
+
+판정: **공식 권장 예시 조건을 적용한 새 full-GPU HQ profile의 실제 단일 이미지 생성·회수 PASS**. “모델이 낼 수 있는 최대”라는 요청은 전역적인 최고 품질을 증명한다는 뜻으로 해석하지 않고, 고정 공식 문서의 고품질 예시를 실제 실행하는 범위로 구체화했다. 한 장만 생성했으며 다른 seed·해상도·설정의 탐색이나 실패 후 낮은 품질 재시도는 하지 않았다.
+
+### 공식 설정과 별도 profile
+
+고정 model card의 text-to-image 예시는 bfloat16 pipeline을 새로 로드해 `.to('cuda')`로 이동하고 **2048×2048, 40 steps, seed 42**를 사용한다. 고정 pipeline의 guidance 기본값은 1.0이며 Qwen-Image 2.1을 guidance 없이 sampling하도록 설명한다. 이번에는 **true_cfg_scale=1.0, negative_prompt=None, use_kv_cache=True, num_images_per_prompt=1**로 실행했다. 고정 model index에는 steps를 덮어쓰는 `sample_sigmas`가 없었다. [고정 모델 공식 예시](https://huggingface.co/Qwen/Qwen-Image-2.1/blob/d26bb61231c349cf6b7896fa83353113880e1ba3/README.md), [고정 pipeline 설정과 설명](https://github.com/huggingface/diffusers/blob/b800f828f3951c4d206e154411bcbfa693cd322e/src/diffusers/pipelines/qwenimage21/pipeline_qwenimage21.py#L511-L571).
+
+512×512·4 steps·CFG 4의 기존 smoke 계약을 바꾸지 않고 별도 HQ worker/profile을 만들었다. 기존 device-map/offload 객체에 GPU 이동을 추가하지 않았다. 공식 경로대로 **새 no-device-map·no-offload-hook pipeline**을 로드한 뒤 CUDA로 옮기고, 모델 파라미터·buffer의 실제 CUDA 배치와 부동소수 파라미터의 bfloat16을 확인했다. 양자화·compile·CPU/disk offload fallback은 사용하지 않았다.
+
+가중치 파일은 총 33,115,613,408 bytes, 약 30.84GiB다. 이것만으로 고해상도 활성값·KV cache·VAE 피크가 맞는다고 단정하지 않았다. 실행 전 GPU total≥78GiB/free≥70GiB, RAM available≥64GiB 등 실제 preflight를 확인했다. 외부 sampled guard는 소유 프로세스 그룹 RSS 64GiB, host available 8GiB, GPU free 4GiB 기준을 적용했다. 이는 OS 강제 quota가 아니며 allocation 사이 OOM을 원천 보장하지 않는다.
+
+소스 준비 단계에서는 HQ 관련 focused CPU 테스트 9개와 기존 관련 테스트 18개, harness 계약 27개, bundle readback/import 검사 8개, 별도 WSL guardian 검사 8개를 확인했다. GPU 첫 표본이 `None`으로 들어가는 실제 루프 반례를 고친 뒤 subsecond 첫 관측 양성·관측 실패 시 정리 음성을 추가 검증했다. 이 로컬 검증을 실제 2K 성공 근거로 대신하지 않았고, 아래 새 실행을 따로 수집했다.
+
+| 실행 source | SHA-256 |
+| --- | --- |
+| HQ worker | `aa8975f2f2f5447f4d425bfdd101fbb8d6cf6fb97f4b3dcbe3085edcac2f716d` |
+| HQ helper | `b5f6f98ca08c08d33258da88badffa8e5ce5fdbbc033e7c82e0311d17527a5e3` |
+| HQ harness | `5857e2ddb55a0a42908e79f3dde25e85e47816224b12f864db2f8571336ffb73` |
+| HQ bundle manifest, 12개 파일 | `eb457f83ba0165011bd34d3459abd49aea339835f76b7cc5aad8180268494568` |
+
+기존 smoke worker `7f5569e85c0d6a5d7da3fdd75c0303fd92e9872001b29c6fa6c85eff6e9573f8`, 진단 모듈과 runtime lock은 그대로 유지했다. 공용 PNG 검증 helper는 기존 기본 2MiB 상한을 유지하고 HQ만 명시적 32MiB 상한을 선택하도록 했다. 이 변경을 제품 코드·새 앱 릴리스로 공개한 것은 아니다.
+
+### 추가 시간의 명시 승인과 새 실행 경계
+
+기존 절대 작업 시각을 임의로 연장하지 않았다. 07:33:18 UTC 조사 때 기존 work-stop까지 약 3분만 남아 새 생성이 차단된 사실을 먼저 보고했다. 사용자에게 공식 HQ 계획·수정/검증 결과·비용안을 알린 뒤 **이번 1장에 한해 추가 최대 45분**을 명시 승인받았다.
+
+새 window는 실제 create intent부터 작업 30분, 삭제 시작 35분, 정리 상한 45분으로 별도 고정했다. 기존 비용은 그대로 합산했다. 새 controller는 UTC/monotonic 중 보수 경과 시간, 240초 lease, GET 한정 bounded transient retry, POST 1회와 신규 immutable ID 고정 정리를 적용했다. 총요율 $2/시간 초과 또는 scope 불일치 시 작업 없이 정리하는 조건도 유지했다. 이 정책은 provider의 계정 hard spending cap을 뜻하지 않는다.
+
+생성 전 fresh Secure 조회는 SXM4 재고 `HIGH`, GPU $1.79/시간, 예산 충족을 확인했다. 과거 첫 두 Pod의 billing에는 각각 약 $0.064954246와 $0.415575722가 집계됐으나 나머지가 미집계여서 정책에는 기존의 더 보수적인 누적 **$0.785424**를 적용했다. 45분 전부를 $2/시간 상한으로 사용해도 누적 추정 $2.285424로 총 $5 아래였지만 남은 시간을 채우기 위해 Pod를 유지하지 않았다.
+
+| 사건 | UTC | KST |
+| --- | --- | --- |
+| 새 create intent | 2026-10-18 07:48:43.071 | 2026-10-18 16:48:43.071 |
+| 실제 새 Pod 생성 | 07:48:44.253 | 16:48:44.253 |
+| 실제 processor gate, 가중치 0개 | 07:56:16 | 16:56:16 |
+| 24개 모델 full SHA 완료 | 07:58:37.709 | 16:58:37.709 |
+| 새 HQ run 출처 기록 | 07:59:32 | 16:59:32 |
+| 결과 회수·1회 검토 뒤 삭제 요청 | 08:03:12.762 | 17:03:12.762 |
+| controller의 삭제 확인 | 08:03:18.288 | 17:03:18.288 |
+| 별도 최종 읽기 확인 | 08:03:31.242 | 17:03:31.242 |
+
+고정한 work-stop은 **08:18:43.071 UTC**, terminate 시작은 **08:23:43.071 UTC**, hard-policy는 **08:33:43.071 UTC**였다. 원격 harness에 create intent+30분의 동일 UTC 값을 전달해 readback했고, 그 UTC와 monotonic deadline을 모델 재해시·spawn 전·실행 루프에서 확인했다. 실제 worker timeout은 남은 시간에서 회수 여유를 뺀 **1,086초**로 선택해 1,500초 고정 상한보다 짧게 적용했다.
+
+### 해당 Pod의 실제 준비와 단일 생성
+
+실제 응답은 Secure Cloud A100 SXM4 80GB 1개, container 20GB + Pod volume 150GB였다. 새 network volume은 0개다. 실제 GPU 단가 $1.79/시간에 storage를 보수적으로 추가한 계산 요율은 **$1.815298/시간**이었다. 새 task 전용 SSH key와 사전 host pin으로 연결했고 계정 global SSH 설정은 바꾸지 않았다. API key는 원격에 보내지 않았으며 PIN은 controller·Pod에 전달하지 않았다.
+
+Python 3.11.10, driver 580.126.16, 실제 A100 SXM4를 확인했다. 해당 Pod에서 source manifest 12개 파일의 SHA와 Linux stdlib CPU fixture 8개를 확인했다. 노출된 cgroup memory limit은 285,999,996,928 bytes였다. Host RAM/df 표본을 Pod quota와 혼동하지 않았고 GPU·RSS·host available guard를 별도로 적용했다.
+
+새 runtime 설치 보고서·wheel/source archive hash와 `pip check`를 회수했다. torch 2.9.1+cu128, torchvision 0.24.1+cu128 및 앞선 고정 라이브러리/pipeline pins가 일치했다. 먼저 processor 9개 파일 15,884,996 bytes를 준비해 가중치 0개 상태의 실제 local-only processor gate를 통과했고, 이후 고정 모델 24개 파일 33,131,601,593 bytes를 공개 공식 endpoint에서 새로 받아 regular file·공식 revision/size/LFS 또는 Git blob·stream/readback full SHA를 전수 확인했다. 이전 Pod·모델 cache·이미지는 연결하지 않았다.
+
+이번 새 run은 `image-hq-8fb47c2124c94614b6e86ab86ad83349`다. 이전 주전자 문구를 반복하지 않고 이번에 새로 작성한 prompt를 HQ 요청·메타데이터에 기록했다.
+
+> A monumental stone observatory on a rugged coastal cliff at sunrise, waves breaking far below, intricate weathered stone carvings, copper instruments and clear glass lenses, wild grasses moving in the sea breeze, luminous clouds, rich natural textures, cinematic yet physically plausible lighting, balanced composition, extraordinary fine detail, no text, no logo, no watermark.
+
+일출 무렵 거친 해안 절벽의 석조 관측소, 부서지는 파도, 풍화된 돌 조각과 구리 관측 도구·유리 렌즈, 풀과 구름의 질감을 자세하게 그리는 요청이다. 새 입력 SHA-256은 `71b8a114e83b14978266c13a70a1ba846c00b4054971e7335a6a4e46268c1485`다.
+
+| 실제 생성 결과 | 값 |
+| --- | --- |
+| Profile / 호출 수 | `qwen-image-2.1-official-hq-single-v1` / pipeline 1회 |
+| 설정 | 2048×2048, 40 steps, seed 42, CFG 1.0, negative=None, KV cache=True |
+| 이미지 수 / 자동 재시도 | 1 / 0 |
+| 실행 | `generated`, worker exit 0, 구조 검증 `generated_verified` |
+| PNG 구조 | 2048×2048 RGBA, 8-bit, non-interlaced |
+| PNG 크기 | 8,483,741 bytes |
+| PNG SHA-256 | `02e13fcf4a47139a1b54010f1961897c568f9b1f6fa3055d642db5a6c8d509c1` |
+| Worker 로딩 | 15.072초 |
+| Worker 추론 | 80.667초 |
+| Harness 실행 | 118.367초 |
+| GPU peak allocated | 60,691,260,416 bytes |
+| GPU peak reserved | 68,467,818,496 bytes |
+| 외부 sampled RSS 최대 | 11,487,084,544 bytes / 227개 표본 |
+| 외부 표본의 최소 GPU free | 16,077,815,808 bytes |
+| 프로세스 정리 | group terminated=true, live members after=0 |
+| 진단 | 14개 이벤트 / 4,356 bytes, failure 0개 |
+
+GPU allocated/reserved, sampled device free와 RSS는 각기 다른 관측값이다. 모든 메모리·성능 환경의 최대치를 뜻하지 않는다. per-step callback은 자원 guard만 수행했으므로 중간 step 번호의 독립 로그는 없으며, 진행률 숫자를 추정하지 않았다. 40 steps 요청·고정 pipeline의 정상 반환·최종 출력과 metadata의 정합을 확인했다.
+
+### 회수·검토·종료·비용과 한계
+
+PNG, metadata, request, provenance, resource/diagnostic, runtime/processor/model 무결성·프로세스 정리 근거의 소형 원본 **25개**를 회수했다. archive는 **8,674,329 bytes**, SHA-256 `3c791a91cd118b8d89460feadb2d845cf9de64f810dd7c60ca53abeb255e6e70`다. 25개 파일의 원격/로컬 크기와 full SHA-256이 모두 일치했다.
+
+독립 reviewer가 정규 파일·PNG CRC/decode·2048 RGBA 구조·metadata/ID/조건/prompt hash·full-GPU source 계약·모델 SHA·후손 0을 한 번 확인했고, 즉시 신규 Pod 삭제를 요청했다. 별도 감독도 읽기 전용으로 실행과 종료를 확인했다. 결과를 사용자에게 표시할 원본으로 보존했지만 주관적 품질 점수나 절대 최고 화질 판정은 부여하지 않았다. 추가 생성·다른 seed·낮은 해상도 fallback·재현 실험은 하지 않았다.
+
+삭제 후 controller와 별도 읽기 확인에서 대상 **GET 404**, v2/v1 목록 부재를 확인했다. 신규 network volume 0개이며 별도 잔류 신규 storage를 만들지 않았다. Pod volume은 삭제된 해당 Pod의 수명을 따른다. Controller도 종료됐고, 이전 Pod·다른 storage·기존 자료·Windows 앱·인증·DB는 제어하지 않았다.
+
+이번 Pod의 최종 billing 조회는 HTTP 200이지만 기록 0개로 **청구 미집계**다. 확정 비용이 0이라는 뜻은 아니다. 최종 읽기 시각까지의 보수 추정은 이번 **$0.447264**, 이전 **$0.785424**, 누적 **$1.232688**이다. 일부 과거 청구는 집계됐지만 이 누적값은 아직 확정 invoice가 아니다. 실제 새 Pod는 약 **14분 34초** 만에 삭제 확인했으며 승인된 45분을 채우지 않았다.
+
+이번 완료 범위는 확인한 A100 80GB·공식 권장 고품질 예시·새 prompt의 단일 이미지 생성과 회수다. 절대 최고 품질, 다양한 prompt 일반화, 주관적 우열, 전체 기능 회귀, 장시간 안정성, 실제 GPU 취소, Windows 8GB 로컬 성공 또는 앱의 원격 통합으로 확대하지 않는다. 제품 코드·PNG·태그·Release를 이 보고와 함께 공개하지 않는다.
