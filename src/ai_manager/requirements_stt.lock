@@ -1,0 +1,19 @@
+# Separate Whisper environment, Windows Python 3.10 / official CUDA 12.8 torch.
+numpy==2.2.6
+transformers==4.57.3
+safetensors==0.8.0
+tokenizers==0.22.2
+huggingface_hub==0.36.2
+filelock==4.1.0
+fsspec==2026.9.0
+packaging==26.3
+PyYAML==6.0.3
+regex==2026.9.29
+requests==2.34.2
+tqdm==4.70.1
+typing_extensions==4.16.0
+certifi==2026.7.22
+charset-normalizer==3.5.2
+idna==3.20
+urllib3==2.8.0
+colorama==0.4.6

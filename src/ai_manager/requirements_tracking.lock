@@ -1,0 +1,6 @@
+# Separate tracking runtime. Torch CUDA wheel is installed by the runtime manager.
+numpy==2.2.6
+Pillow==11.3.0
+av==16.0.1
+dm-tree==0.1.9
+einshape==1.0

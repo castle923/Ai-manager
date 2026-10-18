@@ -11,7 +11,7 @@ from .config import private_home
 from .inference import FileOwner, OwnedChild
 from .preparation import atomic_text
 from .external_process import spawn_external
-from .runtime_paths import runtime_directory
+from .runtime_paths import runtime_directory, python_base, reused_runtime
 
 
 class RuntimeBootstrap:
@@ -41,6 +41,8 @@ class RuntimeBootstrap:
 
     def start(self):
         with self.lock:
+            if self.state.get('status') == 'ready' and reused_runtime(self.home, 'tts'):
+                return self.snapshot()
             if self.thread and self.thread.is_alive():
                 return self.snapshot()
             if self.cancel.is_set():
@@ -87,7 +89,7 @@ class RuntimeBootstrap:
             if not owner.handle:
                 raise ValueError('runtime_setup_already_owned')
             metadata = json.loads((self.resources / 'python-runtime.json').read_text(encoding='utf-8'))
-            python_root = private_home(self.resources / 'python_runtime')
+            python_root = python_base(self.home, 'tts', self.resources / 'python_runtime')
             base = python_root / 'python.exe'
             actual = {p.relative_to(python_root).as_posix() for p in python_root.rglob('*') if p.is_file()}
             if actual != set(metadata['files']):

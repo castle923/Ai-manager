@@ -50,3 +50,31 @@ def save_output(inference, run_id, destination):
     finally:
         if temporary is not None:
             temporary.unlink(missing_ok=True)
+
+
+def save_task_output(tasks, run_id, output_id, destination):
+    """Only a known successful artifact can be saved, never an input/source path."""
+    if not tasks.owner.handle or tasks.closed.is_set():
+        raise ValueError('server_owner_unavailable')
+    data, meta = tasks.export(run_id, output_id)
+    target = safe_destination(destination)
+    if target.suffix.casefold() != meta['extension']:
+        raise ValueError('save_extension_mismatch')
+    if hashlib.sha256(data).hexdigest() != meta['sha256'] or len(data) != meta['bytes']:
+        raise ValueError('output_invalid')
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=target.parent, prefix='.ai-manager-', suffix='.partial', delete=False) as handle:
+            temporary = Path(handle.name)
+            handle.write(data);handle.flush();os.fsync(handle.fileno())
+        if tasks.closed.is_set() or not tasks.owner.handle:raise ValueError('server_owner_unavailable')
+        # Revalidate the source artifact after a potentially long-running SaveDialog.
+        if tasks.export(run_id,output_id)[1] != meta:raise ValueError('output_invalid')
+        safe_destination(target)
+        if os.name == 'nt':os.rename(temporary,target)
+        else:os.link(temporary,target)
+        if target.stat().st_size!=meta['bytes'] or hashlib.sha256(target.read_bytes()).hexdigest()!=meta['sha256']:
+            raise ValueError('saved_output_invalid')
+        return dict(status='saved',filename=target.name,bytes=meta['bytes'],sha256=meta['sha256'])
+    finally:
+        if temporary is not None:temporary.unlink(missing_ok=True)

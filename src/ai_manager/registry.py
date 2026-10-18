@@ -10,8 +10,13 @@ import uuid
 
 from .config import private_home
 from .dashboard import Dashboard
-from .models import model_ids, manifest_path
-from .preparation import manifest
+from .models import model_ids as tts_model_ids, manifest_path as tts_manifest_path
+from .preparation import manifest as tts_manifest
+from . import adapters
+
+def model_ids(): return tts_model_ids() + adapters.configured_ids()
+def manifest_path(identifier): return tts_manifest_path(identifier) if identifier in tts_model_ids() else adapters.manifest_path(identifier)
+def manifest(identifier): return tts_manifest(identifier) if identifier in tts_model_ids() else adapters.manifest(identifier)
 
 
 SCHEMA = """CREATE TABLE models (
@@ -53,12 +58,12 @@ def text(value, maximum, required=False):
 
 
 class Registry:
-    def __init__(self, home, settings=None, inference=None):
+    def __init__(self, home, settings=None, inference=None, tasks=None):
         self.home = private_home(Path(home))
         self.home.mkdir(parents=True, exist_ok=True)
         self.path = self.home / 'registry.sqlite3'
         private_home(self.path)
-        self.settings, self.inference = settings, inference
+        self.settings, self.inference, self.tasks = settings, inference, tasks
         # A distinct database preserves the inventory and its existing recovery contract.
         with self.connect() as db:
             version = db.execute('PRAGMA user_version').fetchone()[0]
@@ -301,7 +306,15 @@ class Registry:
         result['runtime'] = 'unconfirmed'
         result['integrity'] = 'unverified'
         if adapter and any(self._local_match(ref,row['artifact']) for ref in row['references']): result['integrity']='recorded_hash_match'
-        if adapter and not reasons:
+        result['task_type'] = adapters.descriptor(adapter)['task_type'] if adapter in adapters.CATALOG else 'tts'
+        execution_blocker = adapters.descriptor(adapter).get('blocker') if adapter in adapters.CATALOG else None
+        result['execution_target'] = 'local'
+        result['execution_advisories'] = [execution_blocker] if execution_blocker else []
+        if adapter and adapter in adapters.CATALOG and not reasons:
+            from .task_runtime import environment
+            result['preparation'] = 'recorded_ready'
+            result['runtime'] = environment(self.home, adapter)['status']
+        if adapter and adapter not in adapters.CATALOG and not reasons:
             from .preparation import Preparation
             from .inference import regular
             from .preparation import safe_relative
@@ -322,17 +335,20 @@ class Registry:
                 except (OSError,ValueError,KeyError): pass
             result['runtime']=prep.environment().get('status','unconfirmed')
         result['runs'] = []
-        if self.inference:
-            for run in self.inference.registry_runs(row['id']):
+        executor = self.tasks if adapter in adapters.CATALOG else self.inference
+        if executor:
+            for run in executor.registry_runs(row['id']):
                 binding = run.get('registry_binding') or {}
                 current = binding.get('generation') == row['generation'] and binding.get('fingerprint') == row['fingerprint']
-                verified = current and not reasons and self.inference.registry_verified(run, binding)
+                verified = current and not reasons and executor.registry_verified(run, binding)
                 result['runs'].append({'run':run, 'current_artifact':current, 'verified':verified})
             current_runs = [r for r in result['runs'] if r['current_artifact']]
             result['latest_run_status'] = current_runs[0]['run']['status'] if current_runs else None
             if any(r['verified'] for r in current_runs): result['execution'] = 'verified'
             elif any(r['run']['status'] not in {'succeeded','failed','cancelled','interrupted'} for r in current_runs): result['execution'] = 'running'
             elif current_runs: result['execution'] = 'failed' if current_runs[0]['run']['status'] == 'failed' else 'unverified'
+        result['execution_blockers'] = (['configuration_required'] if reasons else []) + ([] if result['runtime']=='ready' else ['adapter_runtime_not_ready']) + (['model_archived'] if result['archived'] else [])
+        result['execution_eligibility'] = 'blocked' if result['execution_blockers'] else 'requires_run_preflight'
         result['status'] = 'archived' if result['archived'] else 'running' if result['execution'] == 'running' else 'configuration_needed' if reasons else 'failed' if result['latest_run_status'] == 'failed' else 'verified' if result['execution'] == 'verified' else ('ready' if result['runtime']=='ready' else 'prepared') if result['preparation'] == 'recorded_ready' else 'unexecuted'
         return result
 
@@ -365,4 +381,23 @@ class Registry:
             binding['manifest_sha256'] = row['artifact']['manifest_sha256']
             binding['asset_sha256'] = sha([{k:i[k] for k in ('path','size','sha256')} for i in manifest(row['artifact']['adapter_id'])['files']])
             binding['registered_source'] = next(r['path'] for r in fresh if self._local_match(r,row['artifact']))
+            if row['artifact']['adapter_id'] in adapters.CATALOG: raise RegistryError('typed_input_required')
             return self.inference.create_registered(text_value,row['artifact']['adapter_id'],binding)
+
+
+    def create_task(self, identifier, row_version, payload):
+        if self.tasks is None: raise RegistryError('execution_unavailable')
+        with self.connect() as db:
+            row=self._row(db,identifier)
+            if type(row_version) is not int or row['row_version']!=row_version:raise RegistryError('stale_edit')
+            if row['archived']:raise RegistryError('model_archived')
+            adapter=row['artifact']['adapter_id']
+            if adapter not in adapters.configured_ids():raise RegistryError('adapter_unsupported')
+            if self._public(row)['configuration_attention']:raise RegistryError('configuration_required')
+            fresh=self._attest(row['references'],row['artifact'])
+            if self._fingerprint(row['artifact'],fresh)!=row['fingerprint'] or not any(self._local_match(r,row['artifact']) for r in fresh):raise RegistryError('artifact_files_changed')
+            binding={k:row[k] for k in ('id','generation','fingerprint')}
+            binding['manifest_sha256']=row['artifact']['manifest_sha256']
+            binding['asset_sha256']=sha([{k:i[k] for k in ('path','size','sha256')} for i in manifest(adapter)['files']])
+            binding['registered_source']=next(r['path'] for r in fresh if self._local_match(r,row['artifact']))
+            return self.tasks.create_registered(payload,adapter,binding)

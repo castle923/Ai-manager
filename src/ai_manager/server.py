@@ -19,8 +19,8 @@ from datetime import datetime, timezone
 
 class LocalApplication:
     """An explicitly owned loopback server with deterministic host shutdown."""
-    def __init__(self, server, inference, cancel):
-        self.server, self.inference, self.cancel = server, inference, cancel
+    def __init__(self, server, inference, cancel, tasks=None):
+        self.server, self.inference, self.cancel, self.tasks = server, inference, cancel, tasks
         self.url = f"http://127.0.0.1:{server.server_port}/"
         self.thread = None
         self.closed = False
@@ -39,6 +39,7 @@ class LocalApplication:
         self.cancel.set()
         if self.thread is not None:
             self.server.shutdown()
+        if self.tasks: self.tasks.close()
         self.inference.close()
         self.server.server_close()
         if self.thread is not None:
@@ -46,13 +47,17 @@ class LocalApplication:
 
 
 def create_application(home, settings, auth, port=0):
+    from .config import private_home
+    home=private_home(home)
     from .inventory import Inventory
     from .dashboard import Dashboard
     from .preparation import Preparation
     preparation = Preparation(home, settings, auth)
     inference = Inference(home)
     from .registry import Registry, RegistryError
-    registry = Registry(home, settings, inference)
+    from .task_inference import TaskInference
+    tasks = TaskInference(home)
+    registry = Registry(home, settings, inference, tasks)
     from .history import History, HistoryError
     from .preferences import Preferences, PreferenceError
     history, preferences = History(home), Preferences(home)
@@ -148,7 +153,7 @@ def create_application(home, settings, auth, port=0):
             if not self.allowed():
                 return self.reply(403, {"error": "forbidden"})
             path = urlsplit(self.path).path
-            history_match=re.fullmatch(r'/api/history/(scan|preparation|run|comparison|runtime|runtime_check|task)/([a-f0-9]{32}|runtime(?:-[a-f0-9]{16})?)',path)
+            history_match=re.fullmatch(r'/api/history/(scan|preparation|run|comparison|runtime|runtime_check|task|model_run)/([a-f0-9]{32}|runtime(?:-[a-f0-9]{16})?)',path)
             if path=='/api/history' or history_match:
                 try:
                     result={'item':history.detail(history_match[1],history_match[2])}if history_match else history.query(parse_qs(urlsplit(self.path).query,keep_blank_values=True))
@@ -156,10 +161,10 @@ def create_application(home, settings, auth, port=0):
                 except HistoryError as error:return self.reply(404 if str(error)=='history_not_found' else 410 if str(error)=='history_snapshot_expired' else 400,{'error':str(error)})
             if path=='/api/preferences':
                 try:
-                    from .runtime_paths import runtime_directory
+                    from .runtime_paths import runtime_directory, runtime_dependencies
                     paths={name:str(Path(home)/relative)for name,relative in {'home':'','settings':'settings.json','preferences':'preferences.json','inventory':'inventory.sqlite3','registry':'registry.sqlite3','outputs':'tts'}.items()}
                     paths['runtime']=str(runtime_directory(home))
-                    return self.reply(200,{'preferences':preferences.read(),'workspace':{'paths':paths,'accounts':{a:bool(auth.store.get(a))for a in('A','B')},'allowed_folder_count':len(settings['allowlist']),'settings_mutable_fields':[],'backup_scope':'inventory_database_only','preference_scope':'this_workspace_display_only'}})
+                    return self.reply(200,{'preferences':preferences.read(),'workspace':{'paths':paths,'runtime_dependencies':runtime_dependencies(home),'accounts':{a:bool(auth.store.get(a))for a in('A','B')},'allowed_folder_count':len(settings['allowlist']),'settings_mutable_fields':[],'backup_scope':'inventory_database_only','preference_scope':'this_workspace_display_only'}})
                 except PreferenceError as error:return self.reply(400,{'error':str(error)})
             performance_match=re.fullmatch(r'/api/performance/([a-f0-9]{32})',path)
             if performance_match:
@@ -176,6 +181,16 @@ def create_application(home, settings, auth, port=0):
                     return self.reply(404 if str(error)=='model_not_found' else 400,{'error':str(error)})
             if path == "/api/diagnostics/health":
                 return self.reply(200 if diagnostics.enabled else 404, diagnostics.health() if diagnostics.enabled else {"error": "not_found"})
+            if path == '/api/tasks/status':
+                return self.reply(200, tasks.snapshot())
+            typed_match = re.fullmatch(r'/api/tasks/runs/([a-f0-9]{32})(?:/outputs/(transcript|text|response|response_text|tracks|preview|image|image_metadata))?',path)
+            if typed_match:
+                try:
+                    if typed_match[2]:
+                        data,meta=tasks.export(typed_match[1],typed_match[2])
+                        return self.reply(200,data,meta['mime'],typed_match[1]+meta['extension'] if parse_qs(urlsplit(self.path).query).get('download')==['1'] else None)
+                    return self.reply(200,{'run':tasks.public(tasks.get(typed_match[1]))})
+                except ValueError as error:return self.reply(404 if str(error)=='run_not_found' else 409,{'error':str(error)})
             if path == "/api/tts/status":
                 return self.reply(200, inference.snapshot())
             if path == '/api/comparisons/status':
@@ -256,12 +271,29 @@ def create_application(home, settings, auth, port=0):
             try:
                 length = int(self.headers.get("Content-Length", "0"))
                 limit = 65536 if self.path == '/api/registry' or re.fullmatch(r'/api/registry/[a-f0-9]{32}(/runs)?',self.path) else 4096
+                typed_limit=re.fullmatch(r'/api/registry/([a-f0-9]{32})/tasks',self.path)
+                if typed_limit:
+                    try: input_type=registry.get(typed_limit[1])['task_type']
+                    except RegistryError:input_type='unknown'
+                    limit={'stt':1_300_000,'tracking':6_680_000,'llm':50_000,'image':50_000}.get(input_type,4096)
                 if not 0 < length <= limit:
                     raise ValueError()
                 data = json.loads(self.rfile.read(length))
                 if self.path=='/api/preferences':
                     try:return self.reply(200,{'preferences':preferences.update(data)})
                     except PreferenceError as error:return self.reply(409 if str(error)in('preferences_stale','preferences_busy') else 400,{'error':str(error)})
+                typed_create=re.fullmatch(r'/api/registry/([a-f0-9]{32})/tasks',self.path)
+                typed_cancel=re.fullmatch(r'/api/tasks/runs/([a-f0-9]{32})/cancel',self.path)
+                if typed_create or typed_cancel:
+                    try:
+                        if typed_create:
+                            if not isinstance(data,dict) or set(data)!={'row_version','input'}:raise ValueError('invalid_request')
+                            result=registry.create_task(typed_create[1],data['row_version'],data['input'])
+                        else:
+                            if data!={}:raise ValueError('invalid_request')
+                            result=tasks.cancel(typed_cancel[1])
+                        return self.reply(202,{'run':result})
+                    except ValueError as error:return self.reply(409 if str(error) in {'stale_edit','operation_running','queue_full','configuration_required','adapter_runtime_not_ready'} else 400,{'error':str(error)})
                 registry_action = re.fullmatch(r'/api/registry/([a-f0-9]{32})(/runs)?',self.path)
                 if self.path == '/api/registry' or registry_action:
                     try:
@@ -339,11 +371,12 @@ def create_application(home, settings, auth, port=0):
     try:
         server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     except OSError:
+        tasks.close()
         inference.close()
         raise
     server.daemon_threads = True
     server.timeout = 1
-    return LocalApplication(server, inference, cancel)
+    return LocalApplication(server, inference, cancel, tasks)
 
 
 def serve(home, settings, auth, browser=webbrowser.open, port=0):

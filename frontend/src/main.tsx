@@ -28,9 +28,10 @@ import {
 } from "lucide-react";
 import "./style.css";
 import { PreparationPanel } from "./PreparationPanel";
+import { TaskPanel } from "./TaskPanel";
 import { TtsPanel } from "./TtsPanel";
 import { ComparisonPanel } from "./ComparisonPanel";
-import { DesktopRuntime } from "./DesktopHost";
+import { DesktopRuntime, TaskRuntime } from "./DesktopHost";
 import { RegistryPanel, type CandidateRegistration } from "./RegistryPanel";
 import { HistoryPanel } from "./HistoryPanel";
 import { SettingsPanel } from "./SettingsPanel";
@@ -184,13 +185,15 @@ function App() {
       id = p.get("source_id");
     return kind &&
       id &&
-      ["run", "comparison", "scan"].includes(kind) &&
+      ["model_run", "run", "comparison", "scan"].includes(kind) &&
       p.get("section") ===
         (
-          { run: "tts", comparison: "comparison", scan: "library" } as Record<
-            string,
-            string
-          >
+          {
+            model_run: "tasks",
+            run: "tts",
+            comparison: "comparison",
+            scan: "library",
+          } as Record<string, string>
         )[kind] &&
       /^[a-f0-9]{32}$/.test(id)
       ? { kind, id }
@@ -209,6 +212,7 @@ function App() {
           "connections",
           "preparation",
           "tts",
+          "tasks",
           "comparison",
         ].includes(value)
         ? value
@@ -253,6 +257,7 @@ function App() {
       "connections",
       "preparation",
       "tts",
+      "tasks",
       "comparison",
     ].includes(appViewParams().get("section") || ""),
   );
@@ -272,7 +277,8 @@ function App() {
   const [validatedSource, setValidatedSource] = useState<string | null>(null);
   const activeSourceKey =
     sourceSelection &&
-    ((section === "tts" && sourceSelection.kind === "run") ||
+    ((section === "tasks" && sourceSelection.kind === "model_run") ||
+      (section === "tts" && sourceSelection.kind === "run") ||
       (section === "comparison" && sourceSelection.kind === "comparison") ||
       (section === "library" && sourceSelection.kind === "scan"))
       ? sourceSelection.kind + ":" + sourceSelection.id
@@ -330,7 +336,8 @@ function App() {
     const view = appViewParams();
     if (
       sourceSelection &&
-      ((section === "tts" && sourceSelection.kind === "run") ||
+      ((section === "tasks" && sourceSelection.kind === "model_run") ||
+        (section === "tts" && sourceSelection.kind === "run") ||
         (section === "comparison" && sourceSelection.kind === "comparison") ||
         (section === "library" && sourceSelection.kind === "scan"))
     ) {
@@ -554,6 +561,12 @@ function App() {
             <Play size={19} /> 음성 작업실
           </button>
           <button
+            className={section === "tasks" ? "nav active" : "nav"}
+            onClick={() => setSection("tasks")}
+          >
+            <Play size={19} /> 유형별 작업실
+          </button>
+          <button
             className={section === "comparison" ? "nav active" : "nav"}
             onClick={() => setSection("comparison")}
           >
@@ -589,21 +602,23 @@ function App() {
         <header className="topbar">
           <span>
             Ai-manager <span className="slash">/</span>{" "}
-            {section === "history"
-              ? "통합 작업 기록"
-              : section === "settings"
-                ? "설정"
-                : section === "registry"
-                  ? "모델 관리"
-                  : section === "library"
-                    ? "파일 후보 탐색"
-                    : section === "preparation"
-                      ? "모델 준비"
-                      : section === "tts"
-                        ? "음성 작업실"
-                        : section === "comparison"
-                          ? "새 A/B 비교"
-                          : "계정 및 수집"}
+            {section === "tasks"
+              ? "유형별 작업실"
+              : section === "history"
+                ? "통합 작업 기록"
+                : section === "settings"
+                  ? "설정"
+                  : section === "registry"
+                    ? "모델 관리"
+                    : section === "library"
+                      ? "파일 후보 탐색"
+                      : section === "preparation"
+                        ? "모델 준비"
+                        : section === "tts"
+                          ? "음성 작업실"
+                          : section === "comparison"
+                            ? "새 A/B 비교"
+                            : "계정 및 수집"}
           </span>
           <div className="top-meta">
             <ShieldCheck size={15} /> Drive 읽기 전용{" "}
@@ -647,38 +662,42 @@ function App() {
             <div>
               <div className="eyebrow">YOUR MODELS, CLEARLY ORGANIZED</div>
               <h1>
-                {section === "history"
-                  ? "통합 작업 기록"
-                  : section === "settings"
-                    ? "작업실 설정"
-                    : section === "registry"
-                      ? "모델 관리"
-                      : section === "library"
-                        ? "파일 후보 탐색"
-                        : section === "preparation"
-                          ? "모델 준비"
-                          : section === "tts"
-                            ? "음성 작업실"
-                            : section === "comparison"
-                              ? "새 A/B 비교"
-                              : "계정 및 수집"}
+                {section === "tasks"
+                  ? "유형별 작업실"
+                  : section === "history"
+                    ? "통합 작업 기록"
+                    : section === "settings"
+                      ? "작업실 설정"
+                      : section === "registry"
+                        ? "모델 관리"
+                        : section === "library"
+                          ? "파일 후보 탐색"
+                          : section === "preparation"
+                            ? "모델 준비"
+                            : section === "tts"
+                              ? "음성 작업실"
+                              : section === "comparison"
+                                ? "새 A/B 비교"
+                                : "계정 및 수집"}
               </h1>
               <p>
-                {section === "history"
-                  ? "수집부터 준비·실행·비교까지, 저장된 원본 기록과 확인 근거를 따라가세요."
-                  : section === "settings"
-                    ? "이 작업실의 보기 옵션과 자료 위치·적용 범위를 확인하세요."
-                    : section === "registry"
-                      ? "내 모델의 설명과 보관 위치를 등록하고, 확인된 근거에 따라 현재 상태를 살펴보세요."
-                      : section === "library"
-                        ? "흩어져 있는 모델 파일을 모으고, 현재 확인 수준을 한눈에 살펴보세요."
-                        : section === "preparation"
-                          ? "선정 모델의 파일과 환경을 준비하고, 확인 근거를 단계별로 살펴보세요."
-                          : section === "tts"
-                            ? "새 한국어 문장을 음성으로 만들고, 이번 실행의 검증 결과를 확인하세요."
-                            : section === "comparison"
-                              ? "같은 새 입력으로 두 모델을 실행하고, 실제 조건과 결과를 함께 비교하세요."
-                              : "두 계정의 연결과 허용 폴더 수집을 관리하세요."}
+                {section === "tasks"
+                  ? "유형별 작업실"
+                  : section === "history"
+                    ? "수집부터 준비·실행·비교까지, 저장된 원본 기록과 확인 근거를 따라가세요."
+                    : section === "settings"
+                      ? "이 작업실의 보기 옵션과 자료 위치·적용 범위를 확인하세요."
+                      : section === "registry"
+                        ? "내 모델의 설명과 보관 위치를 등록하고, 확인된 근거에 따라 현재 상태를 살펴보세요."
+                        : section === "library"
+                          ? "흩어져 있는 모델 파일을 모으고, 현재 확인 수준을 한눈에 살펴보세요."
+                          : section === "preparation"
+                            ? "선정 모델의 파일과 환경을 준비하고, 확인 근거를 단계별로 살펴보세요."
+                            : section === "tts"
+                              ? "새 한국어 문장을 음성으로 만들고, 이번 실행의 검증 결과를 확인하세요."
+                              : section === "comparison"
+                                ? "같은 새 입력으로 두 모델을 실행하고, 실제 조건과 결과를 함께 비교하세요."
+                                : "두 계정의 연결과 허용 폴더 수집을 관리하세요."}
               </p>
             </div>
             <button
@@ -719,7 +738,7 @@ function App() {
             </div>
           )}
           {(sourceUrlError || sourceOriginError) &&
-          ["tts", "comparison", "library"].includes(section) ? (
+          ["tasks", "tts", "comparison", "library"].includes(section) ? (
             <section className="panel">
               <h2>원본 선택을 확인해야 합니다</h2>
               <p>
@@ -743,15 +762,17 @@ function App() {
                   setPage(1);
                 }
                 setSection(
-                  kind === "run"
-                    ? "tts"
-                    : kind === "comparison"
-                      ? "comparison"
-                      : kind === "scan"
-                        ? "library"
-                        : kind === "task"
-                          ? "connections"
-                          : "preparation",
+                  kind === "model_run"
+                    ? "tasks"
+                    : kind === "run"
+                      ? "tts"
+                      : kind === "comparison"
+                        ? "comparison"
+                        : kind === "scan"
+                          ? "library"
+                          : kind === "task"
+                            ? "connections"
+                            : "preparation",
                 );
               }}
             />
@@ -763,6 +784,7 @@ function App() {
               candidate={registration}
               onCandidateUsed={() => setRegistration(null)}
               onExplore={() => setSection("library")}
+              onTasks={() => setSection("tasks")}
               onPrepare={() => setSection("preparation")}
             />
           ) : section === "comparison" ? (
@@ -776,6 +798,18 @@ function App() {
               }
               preferences={preferences}
             />
+          ) : section === "tasks" ? (
+            <>
+              <TaskRuntime />
+              <TaskPanel
+                csrf={csrf.current}
+                initialRunId={
+                  sourceSelection?.kind === "model_run"
+                    ? sourceSelection.id
+                    : undefined
+                }
+              />
+            </>
           ) : section === "tts" ? (
             <TtsPanel
               csrf={csrf}

@@ -17,10 +17,10 @@ from .inference import regular, digest
 from .models import DEFAULT_MODEL, model_ids, load_manifest, manifest_path
 from .runtime_paths import runtime_directory
 
-KINDS={'scan','preparation','run','comparison','runtime','runtime_check','task'}
+KINDS={'model_run','scan','preparation','run','comparison','runtime','runtime_check','task'}
 STATUSES={'queued','staged','preparing','loading','running','cancelling','succeeded','complete','completed','partial','failed','cancelled','interrupted','ready','blocked','verifying','downloading','finished','idle','unknown','not_started'}
 ACTIONS={'connect','refresh','scan','disconnect','prepare','runtime_check'}
-LABELS=dict(scan='Drive 수집',preparation='모델 파일 준비',run='음성 실행',comparison='A/B 비교',runtime='현재 런타임 준비 상태',runtime_check='현재 환경 점검 기록',task='앱 작업')
+LABELS=dict(model_run='모델 유형별 실행',scan='Drive 수집',preparation='모델 파일 준비',run='음성 실행',comparison='A/B 비교',runtime='현재 런타임 준비 상태',runtime_check='현재 환경 점검 기록',task='앱 작업')
 
 
 def comparison_projection(state, home):
@@ -133,7 +133,7 @@ class History:
                             event=self.event('scan',identifier,{});event.update(read_error=True,source_id_available=bool(valid_id));records.append(event)
             except (OSError,ValueError,sqlite3.DatabaseError):issues.append('scan_records_unavailable')
         paths=[]
-        for kind,base in (('run',self.home/'tts'),('comparison',self.home/'comparisons'),('task',self.home/'task-history')):
+        for kind,base in (('model_run',self.home/'task-runs'),('run',self.home/'tts'),('comparison',self.home/'comparisons'),('task',self.home/'task-history')):
             if base.exists():
                 try:
                     regular(base,self.home)
@@ -171,6 +171,9 @@ class History:
                     if not isinstance(model,dict)or not isinstance(state.get('metrics',{}),dict)or not isinstance(state.get('parameters',{}),dict):raise ValueError('invalid_nested_record')
                     cid=state.get('comparison_id')
                     details=dict(model_id=model.get('id')if model.get('id')in model_ids()else None,input_sha256=state.get('input_sha256')if re.fullmatch('[a-f0-9]{64}',str(state.get('input_sha256')))else None,comparison_id=cid if isinstance(cid,str)and re.fullmatch('[a-f0-9]{32}',cid)else None,metrics={k:number((state.get('metrics')or{}).get(k))for k in('total_seconds','loading_seconds','inference_seconds','peak_gpu_allocated_bytes')})
+                elif kind=='model_run':
+                    if not isinstance(state.get('input'),dict) or not isinstance(state.get('metrics',{}),dict):raise ValueError('invalid_nested_record')
+                    details=dict(adapter_id=state.get('adapter_id'),task_type=state.get('task_type'),input_sha256=(state.get('input')or{}).get('sha256'),metrics={k:number((state.get('metrics')or{}).get(k)) for k in ('total_seconds','loading_seconds','inference_seconds','peak_gpu_allocated_bytes')})
                 elif kind=='comparison':
                     if not isinstance(state.get('run_ids'),list)or any(not isinstance(x,str)or not re.fullmatch('[a-f0-9]{32}',x)for x in state['run_ids']):raise ValueError('invalid_run_ids')
                     details=dict(run_ids=state['run_ids'])
@@ -245,7 +248,8 @@ class History:
                 linked=bool(linked and model['revision']==declared['revision']and proof['manifest_sha256']==digest(manifest_path(model['id']))and source_input.get('parameters')==parameters and source_input.get('sha256')==run.get('input_sha256')and isinstance(source_input.get('text'),str)and hashlib.sha256(source_input['text'].encode()).hexdigest()==run.get('input_sha256'))
             except(OSError,ValueError,KeyError,TypeError):linked=False
             expected_code={'inference.py','tts_worker.py','models.py','preparation.py','server.py','external_process.py','runtime_bootstrap.py','runtime_paths.py','desktop.py','security.py','config.py','registry.py'}
-            if linked and isinstance(proof.get('runtime_directory'),str)and Path(proof['runtime_directory']).is_absolute()and re.fullmatch('[a-f0-9]{64}',str(proof.get('runtime_lock_sha256')))and isinstance(proof.get('code_sha256'),dict)and set(proof['code_sha256'])==expected_code and all(re.fullmatch('[a-f0-9]{64}',str(h))for h in proof['code_sha256'].values()):
+            known_code_sets=(expected_code,expected_code|{'runtime_reuse.py'})
+            if linked and isinstance(proof.get('runtime_directory'),str)and Path(proof['runtime_directory']).is_absolute()and re.fullmatch('[a-f0-9]{64}',str(proof.get('runtime_lock_sha256')))and isinstance(proof.get('code_sha256'),dict)and set(proof['code_sha256'])in known_code_sets and all(re.fullmatch('[a-f0-9]{64}',str(h))for h in proof['code_sha256'].values()):
                 runtime_scope=hashlib.sha256(json.dumps({k:proof.get(k)for k in('runtime_directory','runtime_lock_sha256','code_sha256')},sort_keys=True).encode()).hexdigest()
             from .inference import DEFAULTS
             valid_parameters=set(parameters)=={'language','speaker','batch_size','instruct','max_new_tokens','seed','sampling'}and type(parameters.get('seed'))is int and 0<=parameters['seed']<2**32 and type(parameters.get('batch_size'))is int and parameters['batch_size']==1 and isinstance(parameters.get('language'),str)and bool(parameters['language'])and isinstance(parameters.get('speaker'),str)and bool(parameters['speaker'])and (parameters.get('instruct')is None or isinstance(parameters.get('instruct'),str))and type(parameters.get('max_new_tokens'))is int and 0<parameters['max_new_tokens']<=4096

@@ -1,5 +1,21 @@
 # Ai-manager
 
+> C6 후속 결과: 동일 새 조건의 TTS A/B 양쪽 생성·재생과 새 8개 기록의 정상 재시작 후 유지까지 확인했다. 상세 선택은 재선택 검증이며 자동 복원 판정이 아니다. 기존 22개 이력 전체 UI ID·모든 필터 검증은 하지 않았다. 최종 전체 완료나 이미지 로컬 성공으로 확대하지 않는다.
+
+> 현재 candidate6 실제 사용 갱신: 이번 새 TTS 생성·running 취소·소유 자식 정리, 사용자 수동 native 저장/취소와 저장본 SHA 일치, 새 Whisper 전사 및 16프레임 합성 TAPIR 추적을 확인했다. Whisper는 원문 차이가 있어 정확도 PASS가 아니며, TAPIR는 실물 영상 검증이 아니다. LLM은 RAM/GPU/disk 공통 자원 gate에서 실패해 출력이 없었다. 새 TTS A/B 양쪽 cold 생성·native 재생 완료와 정상 종료·재시작 후 새 8개 기록 유지까지 확인했다. 기존 DB 행 fingerprint·환경 보존과 대표 STT JSON의 사용자 수동 native 저장·해시 일치도 확인했다. 추가 TAPIR PNG·A/B 저장 변형은 미검증으로 남긴다. 아래 남은 검증/초기 상태와 최신 항목별 결과를 [M10 보고서](docs/M10_REPORT.md)에서 구분한다.
+
+
+## 현재 공개 버전과 M10 후보
+
+공개 프로그램 다운로드는 [v0.7.0 Release](https://github.com/castle923/Ai-manager/releases/tag/v0.7.0)다. 로컬 **0.10.0 candidate6**는 M10 다종 작업·런타임 통합 검증 후보이며 새 Release/설치 자산을 공개한 상태가 아니다. source 게시와 실제 설치본 기능 검증을 구분한다. 현재 후보의 새 설치·실제 앱 창 진입은 확인했고 명시한 새 실행·취소·저장·기록·재시작 표본을 확인했지만 M10 전체 PASS가 아니다. Windows 로컬 이미지 생성·앱 원격 GPU 연동 완료도 주장하지 않는다.
+
+[M10 계획](docs/M10_PLAN.md) · [통합 진행 보고](docs/M10_REPORT.md) · [후보 설치 및 source→UI→wheel/native 빌드 순서](docs/M10_INSTALL.md) · [별도 Linux 원격 GPU 이력](docs/M10_RUNPOD_REPORT.md)
+
+소스 재현은 아래 기본 개발 절차와 M10 안내를 함께 따른다. 생성 static을 저장소에서 가져오는 방식이 아니므로 `frontend`의 고정 npm lock으로 `npm.cmd ci --ignore-scripts`와 `npm.cmd run build`를 **wheel/native 빌드 전에** 실행한다. 기존 환경을 재참조하는 설치에서는 원래 candidate3 Python 기반과 library runtime을 삭제·이동하지 않는다. 기존 TTS·STT·TAPIR·Llama 환경을 재설치하거나 인증·DB·출력을 새로 복사할 필요가 없다.
+
+아래 기존 버전별 설명은 해당 단계의 기록이다. 후보 기능·시험 결과·공개 다운로드의 범위를 위 안내와 구분한다.
+
+
 두 Google Drive 계정에 보관한 AI 모델을 한곳에서 찾고, 필요한 파일을 확인하고, 새 테스트 결과를 비교하는 개인용 대시보드입니다.
 
 **전체 구상은 아직 진행 중입니다.** M0–M7의 TTS 중심 단계·독립 앱, M8의 모델 등록·통합 상태에 이어 **M9 통합 작업 기록·보기 설정·성능 차트**를 확인한 Windows 환경에서 검증했습니다. 후보 3의 새 A/B·차트/원천 표·재생·정상 WAV 저장·설정 유지·정상 재시작을 확인했으며 이번 변경에는 검증된 M9 구현 소스와 문서를 함께 반영합니다. 로컬 0.9.0 후보와 공개 다운로드 v0.7.0은 구분합니다. M10 다종 모델 실행과 향후 자동화는 아직 완료되지 않았습니다. [M9 검증과 제한](docs/M9_REPORT.md) · [M9 사용 안내](docs/M9_INSTALL.md) · [전체 후속 계획](docs/M8_PLAN.md)
@@ -135,3 +151,4 @@ powershell.exe -NoProfile -File .\scripts\setup_runtime.ps1
 - 실제 실행 데이터는 로컬에 보관하며, 공개 예시는 별도 생성하고 예시임을 표시합니다.
 
 작성일: 2026-10-16 (Asia/Seoul)
+

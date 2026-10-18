@@ -11,6 +11,13 @@ type SettingsResponse = {
     paths: Record<string, string>;
     accounts: Record<string, boolean>;
     allowed_folder_count: number;
+    runtime_dependencies?: {
+      role: string;
+      python_base: string;
+      runtime_root: string;
+      reused: boolean;
+      base_required: boolean;
+    }[];
   };
 };
 export function SettingsPanel({
@@ -226,6 +233,29 @@ export function SettingsPanel({
               </div>
             ))}
         </dl>
+        {data?.workspace.runtime_dependencies?.length ? (
+          <div>
+            <p>
+              실행 환경은 아래 Python 기반에 의존합니다. 재사용 중인 이전 앱
+              폴더도 이 참조가 유지되는 동안 삭제하거나 이동하지 마세요.
+              모델·결과·앱 소스는 이전 버전으로 되돌리지 않습니다.
+            </p>
+            <ul>
+              {data.workspace.runtime_dependencies.map((dependency) => (
+                <li key={dependency.role}>
+                  {dependency.role}:{" "}
+                  {dependency.reused
+                    ? "기존 환경 검증 후 참조"
+                    : "새 환경 준비 필요"}{" "}
+                  ·{" "}
+                  <code>
+                    {visible ? dependency.python_base : "Python 기반 경로 가림"}
+                  </code>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         <p>
           계정 A:{" "}
           {data?.workspace.accounts.A

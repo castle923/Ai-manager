@@ -1,0 +1,15 @@
+# Candidate direct runtime pins, NOT an installed/resolved transitive lock.
+# Gate blocked until isolated resolution, wheel hashes and fresh local E2E.
+# Official model d26bb61231c349cf6b7896fa83353113880e1ba3 README:
+# torch>=2.4, transformers>=5.17, diffusers git, accelerate, pillow.
+# Transformers 5.17 requires hub>=1.5 and tokenizers>=0.23.1,<0.24;
+# never install this set into the existing TTS/Whisper environment.
+--extra-index-url https://download.pytorch.org/whl/cu128
+torch==2.9.1+cu128
+torchvision==0.24.1+cu128
+diffusers @ https://github.com/huggingface/diffusers/archive/b800f828f3951c4d206e154411bcbfa693cd322e.zip
+transformers==5.17.0
+accelerate==1.12.0
+safetensors==0.8.0
+Pillow==11.3.0
+psutil==7.2.2

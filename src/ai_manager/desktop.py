@@ -48,6 +48,8 @@ class DesktopBridge:
         self._close_lock, self._setup_close_lock = threading.Lock(), threading.Lock()
         self._closed = False
         self._runtime = RuntimeBootstrap(home, resources)
+        from .task_runtime import RuntimeSetup
+        self._task_runtime = RuntimeSetup(home, resources / 'python_runtime' / 'python.exe', resources)
         self._setup_server, self._setup_thread, self._setup_url = None, None, None
         self._model_thread, self._model_preparation = None, None
         self._model_cancel = threading.Event()
@@ -126,7 +128,7 @@ class DesktopBridge:
                 parent = private_home(selected[0])
             if not self._trusted(setup=True):
                 return {'status': 'denied'}
-            target = parent / 'AiManager-0.9.0'
+            target = parent / 'AiManager-0.10.0'
             self._host_status(installation_stage='validating_and_copying', installation_target_preexisted=target.exists())
             result = install_to_new_directory(self._package_root, target, self._home)
             self._host_status(installation_stage='installed', installation_files_verified=result['files_verified'])
@@ -244,6 +246,30 @@ class DesktopBridge:
             except Exception:
                 return {'status': 'failed', 'error': 'save_failed_use_new_destination'}
 
+    def task_runtime_status(self,identifier='whisper-large-v3-turbo'):
+        if not self._trusted():return {'status':'denied'}
+        return self._task_runtime.snapshot(identifier)
+
+    def prepare_task_runtime(self,identifier='whisper-large-v3-turbo'):
+        if not self._trusted():return {'status':'denied'}
+        return self._task_runtime.start(identifier)
+
+    def save_task(self, run_id, output_id):
+        if not self._trusted() or self._application is None:
+            return {'status':'denied'}
+        import webview
+        from .desktop_files import save_task_output
+        try:
+            tasks=self._application.tasks
+            _,meta=tasks.export(run_id,output_id)
+            with self._dialog_lock:
+                selected=self._window.create_file_dialog(webview.FileDialog.SAVE,save_filename=run_id+meta['extension'],file_types=(meta['extension'].upper()[1:]+' (*'+meta['extension']+')',))
+                if not selected:return {'status':'cancelled'}
+                if not self._trusted():return {'status':'denied'}
+                return save_task_output(tasks,run_id,output_id,selected[0])
+        except Exception:
+            return {'status':'failed','error':'save_failed_use_new_destination'}
+
     def _start_application(self):
         settings = SettingsStore(self._home).load()
         auth = DesktopAuth(settings, SecretStore(self._home / 'credentials'))
@@ -261,6 +287,7 @@ class DesktopBridge:
                 self._model_thread.join(20)
         finally:
             try:
+                self._task_runtime.close()
                 self._runtime.close()
             finally:
                 try:
@@ -338,47 +365,63 @@ SETUP_HTML = r'''<!doctype html><html lang="ko"><meta charset="utf-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'">
 <title>Ai-manager · 처음 시작</title><style>
 body{font:16px/1.8 'Malgun Gothic',sans-serif;color:#213753;background:#f6f8fb;margin:0}main{max-width:700px;padding:36px;margin:auto}h1{font-size:30px}section{background:white;border:1px solid #dce4ef;border-radius:14px;padding:24px;margin:20px 0}button{font:inherit;color:#fff;background:#245caf;border:0;border-radius:7px;padding:10px 16px;margin:7px 7px 7px 0;cursor:pointer}button:focus-visible,input:focus-visible{outline:3px solid #bb6200;outline-offset:4px}p{color:#526889}#message{white-space:pre-wrap}input{box-sizing:border-box;font:inherit;width:100%;border:1px solid #8798b2;border-radius:6px;padding:8px 10px}label{display:block;margin-top:10px}small{color:#526889}</style>
-<main><p>AI-MANAGER / WINDOWS · 0.9.0</p><h1>내 모델 작업실, 처음 시작</h1><p>Python 별도 설치 없이 독립 앱 창에서 사용합니다. 모델·계정 정보는 이 패키지에 포함되지 않습니다.</p>
+<main><p>AI-MANAGER / WINDOWS · 0.10.0</p><h1>내 모델 작업실, 처음 시작</h1><p>Python 별도 설치 없이 독립 앱 창에서 사용합니다. 모델·계정 정보는 이 패키지에 포함되지 않습니다.</p>
 <section><h2>지정 원본으로 새 설정</h2><p>이번 프로젝트에 지정된 OAuth client JSON과 allowlist JSON을 선택하세요. 계정 로그인은 다음 화면에서 시스템 브라우저로 직접 진행합니다.</p>
 <button onclick="choose('client')">OAuth client 선택</button><span id="client">미선택</span><label for="client-path">또는 OAuth client 원본 전체 경로</label><input id="client-path" placeholder="지정 JSON의 절대경로"><button onclick="setPath('client')">OAuth client 경로 적용</button>
 <br><button onclick="choose('allowlist')">허용 목록 선택</button><span id="allowlist">미선택</span><label for="allowlist-path">또는 허용 목록 원본 전체 경로</label><input id="allowlist-path" placeholder="지정 JSON의 절대경로"><button onclick="setPath('allowlist')">허용 목록 경로 적용</button><br><button onclick="initializeApp()">새 작업실 시작</button></section>
-<section><h2>실행 위치 선택</h2><p>압축을 푼 현재 위치에서도 실행할 수 있습니다. 설치는 선택한 상위 폴더 안에 새 AiManager-0.9.0 폴더를 만들며 기존 대상이 있으면 덮어쓰지 않습니다.</p><label for="install-path">설치할 상위 폴더 전체 경로 (선택)</label><input id="install-path" oninput="previewInstall()" placeholder="비워두면 폴더 선택 대화상자를 엽니다"><p id="install-target">생성될 앱 폴더: 선택한 상위 폴더 안의 AiManager-0.9.0</p><button onclick="installApp()">사용자 폴더에 설치</button></section><p id="message" role="status" aria-live="polite">설정 원본을 선택해주세요.</p></main>
-<script>const out=x=>document.getElementById('message').textContent=x;function previewInstall(){const p=document.getElementById('install-path').value.trim();document.getElementById('install-target').textContent='생성될 앱 폴더: '+(p?p.replace(/[\\/]+$/,'')+'/AiManager-0.9.0':'선택한 상위 폴더 안의 AiManager-0.9.0')}async function choose(k){const r=await pywebview.api.choose_setup_file(k);if(r.status==='selected')document.getElementById(k).textContent=r.filename;else out(r.status==='cancelled'?'선택을 취소했습니다.':'선택할 수 없습니다.')}async function setPath(k){const r=await pywebview.api.set_setup_path(k,document.getElementById(k+'-path').value);if(r.status==='selected'){document.getElementById(k).textContent=r.filename;out('지정 원본 경로를 적용했습니다.')}else out('존재하는 지정 JSON의 전체 절대경로를 확인해주세요.')}async function initializeApp(){out('설정을 확인합니다…');const r=await pywebview.api.initialize();if(r.status!=='initialized')out('두 지정 JSON과 새 작업실 상태를 확인해주세요.')}async function installApp(){const p=document.getElementById('install-path').value.trim();out(p?'앱 파일을 확인하고 새 폴더에 설치합니다…':'설치할 상위 폴더를 선택해주세요.');const r=await pywebview.api.install(p||null);out(r.message||(r.status==='cancelled'?'설치를 취소했습니다.':r.error==='installation_destination_exists'?'이 상위 폴더에 AiManager-0.9.0이 이미 있습니다. 다른 상위 폴더를 선택해주세요.':'설치할 기존 상위 폴더의 전체 경로와 저장 공간을 확인해주세요. 기존 자료는 보존됩니다.'));}</script></html>'''
+<section><h2>실행 위치 선택</h2><p>압축을 푼 현재 위치에서도 실행할 수 있습니다. 설치는 선택한 상위 폴더 안에 새 AiManager-0.10.0 폴더를 만들며 기존 대상이 있으면 덮어쓰지 않습니다.</p><label for="install-path">설치할 상위 폴더 전체 경로 (선택)</label><input id="install-path" oninput="previewInstall()" placeholder="비워두면 폴더 선택 대화상자를 엽니다"><p id="install-target">생성될 앱 폴더: 선택한 상위 폴더 안의 AiManager-0.10.0</p><button onclick="installApp()">사용자 폴더에 설치</button></section><p id="message" role="status" aria-live="polite">설정 원본을 선택해주세요.</p></main>
+<script>const out=x=>document.getElementById('message').textContent=x;function previewInstall(){const p=document.getElementById('install-path').value.trim();document.getElementById('install-target').textContent='생성될 앱 폴더: '+(p?p.replace(/[\\/]+$/,'')+'/AiManager-0.10.0':'선택한 상위 폴더 안의 AiManager-0.10.0')}async function choose(k){const r=await pywebview.api.choose_setup_file(k);if(r.status==='selected')document.getElementById(k).textContent=r.filename;else out(r.status==='cancelled'?'선택을 취소했습니다.':'선택할 수 없습니다.')}async function setPath(k){const r=await pywebview.api.set_setup_path(k,document.getElementById(k+'-path').value);if(r.status==='selected'){document.getElementById(k).textContent=r.filename;out('지정 원본 경로를 적용했습니다.')}else out('존재하는 지정 JSON의 전체 절대경로를 확인해주세요.')}async function initializeApp(){out('설정을 확인합니다…');const r=await pywebview.api.initialize();if(r.status!=='initialized')out('두 지정 JSON과 새 작업실 상태를 확인해주세요.')}async function installApp(){const p=document.getElementById('install-path').value.trim();out(p?'앱 파일을 확인하고 새 폴더에 설치합니다…':'설치할 상위 폴더를 선택해주세요.');const r=await pywebview.api.install(p||null);out(r.message||(r.status==='cancelled'?'설치를 취소했습니다.':r.error==='installation_destination_exists'?'이 상위 폴더에 AiManager-0.10.0이 이미 있습니다. 다른 상위 폴더를 선택해주세요.':'설치할 기존 상위 폴더의 전체 경로와 저장 공간을 확인해주세요. 기존 자료는 보존됩니다.'));}</script></html>'''
 
 
 def main():
     os.environ['PYTHONDONTWRITEBYTECODE'] = '1'
     parser = argparse.ArgumentParser()
     parser.add_argument('--home')
+    parser.add_argument('--startup-diagnostics-dir', help='Explicit private directory for bounded, message-free startup diagnostics')
     args = parser.parse_args()
+    from .startup_diagnostics import StartupDiagnostics
+    diagnostics = StartupDiagnostics(args.startup_diagnostics_dir)
     bridge = None
     try:
-        home = private_home(args.home or str(Path(os.environ['LOCALAPPDATA']) / 'AiManager' / 'desktop-0.9.0'))
+        diagnostics.enter('home')
+        home = private_home(args.home or str(Path(os.environ['LOCALAPPDATA']) / 'AiManager' / 'desktop-0.10.0'))
         SettingsStore(home)  # Protect the new home before profile or runtime state exists.
         resources = Path(getattr(sys, '_MEIPASS', Path(__file__).resolve().parents[2]))
-        configure_desktop_runtime(resources)
+        diagnostics.enter('configure_runtime')
+        configure_desktop_runtime(resources, home)
         package_root = Path(sys.executable).parent if getattr(sys, 'frozen', False) else resources
+        diagnostics.enter('bridge')
         bridge = DesktopBridge(home, resources, package_root)
+        diagnostics.enter('import_webview')
         import webview
         webview.settings['ALLOW_DOWNLOADS'] = False
         webview.settings['ALLOW_FILE_URLS'] = False
         webview.settings['OPEN_EXTERNAL_LINKS_IN_BROWSER'] = False
         if (home / 'settings.json').is_file():
+            diagnostics.enter('start_application')
             bridge._start_application()
         else:
+            diagnostics.enter('start_setup')
             bridge._start_setup()
+        diagnostics.enter('create_window')
         window = webview.create_window('Ai-manager · 내 모델 작업실', url=bridge._application.url if bridge._application else bridge._setup_url,
                                        js_api=bridge, width=1280, height=900,
                                        min_size=(768, 620), text_select=True)
         bridge._window = window
         window.events.before_show += bridge._install_navigation_guard
         window.events.closed += bridge._close
+        diagnostics.enter('start_webview')
         webview.start(gui='edgechromium', debug=False, private_mode=False, storage_path=str(private_home(home / 'webview-profile')))
-    except Exception:
+        diagnostics.enter('complete')
+    except Exception as error:
+        diagnostics.failed(error)
         ctypes.windll.user32.MessageBoxW(None, '앱 창을 시작하지 못했습니다. 앱 파일·작업실 설정·Microsoft Edge WebView2 Runtime 설치 상태를 확인하세요. 보안 설정을 변경하거나 다른 렌더러로 전환하지 않습니다.', 'Ai-manager 시작 확인', 0x10)
     finally:
-        if bridge:
-            bridge._close()
+        try:
+            if bridge:
+                bridge._close()
+        finally:
+            diagnostics.close()
 
 
 if __name__ == '__main__':

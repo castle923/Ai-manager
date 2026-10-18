@@ -1,0 +1,38 @@
+{
+  "files": [
+    {
+      "upstream_sha256": "87c05fb17d48d0f4353a00b67c9d40d3a264e13e43d88e3f7b5829119845e3ba",
+      "file": "tapir_model.py",
+      "url": "https://raw.githubusercontent.com/google-deepmind/tapnet/730cda1c730877cfedbe01bf87fb1cadb78a565d/tapnet/torch/tapir_model.py",
+      "vendored_sha256": "91d2d68de1cef4bb87b57745bfa81737026e0aedac1c552fc56f50fb86e6aa18"
+    },
+    {
+      "upstream_sha256": "4961a8e4882e8c9ac219c4714f6f2c811cc1ab665a439d4d2e79942002a9517c",
+      "file": "nets.py",
+      "url": "https://raw.githubusercontent.com/google-deepmind/tapnet/730cda1c730877cfedbe01bf87fb1cadb78a565d/tapnet/torch/nets.py",
+      "vendored_sha256": "4961a8e4882e8c9ac219c4714f6f2c811cc1ab665a439d4d2e79942002a9517c"
+    },
+    {
+      "upstream_sha256": "a4267b3a6bd8ecf2dfe5effacab9f7a43664dc5d08966c98f6a0cc68f5ccedd3",
+      "file": "utils.py",
+      "url": "https://raw.githubusercontent.com/google-deepmind/tapnet/730cda1c730877cfedbe01bf87fb1cadb78a565d/tapnet/torch/utils.py",
+      "vendored_sha256": "a4267b3a6bd8ecf2dfe5effacab9f7a43664dc5d08966c98f6a0cc68f5ccedd3"
+    },
+    {
+      "upstream_sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30",
+      "file": "LICENSE",
+      "url": "https://raw.githubusercontent.com/google-deepmind/tapnet/730cda1c730877cfedbe01bf87fb1cadb78a565d/LICENSE",
+      "vendored_sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+    }
+  ],
+  "modifications": [
+    "tapir_model.py: two tapnet.torch imports changed to internal relative imports only"
+  ],
+  "review": [
+    "Imports confined to stdlib typing/functools, numpy, torch, dm-tree and einshape; no network, subprocess, file loads or dynamic Python execution in vendored modules.",
+    "utils._JaxBackend.exec is the public einshape tensor reshape operation, not Python exec.",
+    "Only the locally verified checkpoint is deserialized by the worker with torch.load weights_only=True; no fallback or custom safe globals."
+  ],
+  "revision": "730cda1c730877cfedbe01bf87fb1cadb78a565d",
+  "license": "Apache-2.0"
+}

@@ -1,0 +1,16 @@
+{
+  "model_id": "tapir",
+  "name": "google/tapnet:bootstapir_checkpoint_v2.pt",
+  "revision": "5d3fb48e76c5422841e38501514121e251beabb7",
+  "provenance_kind": "fixed_official_reference_requires_current_designated_bytes_match",
+  "license": "Apache-2.0",
+  "source": "https://huggingface.co/google/tapnet/tree/5d3fb48e76c5422841e38501514121e251beabb7",
+  "worker_source": "https://github.com/google-deepmind/tapnet/tree/730cda1c730877cfedbe01bf87fb1cadb78a565d",
+  "files": [
+    {
+      "path": "bootstapir_checkpoint_v2.pt",
+      "size": 218886140,
+      "sha256": "8493c7a69e02c85b9382fbb3c7b8b539b36bc08ede744b9e99feb739a0129f4b"
+    }
+  ]
+}

@@ -16,6 +16,9 @@ type HostResult = {
   };
 };
 type HostApi = {
+  task_runtime_status: (identifier?: string) => Promise<HostResult>;
+  prepare_task_runtime: (identifier?: string) => Promise<HostResult>;
+  save_task: (id: string, outputId: string) => Promise<HostResult>;
   save_audio: (id: string) => Promise<HostResult>;
   runtime_status: () => Promise<HostResult>;
   prepare_runtime: () => Promise<HostResult>;
@@ -298,5 +301,130 @@ export function DesktopRuntime() {
         </button>
       </div>
     </section>
+  );
+}
+
+export function TaskDownload({
+  id,
+  outputId,
+  url,
+  children,
+}: {
+  id: string;
+  outputId: string;
+  url: string;
+  children: ReactNode;
+}) {
+  const host = useHost();
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  async function save() {
+    if (!host || busy) return;
+    setBusy(true);
+    try {
+      const result = await host.save_task(id, outputId);
+      setMessage(
+        result.status === "saved"
+          ? `${result.filename} 저장·무결성 확인 완료`
+          : result.status === "cancelled"
+            ? "저장을 취소했습니다."
+            : "저장하지 못했습니다. 올바른 확장자와 새 저장 위치를 확인하세요.",
+      );
+    } catch {
+      setMessage("앱 저장 기능에 연결하지 못했습니다.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <span className="desktop-save">
+      {host ? (
+        <button
+          type="button"
+          className="secondary"
+          disabled={busy}
+          onClick={() => void save()}
+        >
+          {children}
+        </button>
+      ) : (
+        <a className="secondary" href={`${url}?download=1`} download>
+          {children}
+        </a>
+      )}
+      {message ? <small role="status">{message}</small> : null}
+    </span>
+  );
+}
+
+export function TaskRuntime() {
+  const host = useHost();
+  const [identifier, setIdentifier] = useState("whisper-large-v3-turbo");
+  const [state, setState] = useState<HostResult>({ status: "not_started" });
+  useEffect(() => {
+    if (!host) return;
+    let active = true;
+    async function update() {
+      try {
+        const value = await host!.task_runtime_status(identifier);
+        if (active) setState(value);
+      } catch {
+        if (active) setState({ status: "failed" });
+      }
+    }
+    void update();
+    const timer = window.setInterval(update, 1500);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [host, identifier]);
+  if (!host)
+    return (
+      <p>
+        각 모델 유형은 별도 실행 환경을 준비해야 합니다. 독립 앱의 정상 준비
+        기능을 사용하세요.
+      </p>
+    );
+  return (
+    <div className="desktop-runtime">
+      <label>
+        격리 실행 환경
+        <select
+          value={identifier}
+          onChange={(event) => setIdentifier(event.target.value)}
+          disabled={state.status === "running"}
+        >
+          <option value="whisper-large-v3-turbo">Whisper</option>
+          <option value="tapir">BootsTAPIR v2</option>
+          <option value="llama-3.1-8b-instruct">Llama</option>
+          <option value="qwen-image-2.1">Qwen Image (큰 별도 환경)</option>
+        </select>
+      </label>
+      <p role="status">
+        선택한 격리 환경 ·{" "}
+        {state.status === "ready"
+          ? "설치·CUDA 점검 완료"
+          : state.status === "running"
+            ? "설치 중 · 공개 패키지를 받습니다"
+            : state.status === "failed"
+              ? "준비 실패 · 비공개 진단 로그 확인 필요"
+              : "준비 필요"}
+      </p>
+      <button
+        type="button"
+        className="secondary"
+        disabled={state.status === "running" || state.status === "ready"}
+        onClick={async () => {
+          try {
+            setState(await host.prepare_task_runtime(identifier));
+          } catch {
+            setState({ status: "failed" });
+          }
+        }}
+      >
+        선택한 격리 환경 준비
+      </button>
+    </div>
   );
 }

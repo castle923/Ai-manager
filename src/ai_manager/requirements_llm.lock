@@ -1,0 +1,12 @@
+# Separate offline Llama environment. Torch 2.9.1+cu128 is installed separately
+# from https://download.pytorch.org/whl/cu128 by the runtime manager.
+# These are direct execution dependency pins, not a hash-locked resolver graph.
+# Official metadata: transformers v4.57.3/setup.py, accelerate v1.12.0/setup.py.
+transformers==4.57.3
+accelerate==1.12.0
+tokenizers==0.22.2
+safetensors==0.8.0
+huggingface_hub==0.36.2
+numpy==2.2.6
+Jinja2==3.1.6
+psutil==7.1.3

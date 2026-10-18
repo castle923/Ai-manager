@@ -51,6 +51,7 @@ type Run = {
   metrics?: { total_seconds?: number; peak_gpu_allocated_bytes?: number };
 };
 type Model = {
+  task_type?: string;
   id: string;
   row_version: number;
   created_at: string;
@@ -64,6 +65,9 @@ type Model = {
   preparation: string;
   integrity: string;
   runtime: string;
+  execution_eligibility?: string;
+  execution_blockers?: string[];
+  execution_advisories?: string[];
   latest_run_status: string | null;
   configuration_attention: boolean;
   configuration_reasons: string[];
@@ -81,7 +85,7 @@ type Data = {
   supported_artifacts: { adapter_id: string; name: string; revision: string }[];
 };
 const statusLabels: Record<string, string> = {
-  ready: "실행 준비 확인",
+  ready: "구성·환경 준비 확인",
   prepared: "준비 기록 확인",
   configuration_needed: "구성 확인 필요",
   unexecuted: "미실행",
@@ -106,6 +110,11 @@ const reasons: Record<string, string> = {
   artifact_revision_changed: "지정 구성 버전이 바뀌었습니다",
   artifact_files_unconfirmed:
     "고정 구성과 일치하는 로컬 파일의 해시를 확인해야 합니다",
+  configuration_required: "등록 구성과 파일을 먼저 확인해야 합니다",
+  adapter_runtime_not_ready: "현재 모델의 추론 환경을 먼저 점검해야 합니다",
+  model_archived: "보관 중인 모델은 실행하지 않습니다",
+  runtime_memory_feasibility_unconfirmed:
+    "이 로컬 이미지 조건의 메모리 적합성은 미확인입니다. 실제 실행 전 자원 검사로 판단합니다",
 };
 const errors: Record<string, string> = {
   stale_edit:
@@ -169,12 +178,14 @@ export function RegistryPanel({
   onCandidateUsed,
   onExplore,
   onPrepare,
+  onTasks,
 }: {
   csrf: RefObject<string>;
   candidate: CandidateRegistration | null;
   onCandidateUsed: () => void;
   onExplore: () => void;
   onPrepare: () => void;
+  onTasks?: () => void;
 }) {
   const [data, setData] = useState<Data | null>(null),
     [selected, setSelected] = useState<Model | null>(null),
@@ -312,7 +323,9 @@ export function RegistryPanel({
       const refs: unknown[] = newCandidate
         ? [{ candidate_id: newCandidate.id, scan_id: newCandidate.scan_id }]
         : editBase && !replaceRefs
-          ? editBase.references.map((ref) => ({ existing_identity: ref.identity }))
+          ? editBase.references.map((ref) => ({
+              existing_identity: ref.identity,
+            }))
           : [];
       if (local.trim()) refs.push({ local_directory: local.trim() });
       const body = {
@@ -359,7 +372,9 @@ export function RegistryPanel({
           adapter_id: selected.artifact.adapter_id,
           revision: selected.artifact.revision,
         },
-        references: selected.references.map((ref) => ({ existing_identity: ref.identity })),
+        references: selected.references.map((ref) => ({
+          existing_identity: ref.identity,
+        })),
         archived: !selected.archived,
       });
       choose(result.model);
@@ -402,14 +417,21 @@ export function RegistryPanel({
     setBusy(true);
     setError("");
     try {
-      await request("/api/tts/runs/" + id + "/cancel", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-AiManager-CSRF": csrf.current,
+      await request(
+        (selected?.task_type && selected.task_type !== "tts"
+          ? "/api/tasks/runs/"
+          : "/api/tts/runs/") +
+          id +
+          "/cancel",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-AiManager-CSRF": csrf.current,
+          },
+          body: "{}",
         },
-        body: "{}",
-      });
+      );
       setMessage("이 실행의 취소를 요청했습니다.");
       setTick((t) => t + 1);
     } catch (e) {
@@ -442,7 +464,10 @@ export function RegistryPanel({
       </div>
       <p className="caption">
         보관하지 않은 모델 단위 집계입니다. 파일 후보는 포함하지 않습니다. 구성
-        미확인·부족은 확인 필요에 포함하며, 실행 실패는 별도로 표시합니다.
+        미확인·부족은 확인 필요에 포함하며, 실행 실패는 별도로 표시합니다. 실행
+        검증은 현재 등록 구성에 연결된 이 앱의 실행만 집계하며, 별도 원격 실험의
+        성공을 포함하지 않습니다. 구성·환경 준비 뒤에도 실행 시작 시 자원을
+        확인합니다.
       </p>
       <div className="registry-toolbar">
         <label className="registry-search">
@@ -926,7 +951,21 @@ export function RegistryPanel({
                 </dd>
                 <dt>실제 실행</dt>
                 <dd>{statusLabels[selected.execution] || "미확인"}</dd>
+                <dt>현재 실행 조건</dt>
+                <dd>
+                  {selected.execution_eligibility === "blocked"
+                    ? "구성·환경 확인 필요"
+                    : "실행 시작 시 자원 확인 필요"}
+                </dd>
               </dl>
+              {[
+                ...(selected.execution_blockers || []),
+                ...(selected.execution_advisories || []),
+              ].map((reason) => (
+                <p className="caption" key={reason}>
+                  {reasons[reason] || reason}
+                </p>
+              ))}
               <p className="caption">
                 검증 완료는 현재 등록 구성에 연결한 실행 시점의 근거입니다. 파일
                 상태가 바뀌거나 구성 세대가 달라지면 현재 검증에 포함하지
@@ -937,7 +976,9 @@ export function RegistryPanel({
                 <br />
                 {selected.artifact.revision || "가중치 버전 미지정"}
               </p>
-              {selected.artifact.adapter_id && !selected.archived ? (
+              {selected.artifact.adapter_id &&
+              !selected.archived &&
+              (!selected.task_type || selected.task_type === "tts") ? (
                 <>
                   <label>
                     새 한국어 테스트 입력
@@ -971,8 +1012,11 @@ export function RegistryPanel({
                 </>
               ) : (
                 <p className="caption">
-                  관리 정보 등록은 모든 모델에 제공됩니다. 실제 실행은 지정된 두
-                  Qwen TTS 구성만 지원합니다.
+                  관리 정보 등록과 실행 지원을 구분합니다. STT 등 다른 유형은
+                  유형별 작업실에서 현재 구성·환경을 확인하고 실행하세요.
+                  {onTasks ? (
+                    <button onClick={onTasks}>유형별 작업실 열기</button>
+                  ) : null}
                 </p>
               )}
               <h3>이 모델의 실행 기록</h3>

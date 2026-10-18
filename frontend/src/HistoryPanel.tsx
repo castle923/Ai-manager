@@ -36,6 +36,7 @@ type HistoryResult = {
   has_more: boolean;
 };
 const kinds: Record<string, string> = {
+  model_run: "모델 유형별 실행",
   scan: "Drive 수집",
   preparation: "모델 파일 준비",
   run: "음성 실행",
@@ -526,7 +527,8 @@ export function HistoryPanel({
                     </button>
                   )}
                 <button onClick={() => onSource(selected.kind, selected.id)}>
-                  {selected.kind === "run" ||
+                  {selected.kind === "model_run" ||
+                  selected.kind === "run" ||
                   selected.kind === "comparison" ||
                   selected.kind === "scan"
                     ? "이 원본 ID의 작업 화면"
