@@ -1,5 +1,30 @@
 # 데이터 수집부터 실행 비교까지
 
+## M11 이후 자동 검수 흐름 — 신규 설계
+
+현재 수동 선택·요청 중심 흐름을 아래 자동 검수 job으로 연결한다. 상세 정책/상태/재개/검증 기준은 [자동 검수 계획](AUTO_VALIDATION_PLAN.md)을 따른다. 아직 구현·실행 검증 전이다.
+
+```mermaid
+flowchart TD
+ A[사용자 local 폴더 / Drive allowlist·읽기 정책] --> B[metadata 후보 발견]
+ B --> C[config/index/공식 구성 근거 / 6프로필 판정]
+ C --> D[허용된 지원 후보 파일·full SHA 검사]
+ D --> E[환경·현재 자원 preflight]
+ E --> F[immutable 검수 계획·영향·opt-in 승인]
+ F --> G[새 표준 입력 / bounded 순차 dispatcher]
+ G --> H[소유 worker / 산출물 계약·full SHA]
+ H --> I[다축 결과표·history / 변경 시 새 검수]
+ C --> J[미지원·모호·revision차이]
+ E --> K[미준비·자원 차단·유예]
+```
+
+6개를 기존 typed queue에 선제 enqueue하지 않는다. 동일 home 공용 슬롯·기존 queue 상한에 맞춰 다음 case만 발행한다. 외부 앱/GPU 전역 독점을 보장하지 않는다. 같은 batch의 새 TTS 24kHz WAV는 명시한 변환 recipe로 Whisper용 16kHz mono PCM16/30초 이하 입력을 새로 만들고 계보/SHA를 연결할 수 있다. TTS가 막히면 STT는 의존 차단 또는 이번 지정 원본 요구 상태이며 과거 WAV·침묵/noise로 fallback해 정상 전사 PASS를 만들지 않는다.
+
+식별 단계의 README/config 명령은 데이터이며 실행하지 않는다. 임의 remote model code/trust_remote_code·무제한 자동 다운로드는 범위 밖이다. 새 snapshot·승인과 현재 자산/환경/code가 다르면 stale로 중단한다. 같은 batch 재개와 새 batch 검수는 구분하고 완료 case를 새 성공으로 재사용하지 않는다.
+
+**아래 P1–P6와 다이어그램은 최초 설계/기존 기능의 역사 계약이다. 위 흐름의 신규 구현 완료를 뜻하지 않는다.**
+
+
 작성일: 2026-10-16 · 상태: 설계
 
 ## 전체 흐름
