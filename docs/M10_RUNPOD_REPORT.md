@@ -1,6 +1,6 @@
 # M10 Runpod 원격 검증 보고
 
-최신 상태: Secure 단일 Pod의 strict SSH·GPU 식별·자동 안전 종료 확인, 실제 이미지 검증 미완료. 아래 두 시도는 분리한 기록이다.
+최신 상태: 승인된 재개 환경·모델 무결성과 안전 정리는 확인했으나 Qwen 이미지 생성은 로딩 중 실패했다. PNG는 0개이며 두 새 Secure Pod는 모두 삭제 확인했다. 아래 세 시도는 분리한 기록이다.
 
 ## 1차: Community Cloud 재고 조사
 
@@ -137,3 +137,74 @@ CPU 안전 fixture PASS 전에는 의존성·모델 다운로드와 GPU 추론�
 이 새 Pod의 실행·저장 비용을 발생시키는 리소스는 삭제 확인 범위에서 남아 있지 않다. 안전 조기 종료는 검증했지만 원래 목적의 실제 이미지 생성 검증은 미완료다. Windows 로컬 8GB GPU 성공, 앱 원격 통합, 새 모델 검증 또는 모든 환경 PASS를 뜻하지 않는다.
 
 추가 공식 근거: [runpodctl 자동 stop/terminate 플래그 제거 PR](https://github.com/runpod/runpodctl/pull/330), [Pod 볼륨과 독립 network volume 수명](https://docs.runpod.io/pods/storage/types), [Secure/Community 및 network volume 비교](https://docs.runpod.io/pods/choose-a-pod). 원시 응답·개인 경로·키·계정·Pod 식별값·호스트는 공개하지 않는다.
+
+## 3차: 안전 제어 보완 후 승인된 Qwen 검증 재개와 실패 종료
+
+최종 판정: **실제 환경·모델 무결성·CPU 안전 제어·실패 후 정리는 확인했으나, Qwen-Image-2.1 이미지 생성은 실패했다. PNG는 0개이며 이미지 검증 완료가 아니다.** 현재 진행하던 Qwen 검증만 수행했고 다른 모델 검수는 추후로 보류했다.
+
+### 재개 전 보완과 한도
+
+2차 관측의 마지막 heartbeat와 종료 시작 사이 간격은 15,002ms로 기존 15초 request timeout과 일치했다. 그러나 원래 catch가 예외 타입·전송 cause code·HTTP status를 버려 정확한 원인은 소급 확정할 수 없다. timeout 가능성은 추정으로만 남긴다.
+
+부모·독립 리뷰 후 관측 GET만 최대 3회·누적 35초, 요청당 최대 8초·대기 2/5초로 제한한 재시도와 안전한 원인 분류를 별도 controller에 통합했다. timeout·허용된 전송 code·408/429/500/502/503/504만 재시도하고 인증·scope/schema·불명 오류는 정리한다. 원오류 kind·status·허용 code·요청 기간·시도 횟수·결정만 기록하며 응답 body·URL query·키·PIN은 기록하지 않는다. 생성 POST 한 번과 새 ID 고정 삭제 정책은 유지했다. 로컬 합성 10개, 실제 로컬 HTTP의 8초 timeout 후 GET 회복을 포함한 통합 6개 및 기존 생성/정리 경계 회귀를 검증했다. 합성 검증을 실제 클라우드 회복 증거로 대체하지 않는다.
+
+최초 controller의 **06:06:40.380 UTC**를 계속 사용해 작업 중단 **07:36:40.380 UTC**, terminate 시작 **07:41:40.380 UTC**, 외부 최대 **08:06:40.380 UTC**를 고정했다. 새 Pod에서 시간을 리셋하지 않았고 앞선 비용 상한 추정 **$0.096825**를 새 사용료에 합산했다. 240초 operator lease, 보수 단가 $2/시간 상한과 비용 마진을 유지했다.
+
+| 새 제어 코드 | SHA-256 |
+| --- | --- |
+| 재개 controller | `4e1dbecc7356b76565280cbf54b8d99662f8ca70ddf5c53e50746a8ed9244c49` |
+| 원 절대시각·누적 비용 정책 | `578a77a05d692a79d7267a6960f969cc63d94582b0467993bb452873a4414ddb` |
+| 제한 관측 재시도 helper | `d9387e0534458f27a13e6b43891dd8553ce0c56441eaa5ba9c53b68aacf6b18d` |
+
+### 실제 새 환경과 모델 준비
+
+명시 승인된 새 재개 Pod 한 개를 **15:19:59 KST(06:19:59.161 UTC)**에 생성했다. 정확한 scope는 Secure Cloud·NVIDIA A100-SXM4-80GB 한 개, 컨테이너 20GB·Pod 볼륨 150GB·network volume 0개다. 실제 응답은 $1.79/시간, 할당 RAM 250GB·vCPU 32였다. 보수 디스크 비용을 더한 감시 단가는 $1.815298/시간이었다. 이전에 종료한 Pod나 다른 자원은 변경하지 않았다.
+
+전용 사전 host key와 strict SSH로 새 연결을 확인했다. Python 3.11.10, 실제 A100-SXM4-80GB·81,920 MiB, driver 595.91.07을 확인했고 cgroup RAM 한도는 249,999,998,976 bytes였다. 같은 source manifest 해시와 10개 bundle 파일 SHA가 원격 readback과 일치했다. 원격 CPU stdlib 안전 fixture 8개가 새로 PASS했다. 취소·timeout·guardian 죽음·실패 후손 정리·부모 SIGTERM/SIGKILL·arming 전 부모 죽음·정상 gate release를 포함한다. 회수한 fixture/preflight/source-readback 원본 3개는 원격 size·전체 SHA와 일치했다.
+
+새 Linux Python 3.11 venv에 설치하고 실제 runtime audit·pip check를 통과했다. 직접 버전은 torch 2.9.1+cu128, transformers 5.17.0, accelerate 1.12.0, safetensors 0.8.0, Pillow 11.3.0, psutil 7.2.2다. diffusers는 고정 revision `b800f828f3951c4d206e154411bcbfa693cd322e`이며 실제 pipeline SHA는 앞선 `e75e4ce38d38e194edaac818bba99b2115b4bb2bfdbd15ce03a2813b0fe8856c`와 일치했다. CUDA runtime 12.8·bfloat16 지원과 58개 설치 archive의 해시를 기록했다. 직접 pin과 실제 해결된 버전 기록이며 완전한 사전 transitive lock으로 주장하지 않는다.
+
+공식 Hugging Face 고정 revision에서 새 메타데이터를 조회하고 인증 없이 **24개·33,131,601,593 bytes**를 원격에 직접 다운로드했다. 중복 HF cache 없이 regular file로 저장하고 각 파일의 크기·스트림 SHA·전체 readback SHA, 공식 LFS SHA 또는 Git blob 식별값을 확인했다. **15:25:18 KST(06:25:18 UTC)**에 완료했다. 로컬에는 모델·venv를 회수하지 않았다.
+
+| 이번 원본 기록 | SHA-256 |
+| --- | --- |
+| 실제 runtime audit | `8d97430ce8c08f8a8133e1e9777e860850af8ed0a6a9302b4b31f1277fada45e` |
+| 새 모델 24개 전체 해시 검증 manifest | `2179e331ecb509d669ae1c5ea8f6c392799e47e15fb8cb8d1373490bdbaa0a29` |
+
+### 이번 실제 입력과 worker 결과
+
+이번 새 run의 실제 `input.txt`는 다음과 같다.
+
+> A small yellow ceramic teapot on a blue wooden table beside a single white flower, soft daylight, simple studio photograph, no text.
+
+파란 나무 탁자 위의 작은 노란 도자기 찻주전자와 흰 꽃 한 송이를 부드러운 자연광의 단순한 스튜디오 사진으로 표현하고 글자는 넣지 않는 장면이다. 실제 request는 seed 0, 512×512, 4 steps, guidance scale 4.0이다. worker에 설정된 negative prompt는 빈 문자열, `true_cfg_scale=4.0`, 이미지 한 장, `use_kv_cache=False`다. 4 steps는 기본 연결·작동을 확인하려던 smoke 조건이며 품질 평가용 조건이 아니다. 입력 SHA-256은 `6368dc479347370182a0521c7be3a0c64d20cc5457b30f9a7136183e4aed7b9a`다.
+
+같은 worker·helper·placement를 변경 없이 한 번 실행했다. 그러나 기록된 단계는 **loading뿐**이며 running/이미지 생성 호출 도달은 확인되지 않았다. worker는 `failed / inference_failed`를 반환했다. harness의 실패 기록은 `worker_did_not_generate:inference_failed`, duration 약 106.954초다. 외부 18GiB RSS guard는 유지됐고 211개 표본의 RSS peak는 **10,860,793,856 bytes**로 guard를 넘지 않았다. 이는 표본 합계이며 OS hard quota나 모든 순간의 peak는 아니다.
+
+worker 로그에는 checkpoint shard 2/2와 weights 750/750 로딩, CPU/disk offload에 따른 meta-device 안내 후 generic `inference_failed`만 남았다. harness의 `ValueError`는 실패 결과 검증용 wrapper이며 모델 내부 원예외 타입이 아니다. 원예외 타입·안전 스택이 보존되지 않아 정확한 원인은 미확정이다. 이 안내만으로 OOM·GPU 고장·placement 오류·모델 호환성 문제를 확정하지 않는다. 다음 재실행을 검토하기 전에 비밀값 없는 원예외 분류·진단 보강이 필요하다. 이번에는 추가 코드 수정이나 원인 추적용 실행을 하지 않았다.
+
+| 항목 | 재개 실행 판정 |
+| --- | --- |
+| 실제 환경·고정 runtime·CUDA 준비 | 확인 |
+| 공식 모델 24개 새 다운로드·전체 바이트 해시 | 확인 |
+| 실제 Pod CPU 안전 fixture 8개 | PASS |
+| 동일 worker 로딩 | 실제 수행 후 실패 |
+| 실제 이미지 추론 성공 | 실패, running 도달 증거 없음 |
+| 새 PNG·이미지 metadata | 0개 |
+| 의도적인 잘못된 입력 오류 case | 미수행 — 이번 실제 로딩 실패와 구분 |
+| 실GPU worker loading 취소 | 미수행 — CPU fixture 취소와 구분 |
+| 실패 worker의 process group 정리 | `group_terminated=true`, live 후손 0 |
+
+### 회수·한 번의 검토·즉시 종료
+
+사용자의 비용 절약 지시에 따라 실패 확정 후 추가 시도 없이 소형 오류·출처·리소스·runtime·모델 해시 기록만 회수했다. 아카이브는 **181,306 bytes**, SHA-256 `09b57425b2fdca4cd6fdc4bee76ef4d77905431e4b31a227f9dc91923f9033ff`다. 포함한 **17개 파일 모두** 원격 manifest와 로컬 size·전체 SHA가 일치했다. 모델·offload·venv·인증 자료는 회수하지 않았다. 독립 검토자가 실패·PNG 0·후손 0과 회수 해시를 한 번 확인한 직후 종료를 요청했다.
+
+- **15:33:34.916 KST(06:33:34.916 UTC)**: 현재 새 immutable Pod에만 종료 요청.
+- **15:33:36.079 KST(06:33:36.079 UTC)**: DELETE 204.
+- **15:33:36.951 KST(06:33:36.951 UTC)**: GET 404·목록 부재 확인, controller 종료. 별도 감독도 확인했다.
+- **15:33:58 KST(06:33:58 UTC)**: 별도 읽기 재확인에서 v2 대상 GET 404, v2·REST v1 목록 HTTP 200 및 대상 부재.
+- 새 network volume·다른 독립 storage 생성 0. Pod 수명에 묶인 볼륨은 해당 Pod 삭제에 따라 종료되는 형태다. 이번 재개에 의해 과금 중인 새 Pod·독립 storage가 남아 있다는 증거는 없다. 기존 자원은 변경하지 않았다.
+
+마지막 해당 Pod 전용 billing 조회는 HTTP 200이나 record가 아직 없어 **확정 청구 금액은 미집계**다. 마지막 별도 확인 시각까지 보수적으로 계산한 새 재개 비용 상한 추정은 **$0.423334**, 앞선 $0.096825를 합친 **누적 추정은 $0.520159**다. 이를 최종 invoice나 실제 비용 $0으로 표현하지 않는다. 최초 origin부터 약 27분 이내에 종료 확인을 마쳤으며, 남은 시간은 사용하지 않았다.
+
+최종적으로 기반 환경과 모델 준비는 확인했고 실패 근거를 보존·검토한 뒤 새 Pod를 삭제했다. 실제 Qwen 이미지 생성 검증은 미완료이며 다른 모델·Windows 로컬 8GB·앱 원격 통합·일반 품질에 대한 성공 판정으로 확대하지 않는다. 원시 로그·계정·개인 경로·Pod/호스트 식별값·키는 공개하지 않는다.
