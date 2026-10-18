@@ -1,5 +1,9 @@
 # 보유 모델 자동 검수 프로그램 — M11 이후 설계
 
+## M11 계약 원형 checkpoint
+
+후속 source-only M11에서 6개 pinned catalogue·상태/전이·immutable plan/snapshot·dry-run 승인·입력 계보 선언과 stdlib CLI를 구현했다. [M11 보고서](M11_REPORT.md)·[원형 계약](M11_CONTRACT.md)을 따른다. 아래 ‘신규 기능 구현 전’과 최초 28–46인일은 설계 당시 범위로 보존하며, 이번 원형은 실제 discovery/설치/worker/receipt/사용자 인증·영속 승인 소비를 구현한 것이 아니다. 후속 참고 공수는 약 26–43인일이며 AI 시간/납기 약속이 아니다.
+
 기준일: 2026-10-18. 상태: **설계·마일스톤 재정렬. 이 문서의 신규 기능은 구현·실행 검증 전이다.** 기준 main은 `57a65e7af85bfd9416c2bf005804cbade16e385b`, 기존 v0.10.0 Release/tag 소스는 `5a336cd0522fadda68f179ed4b8c5b0d4059aa5f`다. 이 설계 문서 반영으로 기존 패키지·태그·asset을 변경하지 않는다.
 
 ## 1. 제품 목표와 완료의 의미
