@@ -7,10 +7,22 @@
 .recommendation-policy summary { cursor: pointer; color: #2457a6; font-weight: 600; }
 .recommendation-policy ul { padding-left: 20px; margin: 8px 0; }
 .recommendation-cell { min-width: 240px; max-width: 330px; }
+.library .table-wrap table { min-width: 1200px; }
+.library .table-wrap th:nth-child(1) { width: 280px; }
+.library .table-wrap th:nth-child(2) { width: 110px; }
+.library .table-wrap th:nth-child(3) { width: 300px; word-break: keep-all; }
+.library .table-wrap th:nth-child(4) { width: 70px; }
+.library .table-wrap th:nth-child(5) { width: 150px; }
+.library .table-wrap th:nth-child(6) { width: 110px; }
+.library .table-wrap th:nth-child(7) { width: 130px; }
+.library .table-wrap th:nth-child(8) { width: 50px; }
+.library .table-wrap::before { content: "표의 오른쪽 열은 가로로 스크롤하거나 상세 버튼으로 확인하세요."; display: block; position: sticky; left: 0; width: fit-content; max-width: 100%; padding: 10px 22px; box-sizing: border-box; color: #526988; font-size: 12px; line-height: 1.7; word-break: keep-all; }
 .recommendation-notes { font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+.recommendation-cell .recommendation-notes { word-break: keep-all; }
 .recommendation-notes ul { padding-left: 18px; margin: 6px 0; }
 .recommendation-notes small { color: #607189; }
 .recommendation-rank { display: inline-block; color: #174f8d; background: #e5f0ff; border: 1px solid #b9d0ed; border-radius: 6px; padding: 3px 8px; }
+.recommendation-cell .recommendation-rank { white-space: nowrap; }
 .recommendation-limits { color: #627087; }
 .recommendation-policy summary:focus-visible, .purpose-select select:focus-visible { outline: 3px solid #2563eb; outline-offset: 3px; }
 @media (max-width: 760px) { .purpose-select { width: 100%; } .recommendation-policy { padding: 14px 16px; } }
