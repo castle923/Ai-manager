@@ -1,6 +1,6 @@
 # M15 구현·새 Windows 배포 검증 기록
 
-상태: 최종 후보 2의 새 Windows 패키지·격리 설치·독립 창·지정 두 TTS의 같은 batch 부분 재개·별도 CPU 소유 중단 복구를 이번 실행으로 검증했다. GitHub Release 게시와 태그 고정은 최종 공개 gate이며 아직 완료로 기록하지 않는다. 아래 확인 환경과 제한을 따른다. 아래 후보 checkpoint와 초기 시험은 당시 진행 기록으로 보존한다.
+상태: 최종 후보 2의 새 Windows 패키지·격리 설치·독립 창·지정 두 TTS의 같은 batch 부분 재개·별도 CPU 소유 중단 복구를 이번 실행으로 검증했다. GitHub [v0.15.0 Release](https://github.com/castle923/Ai-manager/releases/tag/v0.15.0) 게시와 태그 source 고정·첨부 두 파일의 원격 readback까지 완료했다. 아래 확인 환경과 제한을 따른다. 아래 후보 checkpoint와 초기 시험은 당시 진행 기록으로 보존한다.
 
 ## 최종 후보 2 패키지와 설치
 
@@ -68,4 +68,4 @@ fresh OAuth 로그인·실 Drive 재수집, 별도 PC/Windows 환경, 나머지 
 
 ## 초기 계획과 남은 공개 gate
 
-위 초기 계획의 설치·native UI·지정 두 모델의 부분 재개·별도 CPU 소유 중단은 이번 새 증거와 독립 검토로 확인했다. CPU 독립 검토는 attempt1 interrupted 이력→grant1 소비→attempt2의 서로 다른 run·Job 부재·모델 dispatch0·원래 expiry와 read2,104,396→4,201,548·wall440→5,951의 누적 보존을 다시 확인했다. 보존 파일 현재 SHA/identity와 설치 사후 전량 SHA도 독립 재대조했다. 남은 공개 gate는 이 문서의 정확 변경 집합 게시와 위 고정 source를 대상으로 한 새 태그/Release·ZIP 첨부·원격 readback이다. 실제 source/runtime/model/receipt/hash·실행 ID는 비공개 출처 기록에 연결하고 공개 저장소에는 개인 계정·Drive ID·실제 경로·자격 증명·개인 로그·출력을 포함하지 않는다. 기존 설치·모델·인증·DB·Release/assets는 보존한다. fresh OAuth·다른 모델·모든 환경/품질을 이번 일부 성공으로 대체하지 않는다.
+위 초기 계획의 설치·native UI·지정 두 모델의 부분 재개·별도 CPU 소유 중단은 이번 새 증거와 독립 검토로 확인했다. CPU 독립 검토는 attempt1 interrupted 이력→grant1 소비→attempt2의 서로 다른 run·Job 부재·모델 dispatch0·원래 expiry와 read2,104,396→4,201,548·wall440→5,951의 누적 보존을 다시 확인했다. 보존 파일 현재 SHA/identity와 설치 사후 전량 SHA도 독립 재대조했다. 최종 문서의 앞선 정확 7경로는 commit `55626cf2219dd85d8e0a14706a70ec53c8cd833f`에 게시하고 raw/비대상 blob·type·mode 보존을 확인했다. 이어 [v0.15.0 Release](https://github.com/castle923/Ai-manager/releases/tag/v0.15.0)를 정상 Edge에서 게시했다. 사용자가 공식 파일 선택창으로 지정 두 파일을 직접 선택했으며 확장 파일 URL 권한 거절 후 설정 변경이나 자동 업로드 우회는 없었다. 공식 API는 태그/target을 빌드 source `6c2cb6738c0208b7607385658804e85df7f58c5b`, 공개 Release·정확 uploaded 두 asset으로 확인했다. ZIP113,164,275 bytes와 SHA256SUMS95 bytes의 API digest뿐 아니라 원격 실제 bytes도 새로 받아 각각 위 ZIP SHA와 `9e4846d16936a9c007030030b5f19ad7ee5b263b7e4b618d57edafcfc3d151f7`을 확인했다. 서버 본문은 CRLF이며 LF 정규화 후 승인 본문 SHA `550dab8d8a71f3da3fe4845e2dfbd7459c905c362b1bdf55714acdbd6fbf76a2`와 내용이 일치한다. 서버 raw byte SHA와 같은 값이라고 주장하지 않는다. 독립 검토도 실제 원격 bytes/태그/본문과 기존 세 Release의 id·target·published/updated·asset 전체 보존을 다시 확인했다. 실제 source/runtime/model/receipt/hash·실행 ID는 비공개 출처 기록에 연결하고 공개 저장소에는 개인 계정·Drive ID·실제 경로·자격 증명·개인 로그·출력을 포함하지 않는다. 기존 설치·모델·인증·DB·Release/assets는 보존한다. fresh OAuth·다른 모델·모든 환경/품질을 이번 일부 성공으로 대체하지 않는다.

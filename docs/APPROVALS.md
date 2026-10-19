@@ -129,3 +129,6 @@ M6 fresh home에는 사용자가 이번 프로젝트에 지정한 OAuth client J
 실행 중인 다른 앱/작업을 종료하거나 모델 다운로드·원격 비용·Drive 쓰기·OS 전역 보안 변경으로 확대하지 않는다. OAuth 로그인·동의는 사용자 직접행위다. 새 TTS 두 지정 모델의 같은 batch checkpoint/restart/미시작 case 재개와 별도 새 CPU 전용 owner 종료 반례는 소유·정확 범위를 고정한 독립/부모 GO 이후 수행한다. 현재 문서는 승인·진행 기록이며 실제 검증/게시 완료를 뜻하지 않는다.
 
 후속 checkpoint: 각 source/package/fresh 설치·실행과 실제 두 TTS checkpoint 재개, 별도 CPU 전용 owner 중단은 정확 manifest의 독립/부모 GO 뒤 이번 새 home·입력·출력으로 수행했고 [M15 보고서](M15_REPORT.md)에 완료 범위와 실패/수리 이력·제한을 구분했다. 실제 두 TTS는 시작1·일시중지1·정상 닫기/재시작·native 새 승인 소비1로 끝냈고 완료 증거를 재사용해 새로운 모델 성공으로 승격하지 않았다. CPU는 새 owner image/creation/script/home/child/Job을 확인한 정확 handle 외부 종료1회로 한정했고 모델/GPU/기존 설치앱·외부 프로세스 종료0이다. 선정 원본11파일·3DB snapshot·25모델 metadata와 설치payload8,310파일 사후 불일치0을 독립 대조했다. 제품코드·ZIP은 고정하고 최종 docs-only 게시와 source 고정 tag/새 Release/첨부·원격 readback은 별도 공개 gate를 따른다.
+
+
+최종 게시 checkpoint: 정확 7docs를 `55626cf2219dd85d8e0a14706a70ec53c8cd833f`에 반영한 뒤 승인된 [v0.15.0 Release](https://github.com/castle923/Ai-manager/releases/tag/v0.15.0)를 정상 Edge에서 게시했다. 사용자 직접 선택한 최종 ZIP/SHA256SUMS 두 파일만 첨부했고 확장 파일 URL 접근 권한을 변경하거나 자동 업로드를 우회하지 않았다. 태그는 실제 빌드 source `6c2cb6738c0208b7607385658804e85df7f58c5b`에 고정했다. 공식 API의 공개 상태·target·본문 정규화 내용·정확 asset size/digest와 신규 원격 실제 bytes SHA를 독립 대조했고 기존 세 Release/assets는 baseline과 일치했다. 이 후속 상태 문서는 제품코드·ZIP·태그 소스 변경이 아니다.

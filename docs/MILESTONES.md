@@ -2,7 +2,7 @@
 
 ## M15 실제 부분 재개·새 Windows 패키지 검증 기록
 
-durable 부분 재개·중단 복구·새 Windows 배포 패키지 구현과 실제 검증·저장소/Release 반영이 승인됐다. [M15 계약](M15_CONTRACT.md)·[보고서](M15_REPORT.md)에 명시 재개 승인·시도/예산 보존·완료 증거 재검증·소유 작업 확인을 기록한다. 후보 2 source `6c2cb6738c0208b7607385658804e85df7f58c5b`에서 381개/374 PASS·7 SKIP·실패0, 새 package/격리 설치/frozen 결속, 지정 두 TTS의 같은 batch 일시중지→정상 재시작→native 명시 재개, 별도 CPU 전용 owner 중단→새 attempt2와 선정 원본 보존을 이번 증거·독립 검토로 확인했다. Release/tag/첨부의 최종 원격 게시 gate는 별도이며 아직 완료로 기록하지 않는다. fresh OAuth·다른 모델·실제 GPU crash·별도 PC·전면 접근성과 품질 우열은 미검증이다. 이전 Release/assets와 각 단계의 당시 성과·제한은 보존한다.
+durable 부분 재개·중단 복구·새 Windows 배포 패키지 구현과 실제 검증·저장소/Release 반영이 승인됐다. [M15 계약](M15_CONTRACT.md)·[보고서](M15_REPORT.md)에 명시 재개 승인·시도/예산 보존·완료 증거 재검증·소유 작업 확인을 기록한다. 후보 2 source `6c2cb6738c0208b7607385658804e85df7f58c5b`에서 381개/374 PASS·7 SKIP·실패0, 새 package/격리 설치/frozen 결속, 지정 두 TTS의 같은 batch 일시중지→정상 재시작→native 명시 재개, 별도 CPU 전용 owner 중단→새 attempt2와 선정 원본 보존을 이번 증거·독립 검토로 확인했다. [v0.15.0 Release](https://github.com/castle923/Ai-manager/releases/tag/v0.15.0) 게시와 태그 source 고정·첨부 두 파일의 원격 실제 SHA·기존 Release/assets 보존을 독립 대조했다. 후속 docs는 ZIP/태그를 바꾸지 않는다. fresh OAuth·다른 모델·실제 GPU crash·별도 PC·전면 접근성과 품질 우열은 미검증이다. 이전 Release/assets와 각 단계의 당시 성과·제한은 보존한다.
 
 ## M14 후속 구현 기록
 

@@ -1,6 +1,6 @@
 # M15 중단 복구·같은 batch 부분 재개 계약
 
-상태: 아래 계약을 후보 2 source `6c2cb6738c0208b7607385658804e85df7f58c5b`에서 구현하고 합성 반례·새 Windows 설치/독립 창·지정 두 TTS의 같은 batch 부분 재개·별도 CPU 소유 owner 중단 복구를 이번 증거로 검증했다. [현재 보고서와 한계](M15_REPORT.md)를 따른다. Release/tag/첨부 원격 게시 gate는 별도이며 실제 GPU/frozen GUI 강제 crash·모든 모델/환경 검증은 아니다. 과거 M14 성공은 이번 성공 증거가 아니다.
+상태: 아래 계약을 후보 2 source `6c2cb6738c0208b7607385658804e85df7f58c5b`에서 구현하고 합성 반례·새 Windows 설치/독립 창·지정 두 TTS의 같은 batch 부분 재개·별도 CPU 소유 owner 중단 복구를 이번 증거로 검증했다. [현재 보고서와 한계](M15_REPORT.md)를 따른다. [v0.15.0 Release](https://github.com/castle923/Ai-manager/releases/tag/v0.15.0) 게시와 source 고정 태그/첨부 원격 실제 bytes 대조까지 완료했으며 실제 GPU/frozen GUI 강제 crash·모든 모델/환경 검증은 아니다. 과거 M14 성공은 이번 성공 증거가 아니다.
 
 ## 승인·원장
 
