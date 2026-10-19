@@ -14,6 +14,8 @@
 
 복구는 running batch를 interrupted로 바꾸고 실행 중 case의 중단 attempt를 보존한다. queued는 미시작 pending으로, 기존 pending·terminal case는 보존한다. 새 명시 재개 승인 전 실행은 없다. 정상 취소/timeout에서도 다음 case dispatch를 멈추고 소유 Job drain 뒤 상태를 확정한다. 재개 검증 도중 들어온 새 취소는 취소 이벤트 sequence로 재대조하여 지우지 않는다. 정전·디스크 하드웨어 실패의 원자적 복구를 검증했다는 주장은 하지 않는다.
 
+최초 승인 또는 재개 grant 소비가 pending으로 commit된 뒤 coordinator가 running을 주장하기 전 중단된 경우도 복구한다. 최신 소비 event의 PID와 Windows process creation FILETIME을 기록하고 현재 exact identity가 살아 있으면 정상 handoff를 가로채지 않는다. 관찰 불명은 중단하고, 소비 owner가 사라진 pending만 같은 OS lock·소유 child 관찰 아래 interrupted로 바꾼다. pending case의 미시작 attempt 1 또는 이미 배정한 attempt 2는 유지하며 새 명시 재개 전 dispatch0이다.
+
 ## 같은 batch 완료 증거와 변경
 
 완료 receipt SHA·batch/case/run/plan/code/profile·소유 cleanup 계약을 검사하고, request/result raw SHA와 실제 input/output bytes·출력 decode 계약을 재검증한다. 같은 batch에서 확인한 완료 TTS만 의존 STT 입력으로 복원할 수 있다. 다른 batch나 과거 작업 WAV fallback은 없다. 원본 관찰·code/static/catalog·runtime Python/lock·승인 설정 변경은 fail-closed이며 새 계획을 요구한다. 일시적 자원 관측은 worker 실행 전에 다시 수행한다.

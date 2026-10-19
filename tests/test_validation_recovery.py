@@ -29,6 +29,54 @@ class RecoveryTests(unittest.TestCase):
             db.execute("UPDATE cases SET status='interrupted',reason='synthetic_interruption' WHERE id=?",(cid,))
         return cid
 
+    def test_consumed_pending_without_coordinator_recovers_without_dispatch(self):
+        with synthetic_source(1) as (folder,root):
+            store,saved,batch=self.prepared(folder,root)
+            before=store.status(batch)
+            self.assertEqual(before['batch']['status'],'pending')
+            with patch.object(recovery,'process_stamp',return_value=None):result=recovery.recover(ValidationStore(store.home),batch)
+            self.assertEqual(result['batch']['status'],'interrupted')
+            self.assertEqual(result['cases'][0]['status'],'pending')
+            self.assertFalse(any(e['kind']=='case_running' for e in result['events']))
+            self.assertEqual(result['budget']['expires_ms'],before['budget']['expires_ms'])
+            grant=recovery.approve(store,batch,saved['plan_sha256'],confirmed=True)
+            result=Coordinator(store).run(batch,resume_approval=grant['resume_approval_id'])
+            self.assertEqual(result['batch']['status'],'control_validated')
+            self.assertEqual(result['cases'][0]['attempt'],1)
+            self.assertEqual(sum(e['kind']=='case_running' for e in result['events']),1)
+
+    def test_live_pending_consumer_is_not_stolen_before_running_claim(self):
+        with synthetic_source(1) as (folder,root):
+            store,saved,batch=self.prepared(folder,root)
+            with self.assertRaisesRegex(ContractError,'pending_owner_still_alive'):recovery.recover(store,batch)
+            self.assertEqual(store.status(batch)['batch']['status'],'pending')
+            result=Coordinator(store).run(batch)
+            self.assertEqual(result['batch']['status'],'control_validated')
+            self.assertEqual(sum(e['kind']=='case_running' for e in result['events']),1)
+
+    def test_unobservable_pending_owner_is_not_assumed_dead(self):
+        with synthetic_source(1) as (folder,root):
+            store,saved,batch=self.prepared(folder,root)
+            with patch.object(recovery,'process_stamp',side_effect=ContractError('owner_identity_unobservable')):
+                with self.assertRaisesRegex(ContractError,'unobservable'):recovery.recover(store,batch)
+            self.assertEqual(store.status(batch)['batch']['status'],'pending')
+
+    def test_resume_handoff_crash_preserves_assigned_attempt_without_auto_dispatch(self):
+        with synthetic_source(1) as (folder,root):
+            store,saved,batch=self.prepared(folder,root);self.interrupted(store,batch)
+            grant=recovery.approve(store,batch,saved['plan_sha256'],confirmed=True)
+            self.assertTrue(recovery.consume_locked(store,batch,grant['resume_approval_id']))
+            self.assertEqual(store.status(batch)['cases'][0]['attempt'],2)
+            with self.assertRaisesRegex(ContractError,'pending_owner_still_alive'):recovery.recover(store,batch)
+            with patch.object(recovery,'process_stamp',return_value=None):result=recovery.recover(store,batch)
+            self.assertEqual(result['batch']['status'],'interrupted')
+            self.assertEqual(result['cases'][0]['status'],'pending')
+            self.assertEqual(result['cases'][0]['attempt'],2)
+            grant=recovery.approve(store,batch,saved['plan_sha256'],confirmed=True)
+            result=Coordinator(store).run(batch,resume_approval=grant['resume_approval_id'])
+            self.assertEqual(result['batch']['status'],'control_validated')
+            self.assertEqual(result['cases'][0]['attempt'],2)
+
     def test_explicit_confirmation_and_new_attempt_same_batch(self):
         with synthetic_source(2) as (folder,root):
             store,saved,batch=self.prepared(folder,root);cid=self.interrupted(store,batch)

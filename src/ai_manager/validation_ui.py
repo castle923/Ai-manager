@@ -247,6 +247,8 @@ class ValidationUI:
 
     def recover(self,data):
         object_fields(data,('plan_id','batch_id'))
+        with self.lock:
+            if self.worker and self.worker.is_alive():fail('coordinator_busy')
         store=self.store()
         if store.status(data['batch_id'])['batch']['plan_id']!=data['plan_id']:fail('batch_plan_mismatch')
         from .validation_recovery import recover

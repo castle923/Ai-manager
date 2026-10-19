@@ -14,6 +14,36 @@ RESUMABLE = {'interrupted', 'cancelled', 'run_failed', 'timed_out'}
 RETRY = {'interrupted', 'cancelled', 'run_failed', 'timed_out'}
 
 
+def process_stamp(pid):
+    """Read creation identity, distinguishing PID reuse and unobservable owners."""
+    if type(pid) is not int or pid<=0:fail('owner_identity_invalid')
+    if os.name!='nt':
+        try:
+            raw=Path('/proc/'+str(pid)+'/stat').read_text()
+            return dict(pid=pid,creation=raw.rsplit(')',1)[1].split()[19])
+        except FileNotFoundError:return None
+        except (OSError,IndexError):fail('owner_identity_unobservable')
+    import ctypes
+    from ctypes import wintypes
+    kernel=ctypes.WinDLL('kernel32',use_last_error=True)
+    kernel.OpenProcess.argtypes=[wintypes.DWORD,wintypes.BOOL,wintypes.DWORD];kernel.OpenProcess.restype=wintypes.HANDLE
+    kernel.CloseHandle.argtypes=[wintypes.HANDLE]
+    kernel.GetExitCodeProcess.argtypes=[wintypes.HANDLE,ctypes.POINTER(wintypes.DWORD)]
+    kernel.GetProcessTimes.argtypes=[wintypes.HANDLE]+[ctypes.POINTER(wintypes.FILETIME)]*4
+    handle=kernel.OpenProcess(0x1000,False,pid)
+    if not handle:
+        if ctypes.get_last_error() in (87,1168):return None
+        fail('owner_identity_unobservable')
+    try:
+        code=wintypes.DWORD()
+        if not kernel.GetExitCodeProcess(handle,ctypes.byref(code)):fail('owner_identity_unobservable')
+        if code.value!=259:return None
+        created=wintypes.FILETIME();exit_time=wintypes.FILETIME();kernel_time=wintypes.FILETIME();user=wintypes.FILETIME()
+        if not kernel.GetProcessTimes(handle,ctypes.byref(created),ctypes.byref(exit_time),ctypes.byref(kernel_time),ctypes.byref(user)):fail('owner_identity_unobservable')
+        return dict(pid=pid,creation=str((created.dwHighDateTime<<32)|created.dwLowDateTime))
+    finally:kernel.CloseHandle(handle)
+
+
 def spawn_marker(directory,log_name):
     nonce=uuid.uuid4().hex
     marker=Path(directory)/(log_name+'.job.json')
@@ -146,8 +176,13 @@ def ledger(store,batch):
 
 def recover_locked(store,batch):
     status=store.status(batch)
+    if status['batch']['status']=='pending':
+        consumed=[json.loads(e['body']) for e in status['events'] if e['kind'] in ('approval_consumed','resume_approval_consumed')]
+        if not consumed or not consumed[-1].get('owner'):fail('pending_owner_identity_missing')
+        previous=consumed[-1]['owner']
+        if process_stamp(previous['pid'])==previous:fail('pending_owner_still_alive')
     ownership(store,batch)
-    if status['batch']['status']=='running':
+    if status['batch']['status'] in ('pending','running'):
         with store.transaction() as db:
             now=store._clock(db)
             db.execute("UPDATE batches SET status='interrupted',consumed_ms=MAX(consumed_ms,?) WHERE id=?",(now-status['budget']['created_ms'],batch))
@@ -155,7 +190,7 @@ def recover_locked(store,batch):
             for case in status['cases']:
                 if case['status']=='running':store.event(db,batch,now,'case_interrupted',dict(case_id=case['id'],attempt=case['attempt'],reason='previous_owner_lost'))
             db.execute("UPDATE cases SET status='pending',reason=NULL WHERE batch_id=? AND status='queued'",(batch,))
-            store.event(db,batch,now,'recovered_interrupted',dict(ownership_observed=True))
+            store.event(db,batch,now,'recovered_interrupted',dict(ownership_observed=True,previous_status=status['batch']['status']))
     return store.status(batch)
 
 
@@ -215,7 +250,7 @@ def consume_locked(store,batch,grant):
                 if case['attempt']>=2: fail('attempt_budget_exceeded')
                 db.execute("UPDATE cases SET status='pending',reason=NULL,attempt=attempt+1 WHERE id=?",(case['id'],))
         db.execute("UPDATE batches SET status='pending',cancel=0 WHERE id=?",(batch,))
-        store.event(db,batch,now,'resume_approval_consumed',dict(approval_id=grant))
+        store.event(db,batch,now,'resume_approval_consumed',dict(approval_id=grant,owner=process_stamp(os.getpid())))
     return True
 
 

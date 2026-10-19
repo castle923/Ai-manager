@@ -269,7 +269,8 @@ class ValidationStore:
             db.execute('INSERT INTO batches(id,plan_id,approval_id,status,read_bytes) VALUES (?,?,?,?,?)',
                        (batch,plan_id,approval_id,'pending',db.execute('SELECT read_reserved FROM plans WHERE id=?',(plan_id,)).fetchone()[0]))
             for n,case in enumerate(record['plan']['cases']):db.execute('INSERT INTO cases(id,batch_id,position,status) VALUES (?,?,?,?)',(case['case_id'],batch,n,'pending'))
-            self.event(db,batch,now,'approval_consumed',dict(action=approval['action']))
+            from .validation_recovery import process_stamp
+            self.event(db,batch,now,'approval_consumed',dict(action=approval['action'],owner=process_stamp(__import__('os').getpid())))
         return dict(batch_id=batch,created=True)
 
     def event(self,db,batch,now,kind,body):
