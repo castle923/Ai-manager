@@ -4,13 +4,17 @@ import json
 import re
 
 from .inventory import Inventory
+from .candidate_recommendations import PURPOSES, annotate_and_rank, explain, policy
 
 
 def family(path):
-    value = path.casefold()
-    for token, label in (("tts", "음성 합성"), ("whisper", "음성 인식"), ("qwen-asr", "음성 인식"), ("qwen-image", "이미지 생성"), ("qwen_image", "이미지 생성"), ("stable-diffusion", "이미지 생성"), ("flux", "이미지 생성"), ("llama", "언어 모델"), ("qwen", "언어 모델"), ("bert", "언어 모델")):
-        if token in value:
-            return label
+    segments = [p.casefold() for p in re.split(r'[/\\]', path) if p]
+    # A nearer explicit family hint outranks a generic archive directory name.
+    for value in reversed(segments):
+        for token, label in (("whisper", "음성 인식"), ("qwen-asr", "음성 인식"), ("qwen-image", "이미지 생성"), ("qwen_image", "이미지 생성"), ("stable-diffusion", "이미지 생성"), ("flux", "이미지 생성"), ("bootstapir", "영상 추적"), ("tapir", "영상 추적"), ("tapnet", "영상 추적"), ("llama", "언어 모델"), ("tts", "음성 합성"), ("bert", "언어 모델")):
+            if re.search(r'(?<![a-z0-9])'+re.escape(token)+r'(?![a-z])', value):
+                return label
+    if any(re.search(r'(?<![a-z0-9])qwen[0-9]*(?![a-z])', value) for value in segments):return '언어 모델'
     return "미분류"
 
 
@@ -37,6 +41,9 @@ class Dashboard:
         self.inventory = Inventory(home, read_only=read_only)
 
     def snapshot(self, scan=None):
+        if self.inventory.read_only and not self.inventory.db.exists():
+            if scan:raise ValueError('unknown scan')
+            return {'scans':[], 'files':[], 'models':[]}
         with self.inventory.connect() as db:
             if scan:
                 rows = db.execute("SELECT * FROM scans WHERE scan_id=?", (scan,)).fetchall()
@@ -80,9 +87,10 @@ class Dashboard:
         def arg(name, default=""):
             return params.get(name, [default])[0]
         view, account, category, task = arg("view", "models"), arg("account"), arg("kind"), arg("family")
-        sort = arg("sort", "name")
+        sort = arg("sort", "recommendation")
+        purpose = arg("purpose")
         page, limit = int(arg("page", "1")), int(arg("limit", "24"))
-        if view not in {"models", "files"} or account not in {"", "A", "B"} or sort not in {"name", "size", "modified"} or not 1 <= page or not 1 <= limit <= 100 or len(arg("q")) > 300:
+        if view not in {"models", "files"} or account not in {"", "A", "B"} or sort not in {"recommendation", "name", "size", "modified"} or purpose not in {'', *(p['id'] for p in PURPOSES)} or not 1 <= page or not 1 <= limit <= 100 or len(arg("q")) > 300:
             raise ValueError("invalid query")
         data = self.snapshot(arg("scan") or None)
         rows = data[view]
@@ -90,7 +98,10 @@ class Dashboard:
         filtered = [r for r in rows if (not account or r["account"] == account) and (not task or r["family"] == task)
                     and (not category or (r.get("kind") == category if view == "files" else any(f["kind"] == category for f in r["files"])))
                     and (not q or q in r["path"].casefold() or q in r["family"].casefold())]
-        if sort == "size":
+        filtered, ranked, recommended = annotate_and_rank(filtered, purpose, view)
+        if sort == 'recommendation':
+            filtered = ranked
+        elif sort == "size":
             filtered.sort(key=lambda r: (r["size"] is None, -(r["size"] or 0), r["path"].casefold(), r["id"]))
         elif sort == "modified":
             filtered.sort(key=lambda r: (r.get("modified") or max((f["modified"] or "" for f in r.get("files", [])), default=""), r["id"]), reverse=True)
@@ -102,15 +113,17 @@ class Dashboard:
         for row in filtered[(page - 1) * limit:page * limit]:
             result_rows.append({k: v for k, v in row.items() if k != "files"})
         return {"rows": result_rows, "total": total, "page": page, "limit": limit, "scans": data["scans"],
+                "recommendation": dict(policy(purpose, view), recommended=recommended, related=sum(r['recommendation']['related'] for r in filtered)),
                 "summary": {"files": len(data["files"]), "groups": len(data["models"]), "weights": sum(f["kind"] == "weight_candidate" for f in data["files"]),
                             "known_bytes": sum(f["size"] or 0 for f in data["files"]), "unknown_sizes": sum(f["size"] is None for f in data["files"])},
                 "families": sorted(set(r["family"] for r in rows))}
 
-    def detail(self, identifier, scan=None):
+    def detail(self, identifier, scan=None, purpose=''):
         data = self.snapshot(scan)
         for row in data["models"] + data["files"]:
             if row["id"] == identifier:
                 from .preparation import supported
                 row["supports_preparation"] = supported(row)
+                row['recommendation'] = explain(row, purpose, 'models' if 'files' in row else 'files')
                 return row
         raise KeyError("not found")

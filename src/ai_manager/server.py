@@ -241,8 +241,8 @@ def create_application(home, settings, auth, port=0):
             if path in {"/api/dashboard", "/api/detail"}:
                 try:
                     query = parse_qs(urlsplit(self.path).query)
-                    dashboard = Dashboard(home)
-                    result = dashboard.query(query) if path == "/api/dashboard" else dashboard.detail(query["id"][0], query.get("scan", [None])[0])
+                    dashboard = Dashboard(home, read_only=True)
+                    result = dashboard.query(query) if path == "/api/dashboard" else dashboard.detail(query["id"][0], query.get("scan", [None])[0], query.get('purpose', [''])[0])
                     return self.reply(200, result)
                 except ValueError:
                     return self.reply(400, {"error": "invalid_request"})

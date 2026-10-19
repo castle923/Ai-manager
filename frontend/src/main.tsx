@@ -36,6 +36,7 @@ import { RegistryPanel, type CandidateRegistration } from "./RegistryPanel";
 import { HistoryPanel } from "./HistoryPanel";
 import { ValidationPanel } from "./ValidationPanel";
 import { SettingsPanel } from "./SettingsPanel";
+import { RecommendationNotes, RecommendationSummary, purposeOptions, type Recommendation, type RecommendationPolicy } from "./CandidateRecommendation";
 import {
   defaultPreferences,
   workspaceApi,
@@ -72,6 +73,7 @@ type Item = {
   };
   files?: Item[];
   supports_preparation?: boolean;
+  recommendation?: Recommendation;
 };
 type Data = {
   rows: Item[];
@@ -80,6 +82,7 @@ type Data = {
   limit: number;
   scans: Scan[];
   families: string[];
+  recommendation?: RecommendationPolicy;
   summary: {
     files: number;
     groups: number;
@@ -226,7 +229,8 @@ function App() {
     [account, setAccount] = useState(""),
     [kind, setKind] = useState(""),
     [family, setFamily] = useState(""),
-    [sort, setSort] = useState("name"),
+    [purpose, setPurpose] = useState(""),
+    [sort, setSort] = useState("recommendation"),
     [scan, setScan] = useState(() => {
       const p = appViewParams(),
         id = p.get("source_id");
@@ -400,6 +404,7 @@ function App() {
       account,
       kind,
       family,
+      purpose,
       sort,
       scan,
       page: String(page),
@@ -407,6 +412,7 @@ function App() {
     });
     api<Data>("/api/dashboard?" + params, { signal: controller.signal })
       .then((d) => {
+        if (d.recommendation?.purpose !== purpose) throw Error("선택한 작업과 추천 응답이 다릅니다. 다시 확인하세요.");
         if (id === request.current) {
           setData(d);
           setError("");
@@ -420,7 +426,7 @@ function App() {
         if (id === request.current) setLoading(false);
       });
     return () => controller.abort();
-  }, [view, search, account, kind, family, sort, scan, page, tick]);
+  }, [view, search, account, kind, family, purpose, sort, scan, page, tick]);
   useEffect(() => {
     function key(e: KeyboardEvent) {
       if (!dialog.current?.open && (e.ctrlKey || e.metaKey) && e.key === "k") {
@@ -445,16 +451,19 @@ function App() {
     };
   }, [detail, detailLoading]);
   async function open(item: Item) {
+    if (loading || item.recommendation?.purpose !== purpose) return;
     restore.current = document.activeElement as HTMLElement;
+    const listRequest = request.current;
     const id = ++detailRequest.current;
     setDetail(null);
     setDetailLoading(true);
     try {
       const result = await api<Item>(
         "/api/detail?" +
-          new URLSearchParams({ id: item.id, scan: item.scan_id }),
+          new URLSearchParams({ id: item.id, scan: item.scan_id, purpose }),
       );
-      if (id === detailRequest.current) setDetail(result);
+      if (result.recommendation?.purpose !== purpose) throw Error("상세 추천의 작업 목적이 다릅니다. 다시 확인하세요.");
+      if (id === detailRequest.current) setDetail({ ...result, recommendation: result.recommendation && { ...result.recommendation, rank: listRequest === request.current ? item.recommendation?.rank ?? null : null } });
     } catch (e) {
       if (id === detailRequest.current) setError((e as Error).message);
     } finally {
@@ -1065,6 +1074,13 @@ function App() {
                   </span>
                 </div>
                 <div className="search-row">
+                  <label className="purpose-select">
+                    <span>하고 싶은 작업</span>
+                    <select aria-label="하고 싶은 작업" value={purpose} onChange={e => { close(); setData(null); setLoading(true); setPurpose(e.target.value); setSort("recommendation"); setPage(1); }}>
+                      <option value="">작업 선택 · 전체 후보</option>
+                      {purposeOptions.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+                    </select>
+                  </label>
                   <div className="search-field">
                     <Search size={19} />
                     <input
@@ -1096,6 +1112,7 @@ function App() {
                         setPage(1);
                       }}
                     >
+                      <option value="recommendation">{view === "models" ? "추천 우선순" : "작업 관련성순"}</option>
                       <option value="name">이름순</option>
                       <option value="size">큰 용량순</option>
                       <option value="modified">최근 수정순</option>
@@ -1193,6 +1210,7 @@ function App() {
                       : "파일 내용은 내려받지 않았습니다."}
                   </span>
                 </div>
+                {!loading && <RecommendationSummary policy={data?.recommendation} files={view === "files"} />}
                 <div className="table-wrap" aria-busy={loading}>
                   <table>
                     <thead>
@@ -1203,6 +1221,7 @@ function App() {
                             : "파일 이름 / 저장 위치"}
                         </th>
                         <th scope="col">용도 추정</th>
+                        <th scope="col">검토 추천 · 근거</th>
                         <th scope="col">계정</th>
                         <th scope="col">
                           {view === "models" ? "구성 관찰" : "파일 종류"}
@@ -1215,7 +1234,7 @@ function App() {
                       </tr>
                     </thead>
                     <tbody>
-                      {data?.rows.map((item) => (
+                      {!loading && data?.rows.map((item) => (
                         <tr key={item.id}>
                           <td>
                             <button
@@ -1248,6 +1267,7 @@ function App() {
                             <span className="family-label">{item.family}</span>
                             <small className="cell-note">파일명 기준</small>
                           </td>
+                          <td className="recommendation-cell"><RecommendationNotes value={item.recommendation} compact /></td>
                           <td>
                             <span className="account-chip">{item.account}</span>
                           </td>
@@ -1456,6 +1476,8 @@ function App() {
                     상태를 판정하지 않습니다.
                   </p>
                 </div>
+                <h3>선택한 작업의 검토 추천 근거</h3>
+                <RecommendationNotes value={detail.recommendation} />
                 <div className="detail-prepare-link">
                   <HardDrive size={20} />
                   <div>
@@ -1476,7 +1498,7 @@ function App() {
                       setSection("preparation");
                     }}
                   >
-                    준비 화면
+                    TTS 두 모델 준비 화면
                   </button>
                 </div>
                 <h3>이 수집 기록의 메타데이터 확인 수준</h3>

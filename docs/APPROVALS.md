@@ -132,3 +132,7 @@ M6 fresh home에는 사용자가 이번 프로젝트에 지정한 OAuth client J
 
 
 최종 게시 checkpoint: 정확 7docs를 `55626cf2219dd85d8e0a14706a70ec53c8cd833f`에 반영한 뒤 승인된 [v0.15.0 Release](https://github.com/castle923/Ai-manager/releases/tag/v0.15.0)를 정상 Edge에서 게시했다. 사용자 직접 선택한 최종 ZIP/SHA256SUMS 두 파일만 첨부했고 확장 파일 URL 접근 권한을 변경하거나 자동 업로드를 우회하지 않았다. 태그는 실제 빌드 source `6c2cb6738c0208b7607385658804e85df7f58c5b`에 고정했다. 공식 API의 공개 상태·target·본문 정규화 내용·정확 asset size/digest와 신규 원격 실제 bytes SHA를 독립 대조했고 기존 세 Release/assets는 baseline과 일치했다. 이 후속 상태 문서는 제품코드·ZIP·태그 소스 변경이 아니다.
+
+## 작업별 파일 후보 추천 로컬 수정 승인 (2026-10-19)
+
+사용자는 작업 목적에 맞는 후보 추천 내림차순·선택 이유·기준 표시와 TTS만 보이는 원인 진단을 요청했다. 같은 프로젝트 코드·문서, 새 합성/API 검증, 정확 변경 검토 뒤 저장소 반영과 새 0.16.0 Windows 로컬 패키지·격리 설치·실제 추천 UI 검증을 수행한다. 기존 앱/home·인증·DB 변경, 자동 이관, 모델 다운로드·복사·추론, Drive 새 수집/쓰기·원격 비용·새 Release 게시로 확대하지 않는다. 필수 고정 공개 host 의존성의 격리 설치는 승인 범위다. 프로그램 버전과 기본 home을 분리하여 기존 desktop-0.15.0을 유지하되 다른 home 인증을 복원했다고 주장하지 않는다.

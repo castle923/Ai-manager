@@ -1,5 +1,9 @@
 # Ai-manager
 
+## 작업별 파일 후보 추천 · 0.16.0 로컬 수정 후보
+
+현재 수집된 파일 후보에서 작업 목적을 고르면 메타데이터 검토 우선순위와 이유·기준·미확인을 표시한다. 실측 성능·품질 순위나 실행 보장이 아니다. TTS 준비 화면의 제한과 범용 후보 탐색을 구분한다. [기능 계약](docs/CANDIDATE_RANKING_CONTRACT.md) · [로컬 설치·사용](docs/CANDIDATE_RANKING_INSTALL.md) · [이번 검증 상태](docs/CANDIDATE_RANKING_REPORT.md)를 따른다. 현재는 새 패키지·격리 native UI 검증 전 후보이며 기존 사용 앱·인증을 교체/이관한 것이 아니다. 아래 M15는 이전 출시 이력이다.
+
 ## M15: 부분 재개·중단 복구와 Windows 0.15.0 패키지
 
 같은 batch의 완료 receipt/input/output을 보존하고, 미완료 case만 새 명시 일회 승인으로 이어간다. 현재 작업 완료 후 일시중지와 즉시 취소를 구분하며 원래 만료 시각·누적 예산·시도 이력을 유지한다. source/runtime/code·완료 증거·원장 불일치나 소유 작업 불명은 재개를 차단한다. [설치·복구 사용법](docs/M15_INSTALL.md) · [계약](docs/M15_CONTRACT.md) · [이번 실제 검증과 제한](docs/M15_REPORT.md)을 따른다.

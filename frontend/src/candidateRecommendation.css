@@ -1,0 +1,16 @@
+.library .search-row { flex-wrap: wrap; align-items: flex-end; }
+.purpose-select { display: grid; gap: 6px; min-width: 205px; color: #46576f; font-size: 12px; }
+.purpose-select select { min-height: 42px; max-width: 100%; border: 1px solid #b6c5d8; border-radius: 8px; padding: 8px 10px; background: #fff; color: #213c63; font: inherit; font-size: 14px; }
+.recommendation-policy { padding: 16px 22px; background: #f1f6ff; border-block: 1px solid #d5e1f2; color: #344b69; font-size: 13px; line-height: 1.7; }
+.recommendation-policy p { margin: 4px 0 8px; }
+.recommendation-policy details { margin-top: 8px; }
+.recommendation-policy summary { cursor: pointer; color: #2457a6; font-weight: 600; }
+.recommendation-policy ul { padding-left: 20px; margin: 8px 0; }
+.recommendation-cell { min-width: 240px; max-width: 330px; }
+.recommendation-notes { font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+.recommendation-notes ul { padding-left: 18px; margin: 6px 0; }
+.recommendation-notes small { color: #607189; }
+.recommendation-rank { display: inline-block; color: #174f8d; background: #e5f0ff; border: 1px solid #b9d0ed; border-radius: 6px; padding: 3px 8px; }
+.recommendation-limits { color: #627087; }
+.recommendation-policy summary:focus-visible, .purpose-select select:focus-visible { outline: 3px solid #2563eb; outline-offset: 3px; }
+@media (max-width: 760px) { .purpose-select { width: 100%; } .recommendation-policy { padding: 14px 16px; } }

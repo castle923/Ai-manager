@@ -43,7 +43,7 @@ def kind(name):
     extension = Path(lower).suffix
     if extension in WEIGHTS:
         return "weight_candidate"
-    if extension in COMPONENTS or lower in {"config.json", "configuration.json", "generation_config.json", "preprocessor_config.json", "processor_config.json", "tokenizer.json", "tokenizer_config.json", "special_tokens_map.json", "added_tokens.json", "vocab.json", "config.yaml", "config.yml", "model.safetensors.index.json", "pytorch_model.bin.index.json", "tokenizer.txt", "vocab.txt", "merges.txt", "added_tokens.txt", "special_tokens.txt"}:
+    if extension in COMPONENTS or lower in {"config.json", "model_index.json", "configuration.json", "generation_config.json", "preprocessor_config.json", "processor_config.json", "tokenizer.json", "tokenizer_config.json", "special_tokens_map.json", "added_tokens.json", "vocab.json", "config.yaml", "config.yml", "model.safetensors.index.json", "pytorch_model.bin.index.json", "tokenizer.txt", "vocab.txt", "merges.txt", "added_tokens.txt", "special_tokens.txt"}:
         return "model_component_candidate"
     if lower in {"readme", "readme.md", "readme.txt", "license", "license.md", "license.txt", "notice", "notice.txt"}:
         return "distribution_document_candidate"
@@ -80,13 +80,13 @@ def _alive(pid):
 class Inventory:
     def __init__(self, home: Path, session=None, sleep=None, read_only=False):
         self.home = Path(home)
-        self.home.mkdir(parents=True, exist_ok=True)
         self.db = self.home / "inventory.sqlite3"
         self.session = session
         self.sleep = sleep
         self.read_only = read_only
         if read_only:
             return
+        self.home.mkdir(parents=True, exist_ok=True)
         with self.connect() as db, _LOCK:
             db.executescript(SCHEMA_SQL)
             for row in db.execute("SELECT scan_id,pid FROM scans WHERE status='running'").fetchall():
@@ -98,6 +98,7 @@ class Inventory:
     def connect(self):
         db = sqlite3.connect(self.db.as_uri()+'?mode=ro',uri=True,timeout=15) if self.read_only else sqlite3.connect(self.db, timeout=15)
         db.row_factory = sqlite3.Row
+        if self.read_only:db.execute('PRAGMA query_only=ON')
         db.execute("PRAGMA foreign_keys=ON")
         try:
             with db:

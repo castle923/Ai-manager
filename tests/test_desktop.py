@@ -6,7 +6,7 @@ import threading
 import unittest
 from unittest.mock import Mock, patch
 
-from ai_manager.desktop import DesktopBridge
+from ai_manager.desktop import DesktopBridge, resolve_desktop_home
 from ai_manager.desktop_files import save_output
 from ai_manager.desktop_install import install_to_new_directory
 from ai_manager.runtime_bootstrap import RuntimeBootstrap
@@ -14,6 +14,14 @@ from ai_manager.external_process import isolated_environment, spawn_external
 
 
 class DesktopTests(unittest.TestCase):
+    def test_program_update_keeps_existing_default_workspace_without_creating_it(self):
+        import os
+        with patch.dict(os.environ, {'LOCALAPPDATA':str(self.root)}):
+            self.assertEqual(resolve_desktop_home(),self.root/'AiManager'/'desktop-0.15.0')
+            self.assertFalse((self.root/'AiManager').exists())
+        explicit=self.root/'fresh-explicit-workspace'
+        self.assertEqual(resolve_desktop_home(str(explicit)),explicit)
+        self.assertFalse(explicit.exists())
     def model_bridge(self):
         bridge = DesktopBridge(self.home, self.root, self.root)
         bridge._guard_ready = True
@@ -202,7 +210,7 @@ class DesktopTests(unittest.TestCase):
         package = self.package()
         parent = self.root / 'new-user-install'
         parent.mkdir()
-        target = parent / 'AiManager-0.15.0'
+        target = parent / 'AiManager-0.16.0'
         target.mkdir()
         bridge = DesktopBridge(self.home, self.root, package)
         bridge._guard_ready = True
@@ -222,7 +230,7 @@ class DesktopTests(unittest.TestCase):
         package = self.root / 'portable'
         package.mkdir()
         (package / 'AiManager.exe').write_bytes(b'new synthetic executable placeholder')
-        manifest = {'version': '0.15.0', 'files': {'AiManager.exe': hashlib.sha256((package / 'AiManager.exe').read_bytes()).hexdigest()}}
+        manifest = {'version': '0.16.0', 'files': {'AiManager.exe': hashlib.sha256((package / 'AiManager.exe').read_bytes()).hexdigest()}}
         (package / 'DESKTOP-MANIFEST.json').write_text(json.dumps(manifest))
         return package
 
