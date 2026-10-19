@@ -1,5 +1,9 @@
 # Ai-manager
 
+## M13 후속: 실제 모델 검수 연결
+
+새 `run_models` 승인 action에서 명시 로컬 모델의 full-weight SHA·현재 환경/자원 gate·새 입력·고정 worker·독립 출력 검사·actual receipt를 연결한다. 같은 batch의 새 TTS→16kHz STT 변환 계보와 shared-home 단일 slot·Job active0 회수도 포함한다. [M13 계약](docs/M13_CONTRACT.md)과 [실행 보고](docs/M13_REPORT.md)를 따른다. workflow 처리 완료와 모든 프로필 실제 성공·품질 평가는 구분하며 미준비·자원 부족은 차단으로 남긴다. M14 UI·M15 부분 재개와 새 배포는 별도다. 아래 M12/M11은 당시 구현 기록이다.
+
 ## M12 후속: 실제 관찰과 영속 제어
 
 명시 local/읽기 전용 Drive metadata intake, 영속 계획·CLI 확인 승인·one-use 소비, 기존 same-home slot을 쓰는 bounded CPU 제어 조정기를 추가했다. [M12 보고서](docs/M12_REPORT.md)·[계약과 사용법](docs/M12_CONTRACT.md)을 따른다. 작은 config의 지원 후보와 전체 weight/revision 무결성·실모델 정상 작동을 구분하며, 실모델 adapter/새 입력·receipt는 M13, 새 검수 UI는 M14, 부분 재개 완성은 M15에 남는다. 기존 v0.10.0 설치본·Release를 바꾸지 않는 source-only 후속 구현이다.

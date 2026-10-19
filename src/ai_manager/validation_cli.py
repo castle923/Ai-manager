@@ -19,10 +19,12 @@ def main(argv=None):
     sub.add_parser('init')
     scan=sub.add_parser('scan-local');scan.add_argument('--root',required=True);scan.add_argument('--alias',default='local')
     scan.add_argument('--depth',type=int,default=8);scan.add_argument('--json-bytes',type=int,default=262144);scan.add_argument('--read-bytes',type=int,default=2097152)
+    scopes=sub.add_parser('scan-models');scopes.add_argument('--root',required=True,action='append',help='1–6 explicit current local model roots')
     drive=sub.add_parser('scan-drive');drive.add_argument('--account',choices=['A','B'],required=True);drive.add_argument('--root-id',required=True)
     drive.add_argument('--depth',type=int,default=2)
     plan=sub.add_parser('plan');plan.add_argument('--observation',required=True);plan.add_argument('--cpu-probe',action='store_true')
     plan.add_argument('--wall-seconds',type=int,default=300);plan.add_argument('--probe-seconds',type=int,default=1);plan.add_argument('--probe-timeout',type=int,default=10)
+    plan.add_argument('--model-spec',help='Explicit M13 runtime/shared-home JSON; grants run_models only in this new plan')
     approve=sub.add_parser('approve');approve.add_argument('--plan',required=True);approve.add_argument('--sha256',required=True)
     approve.add_argument('--confirm',action='store_true',help='Explicit current local OS-user confirmation; not Google OAuth')
     consume=sub.add_parser('dispatch');consume.add_argument('--plan',required=True);consume.add_argument('--approval',required=True)
@@ -36,8 +38,11 @@ def main(argv=None):
             return authenticated_provider(Path(args.auth_home),previous['account'],previous['root_id'],**previous['scope']).reobserve(previous)
         store=ValidationStore(Path(args.home),initialize=args.command=='init',reobserver=drive_reobserve)
         if args.command=='init':result=dict(status='initialized',store_id=store.store_id)
-        elif args.command in ('scan-local','scan-drive'):
+        elif args.command in ('scan-local','scan-drive','scan-models'):
             if args.command=='scan-local':observation=observe_local(args.root,alias=args.alias,depth_limit=args.depth,json_limit=args.json_bytes,read_limit=args.read_bytes)
+            elif args.command=='scan-models':
+                from .validation_models import observe_scopes
+                observation=observe_scopes(args.root)
             else:
                 if not args.auth_home:fail('live_drive_auth_home_required')
                 from .validation_drive import authenticated_provider
@@ -53,15 +58,21 @@ def main(argv=None):
             path=safe_path(store.home,'observations/'+args.observation+'.json')
             if path.stat().st_size>4194304:fail('observation_size_limit')
             observation=metadata_json(path.read_bytes(),maximum=4194304,node_limit=65536)
-            result=store.save_plan(build_plan(observation,action='run_cpu_probe' if args.cpu_probe else 'validate_control_plan',
-                wall_seconds=args.wall_seconds,probe_seconds=args.probe_seconds,timeout_seconds=args.probe_timeout))
+            spec=None
+            if args.model_spec:
+                if args.cpu_probe:fail('action_conflict')
+                from .validation_models import make_spec
+                specification=metadata_json(safe_path(Path(args.model_spec)).read_bytes(),maximum=65536)
+                spec=make_spec(observation,**specification)
+            result=store.save_plan(build_plan(observation,action='run_models' if spec else 'run_cpu_probe' if args.cpu_probe else 'validate_control_plan',
+                wall_seconds=args.wall_seconds,probe_seconds=args.probe_seconds,timeout_seconds=args.probe_timeout,model_spec=spec))
         elif args.command=='approve':result=store.approve(args.plan,args.sha256,confirmed=args.confirm)
         elif args.command=='dispatch':result=store.consume(args.plan,args.approval)
         elif args.command=='run':result=Coordinator(store).run(args.batch)
         elif args.command=='status':result=store.status(args.batch)
         else:
             store.cancel(args.batch);result=dict(status='cancel_requested')
-        result['model_test_performed']=False
+        result.setdefault('model_test_performed',False)
         print(json.dumps(result,ensure_ascii=True,allow_nan=False))
         return 0
     except ContractError as exc:

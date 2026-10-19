@@ -1,5 +1,9 @@
 # 마일스톤과 검증 기준
 
+## M13 후속 구현 기록
+
+고정 6프로필의 file/env/resource gate·새 입력·순차 worker/output/receipt 연결을 source-only CLI에 추가했다. 명시 로컬 여러 root의 새 batch와 TTS→STT 계보, 현재 runtime raw binding·전체 자산 SHA·소유 child 종료 확인을 [M13 계약](M13_CONTRACT.md)에 고정했다. 실제 실행 결과·차단·CPU 검증·환경 제한은 [M13 보고서](M13_REPORT.md)를 따른다. 6프로필 모두 실제 성공 또는 새 앱 UI/출시 완료를 뜻하지 않는다. M14 UI·M15 부분 재개·배포는 남는다. 이전 계획과 아래 M12 이력은 보존한다.
+
 ## M12 후속 구현 기록
 
 읽기 전용 local/live Drive intake·metadata 후보 판정·영속 plan/승인 소비·bounded CPU 제어 조정기를 구현했다. 실원본 관찰과 실제 CPU child의 순차·취소·timeout·owner 종료 검증을 [M12 보고서](M12_REPORT.md)에 기록한다. 실제 model worker/환경·full hash·새 시험·receipt는 M13, 새 UI는 M14, 부분 재개·새 배포는 M15다. 아래 설계 당시 표와 이전 완료/미검증 이력은 보존한다.

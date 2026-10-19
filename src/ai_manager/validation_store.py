@@ -21,15 +21,24 @@ def packed(value):return json.dumps(value,sort_keys=True,separators=(',',':'),en
 
 
 def control_code_sha():
-    try:return observation_sha({name:hashlib.sha256((Path(__file__).parent/name).read_bytes()).hexdigest() for name in CODE_FILES})
+    # Bind all shipped Python, lock and manifest bytes, including transitive worker helpers.
+    root=Path(__file__).parent
+    files=list(root.rglob('*.py'))+list(root.rglob('*.json'))+list(root.rglob('*.lock'))
+    files += [root.parents[1]/'requirements-runtime.lock']
+    try:return observation_sha({str(p.relative_to(root)) if p.is_relative_to(root) else 'requirements-runtime.lock':hashlib.sha256(p.read_bytes()).hexdigest() for p in files if p.is_file()})
     except OSError:fail('control_code_unavailable')
 
 
-def build_plan(observation,*,action='validate_control_plan',wall_seconds=300,probe_seconds=1,timeout_seconds=10):
-    choice(action,('validate_control_plan','run_cpu_probe'))
+def build_plan(observation,*,action='validate_control_plan',wall_seconds=300,probe_seconds=1,timeout_seconds=10,model_spec=None):
+    choice(action,('validate_control_plan','run_cpu_probe','run_models'))
+    if action=='run_models':
+        from .validation_models import check_spec
+        if model_spec is None:fail('model_spec_required')
+        check_spec(model_spec,observation)
+    elif model_spec is not None:fail('model_authority_forbidden')
     integer(wall_seconds,1,1800);integer(probe_seconds,0,30);integer(timeout_seconds,1,60)
     if timeout_seconds>wall_seconds:fail('timeout_exceeds_plan')
-    if observation.get('kind') not in ('local_readonly','drive_live_readonly') or not observation.get('complete'):fail('source_not_dispatchable')
+    if observation.get('kind') not in (('local_readonly','local_model_scopes') if action=='run_models' else ('local_readonly','drive_live_readonly')) or not observation.get('complete'):fail('source_not_dispatchable')
     if not observation.get('candidates') or len(observation['candidates'])>6:fail('candidate_count_invalid')
     profiles,cat=catalog();cases=[];tts=None
     for candidate in sorted(observation['candidates'],key=lambda x:(not (x.get('profile_id') or '').startswith('qwen3-tts-'),x['candidate_id'])):
@@ -39,14 +48,16 @@ def build_plan(observation,*,action='validate_control_plan',wall_seconds=300,pro
         if key=='whisper-large-v3-turbo' and tts:case['depends_on']=[tts]
         if key and key.startswith('qwen3-tts-') and tts is None:tts=case['case_id']
         cases.append(case)
-    return dict(schema_version=2,plan_id=uuid.uuid4().hex,action=action,
+    result=dict(schema_version=2,plan_id=uuid.uuid4().hex,action=action,
                 observation=observation,catalog_sha256=cat,code_sha256=control_code_sha(),
                 limits=dict(wall_seconds=wall_seconds,read_bytes=33554432,max_cases=6,
                             max_queued=3,max_active=1,metadata_network_bytes=33554432 if observation['kind']=='drive_live_readonly' else 0,
                             metadata_requests=1024 if observation['kind']=='drive_live_readonly' else 0,
-                            model_download_bytes=0,installations=0,model_runs=0),
+                            model_download_bytes=0,installations=0,model_runs=len(cases) if action=='run_models' else 0),
                 probe=dict(seconds=probe_seconds,timeout_seconds=timeout_seconds),cases=cases,
                 model_test_performed=False)
+    if model_spec is not None:result['model_spec']=model_spec
+    return result
 
 
 class ValidationStore:
@@ -123,18 +134,22 @@ class ValidationStore:
         return now
 
     def save_plan(self,plan):
-        object_fields(plan,('schema_version','plan_id','action','observation','catalog_sha256','code_sha256','limits','probe','cases','model_test_performed'))
+        fields=('schema_version','plan_id','action','observation','catalog_sha256','code_sha256','limits','probe','cases','model_test_performed')
+        object_fields(plan,fields+('model_spec',) if plan.get('action')=='run_models' else fields)
         if plan.get('schema_version')!=2 or plan.get('code_sha256')!=control_code_sha():fail('plan_code_stale')
-        identifier(plan['plan_id']);choice(plan['action'],('validate_control_plan','run_cpu_probe'))
+        identifier(plan['plan_id']);choice(plan['action'],('validate_control_plan','run_cpu_probe','run_models'))
+        if plan['action']=='run_models':
+            from .validation_models import check_spec
+            check_spec(plan['model_spec'],plan['observation'])
         limits=object_fields(plan['limits'],('wall_seconds','read_bytes','max_cases','max_queued','max_active','metadata_network_bytes','metadata_requests','model_download_bytes','installations','model_runs'))
         integer(limits['wall_seconds'],1,1800);integer(limits['read_bytes'],1,33554432)
-        for name,value in [('max_cases',6),('max_queued',3),('max_active',1),('model_download_bytes',0),('installations',0),('model_runs',0)]:integer(limits[name],value,value)
+        for name,value in [('max_cases',6),('max_queued',3),('max_active',1),('model_download_bytes',0),('installations',0),('model_runs',len(plan['cases']) if plan['action']=='run_models' else 0)]:integer(limits[name],value,value)
         integer(limits['metadata_network_bytes'],0,33554432);integer(limits['metadata_requests'],0,1024)
         probe=object_fields(plan['probe'],('seconds','timeout_seconds'))
         integer(probe['seconds'],0,30);integer(probe['timeout_seconds'],1,min(60,limits['wall_seconds']))
         if plan['model_test_performed'] is not False:fail('model_authority_forbidden')
         observation=plan['observation']
-        if observation.get('kind') not in ('local_readonly','drive_live_readonly') or observation.get('complete') is not True:fail('source_not_dispatchable')
+        if observation.get('kind') not in (('local_readonly','local_model_scopes') if plan['action']=='run_models' else ('local_readonly','drive_live_readonly')) or observation.get('complete') is not True:fail('source_not_dispatchable')
         candidates={x['candidate_id']:x for x in observation['candidates']}
         if type(plan['cases']) is not list or not 1<=len(plan['cases'])<=6:fail('case_count_invalid')
         seen={};used=set()
@@ -187,6 +202,9 @@ class ValidationStore:
     def check_current(self,record):
         plan=record['plan']
         if plan['code_sha256']!=control_code_sha() or plan['catalog_sha256']!=catalog()[1]:fail('plan_code_or_catalog_stale')
+        if plan['action']=='run_models':
+            from .validation_models import check_spec
+            check_spec(plan['model_spec'],plan['observation'])
         # Reserve a conservative whole read scope before I/O; failures never refund it.
         reserve=plan['observation']['scope']['read_limit']
         network=2097152 if plan['observation']['kind']=='drive_live_readonly' else 0
@@ -198,11 +216,14 @@ class ValidationStore:
             if row['read_reserved']+reserve>plan['limits']['read_bytes']:fail('read_budget_exceeded')
             if row['network_reserved']+network>plan['limits']['metadata_network_bytes'] or row['requests_reserved']+requests>plan['limits']['metadata_requests']:fail('metadata_network_budget_exceeded')
             db.execute('UPDATE plans SET read_reserved=read_reserved+?,network_reserved=network_reserved+?,requests_reserved=requests_reserved+? WHERE id=?',(reserve,network,requests,plan['plan_id']))
-            db.execute('UPDATE batches SET read_bytes=? WHERE plan_id=?',(row['read_reserved']+reserve,plan['plan_id']))
+            db.execute('UPDATE batches SET read_bytes=read_bytes+? WHERE plan_id=?',(reserve,plan['plan_id']))
         try:
             if plan['observation']['kind']=='drive_live_readonly':
                 if self.reobserver is None:fail('live_drive_reobserver_required')
                 return self.reobserver(plan['observation'])
+            if plan['observation']['kind']=='local_model_scopes':
+                from .validation_models import reobserve_scopes
+                return reobserve_scopes(plan['observation'])
             return reobserve(plan['observation'])
         except BaseException:
             with self.transaction() as db:db.execute('UPDATE plans SET invalid=1 WHERE id=?',(plan['plan_id'],))
@@ -251,7 +272,7 @@ class ValidationStore:
             events=[dict(r) for r in db.execute('SELECT * FROM events WHERE batch_id=? ORDER BY sequence',(batch,))]
             budget=db.execute('SELECT created_ms,expires_ms,read_reserved,network_reserved,requests_reserved FROM plans WHERE id=?',(row['plan_id'],)).fetchone()
         return dict(batch=dict(row),cases=cases,events=events,budget=dict(budget),
-                    budget_accounting='conservative_reserved_not_exact_transferred_bytes',model_test_performed=False)
+                    budget_accounting='conservative_reserved_not_exact_transferred_bytes',model_test_performed=bool(row['model_test']))
 
     def cancel(self,batch):
         identifier(batch)

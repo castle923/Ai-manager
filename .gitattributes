@@ -1,0 +1,2 @@
+# These officially vendored sources have pinned byte hashes in PROVENANCE.json.
+src/ai_manager/tapir_vendor/* -text

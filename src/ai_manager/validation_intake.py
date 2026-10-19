@@ -137,11 +137,13 @@ def identify(files,parsed,manifests):
 
 
 def observe_local(root,*,alias='local',clock=time.time,monotonic=time.monotonic,
-                  depth_limit=8,json_limit=262144,read_limit=2097152,_manifests=None):
+                  depth_limit=8,json_limit=262144,read_limit=2097152,_manifests=None,metadata_anchors_only=False):
     if type(alias) is not str or not alias or len(alias)>64:fail('scope_alias_invalid')
     integer(POLICY['max_entries'],1)
     integer(depth_limit,0,8);integer(json_limit,1,262144);integer(read_limit,1,2097152)
     scope=dict(depth_limit=depth_limit,json_limit=json_limit,read_limit=read_limit)
+    if type(metadata_anchors_only) is not bool:fail('metadata_policy_invalid')
+    if metadata_anchors_only:scope['metadata_anchors_only']=True
     start=monotonic();root,root_pins=safe_path(root,_with_identity=True)
     if not root.is_dir():fail('scope_directory_required')
     root_info=root.stat()
@@ -182,7 +184,7 @@ def observe_local(root,*,alias='local',clock=time.time,monotonic=time.monotonic,
                         queue.append((child,depth+1));continue
                     if not stat.S_ISREG(info.st_mode):fail('nonregular_source')
                     item=dict(path=child,bytes=info.st_size,signature=signature(info))
-                    if name in METADATA:
+                    if name in (('config.json','model_index.json') if metadata_anchors_only else METADATA):
                         if info.st_size>json_limit:fail('metadata_size_limit')
                         raw,sig=read_small(root,child,read_limit-read_bytes)
                         read_bytes+=len(raw);budget()

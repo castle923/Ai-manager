@@ -10,7 +10,7 @@ from .validation_intake import safe_path
 from .inference import FileOwner,OwnedChild,regular
 from . import execution_slot
 
-TERMINAL={'control_validated','probe_succeeded','deferred','cancelled','timed_out','interrupted','run_failed'}
+TERMINAL={'control_validated','probe_succeeded','deferred','cancelled','timed_out','interrupted','run_failed','succeeded','models_completed'}
 
 
 class Coordinator:
@@ -61,7 +61,7 @@ class Coordinator:
                 now=self.store._clock(db)
                 db.execute("UPDATE batches SET status='running' WHERE id=? AND status='pending'",(batch,))
                 self.store.event(db,batch,now,'coordinator_started',dict(pid=os.getpid(),model_test_performed=False))
-            cases=record['plan']['cases'];byid={x['case_id']:x for x in cases}
+            cases=record['plan']['cases'];byid={x['case_id']:x for x in cases};receipts={}
             while True:
                 self._check(batch,record,start)
                 rows=self.store.status(batch)['cases']
@@ -71,16 +71,40 @@ class Coordinator:
                 if not queued:break
                 row=queued[0];active=row['id'];case=byid[active]
                 statuses={r['id']:r['status'] for r in self.store.status(batch)['cases']}
-                if any(statuses[d] not in ('probe_succeeded','control_validated') for d in case['depends_on']):
+                if any(statuses[d] not in ('probe_succeeded','control_validated','succeeded') for d in case['depends_on']):
                     self._case(batch,active,'deferred','dependency_blocked');active=None;continue
-                if case['identity']!='supported_metadata':
+                if case['identity']!='supported_metadata' and not (record['plan']['action']=='run_models' and case['identity']=='manifest_hash_required' and case['profile_id']=='tapir'):
                     self._case(batch,active,'deferred','identity_not_supported');active=None;continue
                 self.store.check_current(record);self._check(batch,record,start)
                 if record['plan']['action']=='validate_control_plan':
                     self._case(batch,active,'deferred','model_executor_not_implemented');active=None;continue
-                slot=execution_slot.acquire(self.store.home,lambda:self._check(batch,record,start),self.closed)
+                model_action=record['plan']['action']=='run_models'
+                shared_home=Path(record['plan']['model_spec']['shared_home']) if model_action else self.store.home
+                slot=execution_slot.acquire(shared_home,lambda:self._check(batch,record,start),self.closed)
                 # Reobserve after waiting for the shared app-home GPU slot and immediately before dispatch.
                 self.store.check_current(record);self._check(batch,record,start)
+                if model_action:
+                    from .validation_models import execute
+                    from .validation_contracts import ContractError
+                    import uuid
+                    directory=self.store.home/'model-runs'/batch/uuid.uuid4().hex
+                    directory.mkdir(parents=True);safe_path(directory)
+                    self._case(batch,active,'running',run_id=directory.name,model_test_performed=False)
+                    try:
+                        receipt=execute(self.store,batch,case,record['plan'],directory,
+                            lambda:self._check(batch,record,start),self.closed,
+                            receipts.get(case['depends_on'][0]) if case['depends_on'] else None)
+                    except (ContractError,ValueError,OSError) as exc:
+                        reason=str(exc) if isinstance(exc,ContractError) else 'model_bridge_failed'
+                        if reason in ('cancelled','timed_out','child_cleanup_unverified'):raise
+                        events=self.store.status(batch)['events']
+                        attempted=any(e['kind']=='model_worker_dispatch' and json.loads(e['body']).get('case_id')==active for e in events)
+                        self._case(batch,active,'run_failed' if attempted else 'deferred',reason,model_test_performed=attempted)
+                    else:
+                        receipts[active]=receipt
+                        with self.store.transaction() as db:db.execute('UPDATE batches SET model_test=1 WHERE id=?',(batch,))
+                        self._case(batch,active,'succeeded',receipt_sha256=__import__('ai_manager.inference',fromlist=['digest']).digest(directory/'receipt.json'),run_id=directory.name,model_test_performed=True)
+                    slot.close();slot=None;active=None;continue
                 nonce=active
                 script=Path(__file__).with_name('validation_probe.py')
                 process=subprocess.Popen([getattr(os.sys,'_base_executable',os.sys.executable),'-I','-B',str(script),nonce,
@@ -104,8 +128,9 @@ class Coordinator:
                 child.close();child=None;process.stdout.close();process=None;slot.close();slot=None;active=None
             with self.store.transaction() as db:
                 now=self.store._clock(db)
-                db.execute("UPDATE batches SET status='control_validated' WHERE id=?",(batch,))
-                self.store.event(db,batch,now,'coordinator_finished',dict(model_test_performed=False))
+                final='models_completed' if record['plan']['action']=='run_models' else 'control_validated'
+                db.execute('UPDATE batches SET status=? WHERE id=?',(final,batch))
+                self.store.event(db,batch,now,'coordinator_finished',dict(model_test_performed=bool(receipts)))
         except BaseException as exc:
             from .validation_contracts import ContractError
             reason='cancelled' if isinstance(exc,KeyboardInterrupt) else str(exc) if isinstance(exc,ContractError) else 'coordinator_internal_error'
