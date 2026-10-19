@@ -1,8 +1,8 @@
 # 보유 모델 자동 검수 프로그램 — M11 이후 설계
 
-## M15 배포 후보 구현 checkpoint
+## M15 실제 검증 checkpoint
 
-같은 batch의 완료 case 보존·명시 일회 재개 승인·누적 예산·소유 named Job 관찰·현재 작업 완료 뒤 일시중지를 구현하는 배포 후보 단계다. [M15 계약](M15_CONTRACT.md)·[현재 검증과 남은 gate](M15_REPORT.md)를 따른다. 새 Windows 0.15.0 package의 실제 설치·GPU·중단 복구·Release는 이번 실행 증거와 독립 GO 전 완료로 판정하지 않는다. 아래 M14/M13과 설계 당시 기록은 역사로 보존한다.
+같은 batch의 완료 case 보존·명시 일회 재개 승인·누적 예산·소유 named Job 관찰·현재 작업 완료 뒤 일시중지를 구현했다. [M15 계약](M15_CONTRACT.md)·[이번 실제 검증과 제한](M15_REPORT.md)을 따른다. 후보 2의 Windows 0.15.0 package 결속·새 격리 설치/독립 창·두 지정 TTS checkpoint/정상 재시작/native 명시 재개·별도 CPU 소유 owner 중단과 attempt2·선정 원본 보존을 이번 실행과 독립 readback으로 확인했다. 실제 GPU crash·fresh OAuth·다른 환경/모델은 미검증이며 Release/tag/첨부 원격 게시 gate는 별도다. 아래 M14/M13과 설계 당시 기록은 역사로 보존한다.
 
 ## M14 검수 UI checkpoint
 

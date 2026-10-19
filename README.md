@@ -1,5 +1,13 @@
 # Ai-manager
 
+## M15: 부분 재개·중단 복구와 Windows 0.15.0 패키지
+
+같은 batch의 완료 receipt/input/output을 보존하고, 미완료 case만 새 명시 일회 승인으로 이어간다. 현재 작업 완료 후 일시중지와 즉시 취소를 구분하며 원래 만료 시각·누적 예산·시도 이력을 유지한다. source/runtime/code·완료 증거·원장 불일치나 소유 작업 불명은 재개를 차단한다. [설치·복구 사용법](docs/M15_INSTALL.md) · [계약](docs/M15_CONTRACT.md) · [이번 실제 검증과 제한](docs/M15_REPORT.md)을 따른다.
+
+빌드 source는 `6c2cb6738c0208b7607385658804e85df7f58c5b`다. `AiManager-0.15.0-windows.zip`은 **113,164,275 bytes**, SHA-256 `5f6bf3e656ac18730f5d535baa11b3abb80b1bcf6a1724c3e17563606e2b3363`다. 새 격리 설치·독립 EXE/WebView2 창·frozen/source 결속과 8,310개 payload 전량 SHA, 지정 두 TTS의 같은 batch 일시중지→정상 재시작→native 명시 재개, 별도 CPU 전용 owner 중단→새 attempt2와 선정 원본 보존을 이번 실행·독립 검토로 확인했다. 최종 tag/Release/첨부의 원격 게시 gate는 아직 완료로 기록하지 않는다.
+
+앱 호스트 Python은 동봉하지만 WebView2 Runtime·모델별 기존 runtime과 모델 자산은 별도다. fresh OAuth·별도 PC·모든 모델·실제 GPU crash·전면 접근성·음성 품질 우열은 미검증이며 EXE는 서명되지 않았다. 기존 설치를 덮어쓰거나 인증·DB·output을 새 home으로 복사하지 않는다. 아래 M14 이전 설명은 각 단계 당시의 checkpoint·Release 이력이다.
+
 ## M14 후속: Windows 앱의 자동 검수 UI
 
 자동 검수 탭에서 명시 원본의 관찰 → 기존 runtime 지정 → 새 계획/diff·명시 승인 → 순차 진행/취소 → 파일·환경·실제 시도·출력 계약·품질 미평가·이력/새 계획을 연결한다. [M14 계약](docs/M14_CONTRACT.md)·[Windows 실제 검증과 한계](docs/M14_REPORT.md)를 따른다. 현재 source의 독립 WebView2 창에서 지정 0.6B의 새 실제 실행과 새 계획의 승인/실행 분리를 확인했다. 기존 설치본/v0.10.0 Release의 업데이트가 아니며 fresh Drive OAuth 실검증, M15 부분 재개·새 패키지/Release는 남는다. 아래 M13/M12는 당시 checkpoint 기록이다.

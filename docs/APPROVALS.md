@@ -127,3 +127,5 @@ M6 fresh home에는 사용자가 이번 프로젝트에 지정한 OAuth client J
 사용자는 계획된 부분 재개·중단 복구와 새 Windows 배포 패키지 구현, 설치·실행·복구 실제 검증, 독립 검토와 결과의 저장소/GitHub Release 반영을 요청했다. 같은 프로젝트 코드·문서와 지정 모델/config·공식 공개 의존성을 사용할 수 있다. 새 고유 source/home/input/output을 사용하고 기존 기능·자료·인증·DB·보안과 기존 Release/assets를 보존한다. 완료한 case를 보존하는 명시 재개와 현재 작업 완료 뒤 다음 case 전 일시중지는 이 범위다.
 
 실행 중인 다른 앱/작업을 종료하거나 모델 다운로드·원격 비용·Drive 쓰기·OS 전역 보안 변경으로 확대하지 않는다. OAuth 로그인·동의는 사용자 직접행위다. 새 TTS 두 지정 모델의 같은 batch checkpoint/restart/미시작 case 재개와 별도 새 CPU 전용 owner 종료 반례는 소유·정확 범위를 고정한 독립/부모 GO 이후 수행한다. 현재 문서는 승인·진행 기록이며 실제 검증/게시 완료를 뜻하지 않는다.
+
+후속 checkpoint: 각 source/package/fresh 설치·실행과 실제 두 TTS checkpoint 재개, 별도 CPU 전용 owner 중단은 정확 manifest의 독립/부모 GO 뒤 이번 새 home·입력·출력으로 수행했고 [M15 보고서](M15_REPORT.md)에 완료 범위와 실패/수리 이력·제한을 구분했다. 실제 두 TTS는 시작1·일시중지1·정상 닫기/재시작·native 새 승인 소비1로 끝냈고 완료 증거를 재사용해 새로운 모델 성공으로 승격하지 않았다. CPU는 새 owner image/creation/script/home/child/Job을 확인한 정확 handle 외부 종료1회로 한정했고 모델/GPU/기존 설치앱·외부 프로세스 종료0이다. 선정 원본11파일·3DB snapshot·25모델 metadata와 설치payload8,310파일 사후 불일치0을 독립 대조했다. 제품코드·ZIP은 고정하고 최종 docs-only 게시와 source 고정 tag/새 Release/첨부·원격 readback은 별도 공개 gate를 따른다.
