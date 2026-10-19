@@ -105,7 +105,7 @@ def make_spec(observation, runtimes, shared_home, *, timeout_seconds=600, hash_s
     # Artifact verification is intentionally performed at dispatch under the shared slot.
     # No initial hash proof is claimed by merely creating or approving a plan.
     return dict(version=1,runtimes=values,shared_home=str(Path(shared_home)),timeout_seconds=timeout_seconds,
-                hash_seconds=hash_seconds,fixture_recipe='m13-fresh-v1',hash_bytes=sum(manifest_table()[2][c['profile_id']]['files'][i]['size']
+                hash_seconds=hash_seconds,fixture_recipe='m13-fresh-v1',hash_bytes=2*sum(manifest_table()[2][c['profile_id']]['files'][i]['size']
                     for c in candidates.values() if c['profile_id'] in manifest_table()[2]
                     for i in range(len(manifest_table()[2][c['profile_id']]['files']))))
 
@@ -148,10 +148,13 @@ def _owned(command,directory,check,closed,timeout,*,log_name,resource_gib=None):
     env.update(HF_HUB_OFFLINE='1',TRANSFORMERS_OFFLINE='1',HF_DATASETS_OFFLINE='1',HF_HUB_DISABLE_TELEMETRY='1',DO_NOT_TRACK='1',
                TOKENIZERS_PARALLELISM='false',HF_HOME=str(directory/'model-cache'),HF_MODULES_CACHE=str(directory/'modules-cache'))
     with (directory/log_name).open('xb') as log:
+        from .validation_recovery import spawn_marker,mark_job
+        marker,job=spawn_marker(directory,log_name)
         try:
             check();process=spawn_external(command,stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,cwd=directory,env=env,
                 creationflags=(subprocess.CREATE_NO_WINDOW|0x4) if os.name=='nt' else 0)
-            child=OwnedChild(process)
+            child=OwnedChild(process,job_name=job['name'])
+            mark_job(marker,job,'owned')
             sampled=0
             while process.poll() is None:
                 check()
@@ -168,6 +171,7 @@ def _owned(command,directory,check,closed,timeout,*,log_name,resource_gib=None):
             if child:
                 try:
                     drain_child(child)
+                    mark_job(marker,job,'drained')
                     atomic_text(directory/(log_name+'.ownership.json'),json.dumps(dict(pid=process.pid,exit_code=process.returncode,job_active_processes=0,owned_cleanup_verified=True)))
                 finally:child.close()
             if process is not None and process.poll() is None:process.kill();process.wait(timeout=5)
@@ -309,6 +313,7 @@ def execute(store,batch,case,plan,directory,check,closed,dependency=None):
     if digest(directory/('input.wav' if profile=='whisper-large-v3-turbo' else 'input.mp4' if profile=='tapir' else 'input.txt'))!=info['sha256']:fail('input_changed')
     outputs=validate_outputs(profile,directory,request,result,code);check()
     proof.update(model_test_performed=True,outputs=outputs,status='succeeded',directory=str(directory),metrics=result['metrics'],
+        request_sha256=digest(directory/'request.json'),result_sha256=digest(directory/'result.json'),
         ownership=metadata_json((directory/'worker.log.ownership.json').read_bytes()))
     atomic_text(directory/'receipt.json',json.dumps(proof,ensure_ascii=False,allow_nan=False))
     return proof

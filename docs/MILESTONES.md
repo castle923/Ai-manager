@@ -1,5 +1,9 @@
 # 마일스톤과 검증 기준
 
+## M15 배포 후보 구현 기록
+
+durable 부분 재개·중단 복구·새 Windows 배포 패키지 구현과 실제 검증·저장소/Release 반영이 승인됐다. [M15 계약](M15_CONTRACT.md)·[보고서](M15_REPORT.md)에 명시 재개 승인·시도/예산 보존·완료 증거 재검증·소유 작업 확인과 실제 미완료 gate를 구분한다. 현재 구현·합성 검증 단계이며 새 설치·실제 GPU/복구·Release 완료 주장은 최종 실검증 이후에만 한다. 이전 Release/assets와 각 단계의 당시 성과·제한은 보존한다.
+
 ## M14 후속 구현 기록
 
 자동 검수 UI의 명시 원본 관찰→기존 runtime JSON→새 plan/diff→명시 승인/일회 소비→순차 진행/취소→다축 결과/receipt·이력·새 계획을 기존 Windows UI에 연결했다. [M14 계약](M14_CONTRACT.md)·[실제 검증 보고](M14_REPORT.md)에 최종 source의 363 tests/356 PASS·7 SKIP, native 지정 0.6B 새 실행과 보존·미소비 재검수·미검증 범위를 기록한다. source-host 검증이며 기존 설치본/Release 갱신이나 모든 모델/품질 PASS가 아니다. M15 부분 재개·fresh package/Release는 별도다.

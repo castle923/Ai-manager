@@ -122,3 +122,8 @@ M6 fresh home에는 사용자가 이번 프로젝트에 지정한 OAuth client J
 이 단계의 local source UI/API·테스트·임시 source-host WebView2 실창·새 지정 0.6B 검수와 문서·비식별 저장소 반영이 범위다. 첫 native 후보의 실행 후 표현 충돌 2곳을 수정했고, 새 code/static binding·새 plan·새 승인·새 input/run의 최종 별도 0.6B 1회를 독립/부모 GO 후 수행했다. 실패한 모델 실행을 자동 재시도하거나 이전 승인을 재사용한 것이 아니다. 두 검증의 raw code SHA와 receipt는 별도로 보존한다.
 
 기존 기능/인증/DB/모델/runtime/보안/브라우저 정책을 보존한다. 모델 다운로드·runtime 설치·원격 GPU·비용·Drive 쓰기·삭제/정리·보안 설정 변경·새 모델로 확대하지 않는다. 새 OAuth 로그인/동의는 사용자 직접행위이며 이번 final home에서는 실 Drive 인증을 수행하지 않았다. M15의 부분 재개·새 Windows 패키지/Release와 기존 설치본 업그레이드는 이 source UI 완료에 포함하지 않는다. [M14 보고서](M14_REPORT.md)에 실제 완료 범위와 제한을 기록한다.
+# M15 최신 승인 기록 — 2026-10-19
+
+사용자는 계획된 부분 재개·중단 복구와 새 Windows 배포 패키지 구현, 설치·실행·복구 실제 검증, 독립 검토와 결과의 저장소/GitHub Release 반영을 요청했다. 같은 프로젝트 코드·문서와 지정 모델/config·공식 공개 의존성을 사용할 수 있다. 새 고유 source/home/input/output을 사용하고 기존 기능·자료·인증·DB·보안과 기존 Release/assets를 보존한다. 완료한 case를 보존하는 명시 재개와 현재 작업 완료 뒤 다음 case 전 일시중지는 이 범위다.
+
+실행 중인 다른 앱/작업을 종료하거나 모델 다운로드·원격 비용·Drive 쓰기·OS 전역 보안 변경으로 확대하지 않는다. OAuth 로그인·동의는 사용자 직접행위다. 새 TTS 두 지정 모델의 같은 batch checkpoint/restart/미시작 case 재개와 별도 새 CPU 전용 owner 종료 반례는 소유·정확 범위를 고정한 독립/부모 GO 이후 수행한다. 현재 문서는 승인·진행 기록이며 실제 검증/게시 완료를 뜻하지 않는다.

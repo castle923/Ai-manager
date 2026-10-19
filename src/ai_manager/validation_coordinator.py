@@ -31,41 +31,44 @@ class Coordinator:
     def _case(self,batch,case,status,reason=None,**body):
         with self.store.transaction() as db:
             now=self.store._clock(db)
-            old=db.execute('SELECT status FROM cases WHERE id=? AND batch_id=?',(case,batch)).fetchone()
+            old=db.execute('SELECT status,attempt FROM cases WHERE id=? AND batch_id=?',(case,batch)).fetchone()
             if old is None:fail('case_unknown')
             if old['status'] in TERMINAL:return
             db.execute('UPDATE cases SET status=?,reason=? WHERE id=? AND batch_id=?',(status,reason,case,batch))
-            self.store.event(db,batch,now,'case_'+status,dict(case_id=case,reason=reason,**body))
+            self.store.event(db,batch,now,'case_'+status,dict(case_id=case,attempt=old['attempt'],reason=reason,**body))
 
-    def run(self,batch):
+    def run(self,batch,*,resume_approval=None):
         identifier(batch);safe_path(self.store.home)
         initial=self.store.status(batch)
-        if initial['batch']['status'] in TERMINAL:return initial
+        if initial['batch']['status'] in TERMINAL and resume_approval is None:return initial
         owner=FileOwner(regular(self.store.home/'validation-coordinator.lock',self.store.home))
         if not owner.handle:return dict(status='coordinator_busy',model_test_performed=False)
-        start=time.monotonic();child=None;slot=None;process=None;active=None
+        start=time.monotonic();child=None;slot=None;process=None;active=None;claimed=False
         try:
+            from .validation_recovery import consume_locked,recover_locked,receipts,reserve_attempt
+            if resume_approval is not None:
+                if not consume_locked(self.store,batch,resume_approval):return self.store.status(batch)
             status=self.store.status(batch)
             if status['batch']['status'] in TERMINAL:return status
             record=self.store.plan(status['batch']['plan_id'])
             # A previous claimed/running attempt without its OS lock is interrupted, never auto-replayed.
             if status['batch']['status']=='running':
-                with self.store.transaction() as db:
-                    now=self.store._clock(db)
-                    db.execute("UPDATE batches SET status='interrupted' WHERE id=?",(batch,))
-                    db.execute("UPDATE cases SET status='interrupted',reason='previous_owner_lost' WHERE batch_id=? AND status IN ('pending','queued','running')",(batch,))
-                    self.store.event(db,batch,now,'recovered_interrupted',{})
-                return self.store.status(batch)
+                return recover_locked(self.store,batch)
             self._check(batch,record,start)
             with self.store.transaction() as db:
                 now=self.store._clock(db)
                 db.execute("UPDATE batches SET status='running' WHERE id=? AND status='pending'",(batch,))
                 self.store.event(db,batch,now,'coordinator_started',dict(pid=os.getpid(),model_test_performed=False))
-            cases=record['plan']['cases'];byid={x['case_id']:x for x in cases};receipts={}
+            claimed=True
+            cases=record['plan']['cases'];byid={x['case_id']:x for x in cases};completed=receipts(self.store,batch,record)
             while True:
                 self._check(batch,record,start)
                 rows=self.store.status(batch)['cases']
                 pending=[r for r in rows if r['status']=='pending'];queued=[r for r in rows if r['status']=='queued']
+                events=self.store.status(batch)['events']
+                pause=max((e['sequence'] for e in events if e['kind']=='pause_requested'),default=0)
+                resumed=max((e['sequence'] for e in events if e['kind']=='resume_approval_consumed'),default=0)
+                if (pending or queued) and pause>resumed:fail('checkpoint_paused')
                 for row in pending[:max(0,3-len(queued))]:
                     self._case(batch,row['id'],'queued');queued.append(row)
                 if not queued:break
@@ -89,30 +92,38 @@ class Coordinator:
                     import uuid
                     directory=self.store.home/'model-runs'/batch/uuid.uuid4().hex
                     directory.mkdir(parents=True);safe_path(directory)
+                    reserve_attempt(self.store,batch,active,directory.name,True)
                     self._case(batch,active,'running',run_id=directory.name,model_test_performed=False)
                     try:
                         receipt=execute(self.store,batch,case,record['plan'],directory,
                             lambda:self._check(batch,record,start),self.closed,
-                            receipts.get(case['depends_on'][0]) if case['depends_on'] else None)
+                            completed.get(case['depends_on'][0]) if case['depends_on'] else None)
                     except (ContractError,ValueError,OSError) as exc:
                         reason=str(exc) if isinstance(exc,ContractError) else 'model_bridge_failed'
                         if reason in ('cancelled','timed_out','child_cleanup_unverified'):raise
                         events=self.store.status(batch)['events']
-                        attempted=any(e['kind']=='model_worker_dispatch' and json.loads(e['body']).get('case_id')==active for e in events)
+                        attempted=any(e['kind']=='model_worker_dispatch' and json.loads(e['body']).get('case_id')==active and json.loads(e['body']).get('run_id')==directory.name for e in events)
                         self._case(batch,active,'run_failed' if attempted else 'deferred',reason,model_test_performed=attempted)
                     else:
-                        receipts[active]=receipt
+                        completed[active]=receipt
                         with self.store.transaction() as db:db.execute('UPDATE batches SET model_test=1 WHERE id=?',(batch,))
                         self._case(batch,active,'succeeded',receipt_sha256=__import__('ai_manager.inference',fromlist=['digest']).digest(directory/'receipt.json'),run_id=directory.name,model_test_performed=True)
                     slot.close();slot=None;active=None;continue
                 nonce=active
+                import uuid
+                directory=self.store.home/'model-runs'/batch/uuid.uuid4().hex
+                directory.mkdir(parents=True);safe_path(directory)
+                reserve_attempt(self.store,batch,active,directory.name,False)
+                from .validation_recovery import spawn_marker,mark_job
+                marker,job=spawn_marker(directory,'probe')
                 script=Path(__file__).with_name('validation_probe.py')
                 process=subprocess.Popen([getattr(os.sys,'_base_executable',os.sys.executable),'-I','-B',str(script),nonce,
                     str(record['plan']['probe']['seconds']),str(os.getpid())],stdout=subprocess.PIPE,stderr=subprocess.DEVNULL,
                     stdin=subprocess.DEVNULL,start_new_session=os.name!='nt',
                     creationflags=(subprocess.CREATE_NO_WINDOW|0x4) if os.name=='nt' else 0,
                     env={k:v for k,v in os.environ.items() if k.upper() in ('SYSTEMROOT','WINDIR','TEMP','TMP','LANG','LC_ALL')})
-                child=OwnedChild(process)
+                child=OwnedChild(process,job_name=job['name'])
+                mark_job(marker,job,'owned')
                 self._case(batch,active,'running',pid=process.pid,nonce=nonce,model_test_performed=False)
                 begun=time.monotonic()
                 while process.poll() is None:
@@ -124,17 +135,21 @@ class Coordinator:
                 try:events=[json.loads(line) for line in stdout.splitlines()]
                 except (ValueError,UnicodeError):fail('cpu_probe_failed')
                 if len(events)!=2 or [e.get('event') for e in events]!=['cpu_probe_started','cpu_probe_finished'] or any(e.get('nonce')!=nonce or e.get('pid')!=process.pid or e.get('model_test_performed') is not False for e in events):fail('cpu_probe_failed')
-                self._case(batch,active,'probe_succeeded',pid=process.pid,nonce=nonce,exit_code=process.returncode,model_test_performed=False)
+                from .validation_models import drain_child
+                if os.name=='nt':drain_child(child)
+                mark_job(marker,job,'drained')
+                self._case(batch,active,'probe_succeeded',pid=process.pid,nonce=nonce,exit_code=process.returncode,model_test_performed=False,owned_cleanup_verified=True)
                 child.close();child=None;process.stdout.close();process=None;slot.close();slot=None;active=None
             with self.store.transaction() as db:
                 now=self.store._clock(db)
                 final='models_completed' if record['plan']['action']=='run_models' else 'control_validated'
                 db.execute('UPDATE batches SET status=? WHERE id=?',(final,batch))
-                self.store.event(db,batch,now,'coordinator_finished',dict(model_test_performed=bool(receipts)))
+                self.store.event(db,batch,now,'coordinator_finished',dict(model_test_performed=bool(completed)))
         except BaseException as exc:
+            if not claimed:raise
             from .validation_contracts import ContractError
             reason='cancelled' if isinstance(exc,KeyboardInterrupt) else str(exc) if isinstance(exc,ContractError) else 'coordinator_internal_error'
-            status=reason if reason in ('cancelled','timed_out') else 'run_failed'
+            status='interrupted' if reason=='checkpoint_paused' else reason if reason in ('cancelled','timed_out') else 'run_failed'
             if process is not None and process.poll() is None:
                 if os.name!='nt':
                     import signal
@@ -142,13 +157,18 @@ class Coordinator:
                     except ProcessLookupError:pass
                 else:process.kill()
                 process.wait(timeout=5)
-            if child:child.close();child=None
+            if child:
+                if os.name=='nt':
+                    from .validation_models import drain_child
+                    drain_child(child)
+                mark_job(marker,job,'drained')
+                child.close();child=None
             if active:self._case(batch,active,status,reason,owned_child_waited=process is None or process.poll() is not None,
                                  exit_code=process.returncode if process else None)
             with self.store.transaction() as db:
                 now=self.store.now()
                 db.execute('UPDATE batches SET status=? WHERE id=?',(status,batch))
-                db.execute("UPDATE cases SET status=?,reason=? WHERE batch_id=? AND status IN ('pending','queued')",(status,reason,batch))
+                db.execute("UPDATE cases SET status='pending',reason=NULL WHERE batch_id=? AND status='queued'",(batch,))
                 self.store.event(db,batch,now,'coordinator_stopped',dict(reason=reason,model_test_performed=False))
         finally:
             if child:child.close()

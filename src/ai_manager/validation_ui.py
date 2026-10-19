@@ -139,6 +139,17 @@ class ValidationUI:
             result['status'] = status['batch']['status']
             result['cancel_requested'] = bool(status['batch']['cancel'])
             result['budget'] = status['budget']
+            result['budget']['consumed_ms']=status['batch']['consumed_ms']
+            result['budget']['full_read_reserved']=status['batch']['read_bytes']
+            with store.connection() as db:
+                result['attempts']=[dict(r) for r in db.execute('SELECT case_id,attempt,run_id,stamp_ms,model_reserved FROM case_attempts WHERE batch_id=? ORDER BY stamp_ms,case_id,attempt',(batch['id'],))]
+                resume=db.execute('SELECT id FROM resume_grants WHERE batch_id=? AND used=0 ORDER BY rowid DESC LIMIT 1',(batch['id'],)).fetchone()
+            result['resume_approval_id']=resume['id'] if resume else None
+            last_resume=max((e['sequence'] for e in status['events'] if e['kind']=='resume_approval_consumed'),default=0)
+            rejected=[json.loads(e['body']).get('reason') for e in status['events'] if e['kind']=='resume_rejected' and e['sequence']>last_resume]
+            result['resume_error']=rejected[-1] if rejected else None
+            from .validation_recovery import RESUMABLE,RETRY
+            result['resumable']=status['batch']['status'] in RESUMABLE and any(r['status']=='pending' or r['status'] in RETRY and r['attempt']<2 for r in status['cases'])
             result['model_test_performed'] = status['model_test_performed']
             latest={}
             dispatch=set()
@@ -157,7 +168,7 @@ class ValidationUI:
                 progress.append(dict(sequence=event['sequence'],stamp_ms=event['stamp_ms'],kind=event['kind'],
                     case_id=cid, reason=body.get('reason'), bytes=body.get('bytes')))
             byid={c['case_id']:c for c in plan['cases']}
-            result['cases']=[dict(byid[r['id']], status=r['status'], reason=r['reason'],
+            result['cases']=[dict(byid[r['id']], status=r['status'], reason=r['reason'],attempt=r['attempt'],
                 run_id=run_ids.get(r['id']),
                 receipt_sha256=latest.get(r['id'],{}).get('receipt_sha256'),
                 model_test_performed=r['id'] in dispatch,
@@ -223,6 +234,59 @@ class ValidationUI:
         object_fields(data, ('batch_id',))
         self.store().cancel(data['batch_id'])
         return dict(status='cancel_requested')
+
+    def pause(self,data):
+        object_fields(data,('batch_id',))
+        store=self.store()
+        with store.transaction() as db:
+            now=store._clock(db)
+            row=db.execute('SELECT status FROM batches WHERE id=?',(data['batch_id'],)).fetchone()
+            if row is None or row['status'] not in ('pending','running'):fail('batch_not_active')
+            store.event(db,data['batch_id'],now,'pause_requested',dict(boundary='after_current_case'))
+        return dict(status='pause_requested')
+
+    def recover(self,data):
+        object_fields(data,('plan_id','batch_id'))
+        store=self.store()
+        if store.status(data['batch_id'])['batch']['plan_id']!=data['plan_id']:fail('batch_plan_mismatch')
+        from .validation_recovery import recover
+        recover(store,data['batch_id'])
+        return self.detail(data['plan_id'])
+
+    def approve_resume(self,data):
+        object_fields(data,('plan_id','batch_id','plan_sha256','confirmed'))
+        store=self.store()
+        if store.status(data['batch_id'])['batch']['plan_id']!=data['plan_id']:fail('batch_plan_mismatch')
+        from .validation_recovery import approve
+        approve(store,data['batch_id'],data['plan_sha256'],confirmed=data['confirmed'])
+        return self.detail(data['plan_id'])
+
+    def resume(self,data):
+        object_fields(data,('plan_id','batch_id','resume_approval_id'))
+        with self.lock:
+            if self.closed:fail('application_closing')
+            if self.worker and self.worker.is_alive():fail('validation_operation_running')
+            store=self.store()
+            if store.status(data['batch_id'])['batch']['plan_id']!=data['plan_id']:fail('batch_plan_mismatch')
+            identifier(data['resume_approval_id'])
+            with store.connection() as db:grant=db.execute('SELECT batch_id,used FROM resume_grants WHERE id=?',(data['resume_approval_id'],)).fetchone()
+            if grant is None or grant['batch_id']!=data['batch_id']:fail('resume_approval_scope_mismatch')
+            if grant['used']:return self.detail(data['plan_id'])
+            # The coordinator consumes the grant while holding the same OS lock
+            # used for recovery and every dispatch; polling never starts work.
+            self.coordinator=Coordinator(store)
+            coordinator=self.coordinator
+            def run():
+                from .validation_contracts import ContractError
+                try:
+                    result=coordinator.run(data['batch_id'],resume_approval=data['resume_approval_id'])
+                    if result.get('status')=='coordinator_busy':fail('coordinator_busy')
+                except Exception as error:
+                    reason=str(error) if isinstance(error,ContractError) else 'resume_operation_failed'
+                    with store.transaction() as db:store.event(db,data['batch_id'],store._clock(db),'resume_rejected',dict(reason=reason))
+            self.worker=threading.Thread(target=run,daemon=False)
+            self.worker.start()
+        return self.detail(data['plan_id'])
 
     def supersede(self, data):
         object_fields(data, ('plan_id','plan_sha256'))

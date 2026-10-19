@@ -292,7 +292,7 @@ def create_application(home, settings, auth, port=0):
                     raise ValueError()
                 data = json.loads(self.rfile.read(length))
                 if self.path.startswith('/api/validation/'):
-                    methods={'observe':validation.observe,'plan':validation.create_plan,'approve':validation.approve,'start':validation.start,'cancel':validation.cancel,'supersede':validation.supersede}
+                    methods={'observe':validation.observe,'plan':validation.create_plan,'approve':validation.approve,'start':validation.start,'cancel':validation.cancel,'supersede':validation.supersede,'recover':validation.recover,'approve-resume':validation.approve_resume,'resume':validation.resume,'pause':validation.pause}
                     method=methods.get(self.path.rsplit('/',1)[1])
                     if not method: return self.reply(404,{'error':'not_found'})
                     try: return self.reply(200,method(data))

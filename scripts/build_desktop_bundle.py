@@ -34,6 +34,9 @@ def main():
     parser.add_argument('--image-python-archive', help='Explicit Astral CPython 3.11 archive cache for the isolated image adapter')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
+    source_commit=subprocess.check_output(['git','rev-parse','HEAD'],cwd=root,text=True).strip()
+    if subprocess.check_output(['git','status','--porcelain'],cwd=root,text=True).strip():
+        raise SystemExit('Commit the reviewed source before building; source tree must be clean.')
     output = Path(args.output)
     if not output.is_absolute() or '..' in output.parts or output.exists():
         raise SystemExit('Use a new absolute build directory.')
@@ -118,11 +121,11 @@ def main():
     application = output / 'dist/AiManager'
     guidance = application / 'docs'
     guidance.mkdir()
-    shutil.copyfile(root / 'docs/M10_INSTALL.md', guidance / 'M10_INSTALL.md')
+    shutil.copyfile(root / 'docs/M15_INSTALL.md', guidance / 'M15_INSTALL.md')
     for lock in ('requirements.lock', 'requirements-desktop.lock', 'requirements-runtime.lock'):
         shutil.copyfile(root / lock, application / lock)
     notices = application / 'THIRD-PARTY-NOTICES.txt'
-    notices.write_text('Ai-manager 0.10.0 Windows desktop\nCPython 3.10.22 python-build-standalone release 20261009\nSource: ' + PYTHON_URL +
+    notices.write_text('Ai-manager 0.15.0 Windows desktop\nCPython 3.10.22 python-build-standalone release 20261009\nSource: ' + PYTHON_URL +
                        '\nArchive SHA-256: ' + PYTHON_SHA256 + '\nCPython and bundled component licenses are preserved under _internal/python_runtime.\n'
                        'Python 3.10 is pinned for model compatibility; this is not a maintenance-support guarantee.\n'
                        'Host: PyInstaller 6.22.3, pywebview 6.2.1 (licenses preserved with package distribution metadata).\n'
@@ -138,13 +141,17 @@ def main():
                 path = Path(distribution.locate_file(item))
                 if path.is_file():
                     shutil.copyfile(path, license_dir / (name + '-' + item.name))
-    manifest = {'version': '0.10.0', 'python_runtime_archive_sha256': PYTHON_SHA256,
+    provenance=dict(version='0.15.0',source_commit=source_commit,source_files=source_hashes,
+        source_binding='PyInstaller uses package-data for imports and raw sources; frozen loader code is compared with compiled raw source before plan authority',
+        imports='ai_manager.desktop',host='PyInstaller onedir / Edge WebView2',private_data_included=False)
+    (application/'SOURCE-PROVENANCE.json').write_text(json.dumps(provenance,indent=2),encoding='utf8')
+    manifest = {'version': '0.15.0', 'source_commit':source_commit,'python_runtime_archive_sha256': PYTHON_SHA256,
                 'image_python_runtime_archive_sha256': IMAGE_PYTHON_SHA256,
                 'build_environment': {'python': sys.version.split()[0], 'packages': {name: importlib.metadata.version(name) for name in ('pyinstaller', 'pywebview', 'pythonnet', 'clr_loader', 'pyinstaller-hooks-contrib', 'setuptools', 'wheel')}},
                 'source_files': source_hashes,
                 'files': {p.relative_to(application).as_posix(): digest(p) for p in sorted(application.rglob('*')) if p.is_file()}}
     (application / 'DESKTOP-MANIFEST.json').write_text(json.dumps(manifest, indent=2), encoding='utf-8')
-    bundle = output / 'AiManager-0.10.0-windows.zip'
+    bundle = output / 'AiManager-0.15.0-windows.zip'
     with zipfile.ZipFile(bundle, 'x', zipfile.ZIP_DEFLATED) as target:
         for path in sorted(application.rglob('*')):
             if path.is_file():

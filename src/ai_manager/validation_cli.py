@@ -28,8 +28,10 @@ def main(argv=None):
     approve=sub.add_parser('approve');approve.add_argument('--plan',required=True);approve.add_argument('--sha256',required=True)
     approve.add_argument('--confirm',action='store_true',help='Explicit current local OS-user confirmation; not Google OAuth')
     consume=sub.add_parser('dispatch');consume.add_argument('--plan',required=True);consume.add_argument('--approval',required=True)
-    for name in ('run','status','cancel'):
+    for name in ('run','status','cancel','recover'):
         p=sub.add_parser(name);p.add_argument('--batch',required=True)
+    resume=sub.add_parser('approve-resume');resume.add_argument('--batch',required=True);resume.add_argument('--sha256',required=True);resume.add_argument('--confirm',action='store_true')
+    resume=sub.add_parser('resume');resume.add_argument('--batch',required=True);resume.add_argument('--approval',required=True)
     args=parser.parse_args(argv)
     try:
         def drive_reobserve(previous):
@@ -70,6 +72,13 @@ def main(argv=None):
         elif args.command=='dispatch':result=store.consume(args.plan,args.approval)
         elif args.command=='run':result=Coordinator(store).run(args.batch)
         elif args.command=='status':result=store.status(args.batch)
+        elif args.command=='recover':
+            from .validation_recovery import recover
+            result=recover(store,args.batch)
+        elif args.command=='approve-resume':
+            from .validation_recovery import approve
+            result=approve(store,args.batch,args.sha256,confirmed=args.confirm)
+        elif args.command=='resume':result=Coordinator(store).run(args.batch,resume_approval=args.approval)
         else:
             store.cancel(args.batch);result=dict(status='cancel_requested')
         result.setdefault('model_test_performed',False)

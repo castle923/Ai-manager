@@ -7,7 +7,7 @@ import sys
 import subprocess
 import uuid
 
-STAGES = frozenset(('home', 'configure_runtime', 'bridge', 'import_webview',
+STAGES = frozenset(('home', 'package_integrity', 'configure_runtime', 'bridge', 'import_webview',
     'start_application', 'start_setup', 'create_window', 'start_webview', 'close', 'complete'))
 MODULES = ('desktop', 'runtime_paths', 'runtime_reuse', 'runtime_bootstrap', 'server',
     'inference', 'task_inference', 'config', 'security', 'external_process')

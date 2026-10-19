@@ -109,7 +109,7 @@ class FileOwner:
 
 class OwnedChild:
     """Keep a Windows kill-on-close Job Object for this exact spawned worker."""
-    def __init__(self, process):
+    def __init__(self, process, *, job_name=None):
         self.process, self.job = process, None
         if os.name == 'nt':
             import ctypes
@@ -126,10 +126,11 @@ class OwnedChild:
                             ('JobMemoryLimit', ctypes.c_size_t), ('PeakProcessMemoryUsed', ctypes.c_size_t), ('PeakJobMemoryUsed', ctypes.c_size_t)]
             kernel = ctypes.WinDLL('kernel32', use_last_error=True)
             kernel.CreateJobObjectW.restype = wintypes.HANDLE
+            kernel.CreateJobObjectW.argtypes = [ctypes.c_void_p, wintypes.LPCWSTR]
             kernel.SetInformationJobObject.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD]
             kernel.AssignProcessToJobObject.argtypes = [wintypes.HANDLE, wintypes.HANDLE]
             kernel.CloseHandle.argtypes = [wintypes.HANDLE]
-            job = kernel.CreateJobObjectW(None, None)
+            job = kernel.CreateJobObjectW(None, job_name)
             info = EXTENDED(); info.BasicLimitInformation.LimitFlags = 0x2000
             if not job or not kernel.SetInformationJobObject(job, 9, ctypes.byref(info), ctypes.sizeof(info)) or not kernel.AssignProcessToJobObject(job, int(process._handle)):
                 if job: kernel.CloseHandle(job)

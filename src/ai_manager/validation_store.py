@@ -23,10 +23,18 @@ def packed(value):return json.dumps(value,sort_keys=True,separators=(',',':'),en
 def control_code_sha():
     # Bind all shipped Python, lock and manifest bytes, including transitive worker helpers.
     root=Path(__file__).parent
+    from .package_integrity import verify_frozen
+    provenance=verify_frozen()
+    if provenance is not None:
+        expected={k.removeprefix('src/ai_manager/') for k in provenance['source_files']}
+        actual={p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file() and (p.suffix in ('.py','.json','.lock') or 'static' in p.relative_to(root).parts or p.name=='LICENSE')}
+        if actual!=expected:fail('package_source_set_changed')
+    for required in ('validation_store.py','validation_recovery.py','validation_coordinator.py','validation_models.py','validation_profiles.py','static/index.html'):
+        if not (root/required).is_file():fail('control_code_unavailable')
     files=list(root.rglob('*.py'))+list(root.rglob('*.json'))+list(root.rglob('*.lock'))
     files += [root.parents[1]/'requirements-runtime.lock']
-    files += list((root/'static').rglob('*'))
-    files = [p for p in files if p.is_file()]
+    files += [p for p in (root/'static').rglob('*') if p.is_file()]
+    if not all(p.is_file() for p in files):fail('control_code_unavailable')
     try:return observation_sha({str(p.relative_to(root)) if p.is_relative_to(root) else 'requirements-runtime.lock':hashlib.sha256(p.read_bytes()).hexdigest() for p in files if p.is_file()})
     except OSError:fail('control_code_unavailable')
 
@@ -43,7 +51,7 @@ def build_plan(observation,*,action='validate_control_plan',wall_seconds=300,pro
     if observation.get('kind') not in (('local_readonly','local_model_scopes') if action=='run_models' else ('local_readonly','drive_live_readonly')) or not observation.get('complete'):fail('source_not_dispatchable')
     if not observation.get('candidates') or len(observation['candidates'])>6:fail('candidate_count_invalid')
     profiles,cat=catalog();cases=[];tts=None
-    for candidate in sorted(observation['candidates'],key=lambda x:(not (x.get('profile_id') or '').startswith('qwen3-tts-'),x['candidate_id'])):
+    for candidate in sorted(observation['candidates'],key=lambda x:(not (x.get('profile_id') or '').startswith('qwen3-tts-'),x.get('profile_id') or '',x['candidate_id'])):
         key=candidate['profile_id']
         case=dict(case_id=uuid.uuid4().hex,candidate_id=candidate['candidate_id'],profile_id=key,
                   identity=candidate['identity'],artifact=candidate['artifact'],depends_on=[])
@@ -55,7 +63,7 @@ def build_plan(observation,*,action='validate_control_plan',wall_seconds=300,pro
                 limits=dict(wall_seconds=wall_seconds,read_bytes=33554432,max_cases=6,
                             max_queued=3,max_active=1,metadata_network_bytes=33554432 if observation['kind']=='drive_live_readonly' else 0,
                             metadata_requests=1024 if observation['kind']=='drive_live_readonly' else 0,
-                            model_download_bytes=0,installations=0,model_runs=len(cases) if action=='run_models' else 0),
+                            model_download_bytes=0,installations=0,model_runs=2*len(cases) if action=='run_models' else 0),
                 probe=dict(seconds=probe_seconds,timeout_seconds=timeout_seconds),cases=cases,
                 model_test_performed=False)
     if model_spec is not None:result['model_spec']=model_spec
@@ -94,6 +102,8 @@ class ValidationStore:
                 if values.get('schema')!='2' or values.get('scope')!=observation_sha(str(self.home)):fail('store_scope_mismatch')
                 identifier(values['store_id']);self.store_id=values['store_id']
                 self._clock(db)
+                from .validation_recovery import initialize as initialize_recovery
+                initialize_recovery(db)
         except (sqlite3.Error,OSError,KeyError,ValueError) as exc:
             from .validation_contracts import ContractError
             if isinstance(exc,ContractError):raise
@@ -145,7 +155,7 @@ class ValidationStore:
             check_spec(plan['model_spec'],plan['observation'])
         limits=object_fields(plan['limits'],('wall_seconds','read_bytes','max_cases','max_queued','max_active','metadata_network_bytes','metadata_requests','model_download_bytes','installations','model_runs'))
         integer(limits['wall_seconds'],1,1800);integer(limits['read_bytes'],1,33554432)
-        for name,value in [('max_cases',6),('max_queued',3),('max_active',1),('model_download_bytes',0),('installations',0),('model_runs',len(plan['cases']) if plan['action']=='run_models' else 0)]:integer(limits[name],value,value)
+        for name,value in [('max_cases',6),('max_queued',3),('max_active',1),('model_download_bytes',0),('installations',0),('model_runs',2*len(plan['cases']) if plan['action']=='run_models' else 0)]:integer(limits[name],value,value)
         integer(limits['metadata_network_bytes'],0,33554432);integer(limits['metadata_requests'],0,1024)
         probe=object_fields(plan['probe'],('seconds','timeout_seconds'))
         integer(probe['seconds'],0,30);integer(probe['timeout_seconds'],1,min(60,limits['wall_seconds']))
