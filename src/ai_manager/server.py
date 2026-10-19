@@ -19,9 +19,10 @@ from datetime import datetime, timezone
 
 class LocalApplication:
     """An explicitly owned loopback server with deterministic host shutdown."""
-    def __init__(self, server, inference, cancel, tasks=None):
+    def __init__(self, server, inference, cancel, tasks=None, validation=None):
         self.server, self.inference, self.cancel, self.tasks = server, inference, cancel, tasks
         self.url = f"http://127.0.0.1:{server.server_port}/"
+        self.validation = validation
         self.thread = None
         self.closed = False
 
@@ -39,6 +40,7 @@ class LocalApplication:
         self.cancel.set()
         if self.thread is not None:
             self.server.shutdown()
+        if self.validation: self.validation.close()
         if self.tasks: self.tasks.close()
         self.inference.close()
         self.server.server_close()
@@ -62,6 +64,9 @@ def create_application(home, settings, auth, port=0):
     from .preferences import Preferences, PreferenceError
     history, preferences = History(home), Preferences(home)
     diagnostics = DownloadDiagnostics(home, enabled=os.environ.get("AI_MANAGER_DOWNLOAD_DIAGNOSTICS") == "1")
+    from .validation_ui import ValidationUI
+    from .validation_contracts import ContractError
+    validation = ValidationUI(home, settings, auth)
     csrf = secrets.token_urlsafe(32)
     job_lock = threading.Lock()
     task_state_lock = threading.RLock()
@@ -153,6 +158,13 @@ def create_application(home, settings, auth, port=0):
             if not self.allowed():
                 return self.reply(403, {"error": "forbidden"})
             path = urlsplit(self.path).path
+            if path == '/api/validation/scopes':
+                return self.reply(200,validation.scopes())
+            if path == '/api/validation' or re.fullmatch(r'/api/validation/[a-f0-9]{32}',path):
+                try:
+                    return self.reply(200, validation.history() if path == '/api/validation' else validation.detail(path.rsplit('/',1)[1]))
+                except (ContractError, OSError, ValueError):
+                    return self.reply(400, {'error':'validation_read_failed_preserved'})
             history_match=re.fullmatch(r'/api/history/(scan|preparation|run|comparison|runtime|runtime_check|task|model_run)/([a-f0-9]{32}|runtime(?:-[a-f0-9]{16})?)',path)
             if path=='/api/history' or history_match:
                 try:
@@ -270,7 +282,7 @@ def create_application(home, settings, auth, port=0):
                 return self.reply(415, {"error": "json_required"})
             try:
                 length = int(self.headers.get("Content-Length", "0"))
-                limit = 65536 if self.path == '/api/registry' or re.fullmatch(r'/api/registry/[a-f0-9]{32}(/runs)?',self.path) else 4096
+                limit = 65536 if self.path.startswith('/api/validation/') or self.path == '/api/registry' or re.fullmatch(r'/api/registry/[a-f0-9]{32}(/runs)?',self.path) else 4096
                 typed_limit=re.fullmatch(r'/api/registry/([a-f0-9]{32})/tasks',self.path)
                 if typed_limit:
                     try: input_type=registry.get(typed_limit[1])['task_type']
@@ -279,6 +291,13 @@ def create_application(home, settings, auth, port=0):
                 if not 0 < length <= limit:
                     raise ValueError()
                 data = json.loads(self.rfile.read(length))
+                if self.path.startswith('/api/validation/'):
+                    methods={'observe':validation.observe,'plan':validation.create_plan,'approve':validation.approve,'start':validation.start,'cancel':validation.cancel,'supersede':validation.supersede}
+                    method=methods.get(self.path.rsplit('/',1)[1])
+                    if not method: return self.reply(404,{'error':'not_found'})
+                    try: return self.reply(200,method(data))
+                    except ContractError as error: return self.reply(409,{'error':str(error)})
+                    except (OSError,ValueError,TypeError,KeyError): return self.reply(400,{'error':'validation_operation_failed_preserved'})
                 if self.path=='/api/preferences':
                     try:return self.reply(200,{'preferences':preferences.update(data)})
                     except PreferenceError as error:return self.reply(409 if str(error)in('preferences_stale','preferences_busy') else 400,{'error':str(error)})
@@ -376,7 +395,7 @@ def create_application(home, settings, auth, port=0):
         raise
     server.daemon_threads = True
     server.timeout = 1
-    return LocalApplication(server, inference, cancel, tasks)
+    return LocalApplication(server, inference, cancel, tasks, validation)
 
 
 def serve(home, settings, auth, browser=webbrowser.open, port=0):

@@ -1,5 +1,13 @@
 # Ai-manager
 
+## M14 후속: Windows 앱의 자동 검수 UI
+
+자동 검수 탭에서 명시 원본의 관찰 → 기존 runtime 지정 → 새 계획/diff·명시 승인 → 순차 진행/취소 → 파일·환경·실제 시도·출력 계약·품질 미평가·이력/새 계획을 연결한다. [M14 계약](docs/M14_CONTRACT.md)·[Windows 실제 검증과 한계](docs/M14_REPORT.md)를 따른다. 현재 source의 독립 WebView2 창에서 지정 0.6B의 새 실제 실행과 새 계획의 승인/실행 분리를 확인했다. 기존 설치본/v0.10.0 Release의 업데이트가 아니며 fresh Drive OAuth 실검증, M15 부분 재개·새 패키지/Release는 남는다. 아래 M13/M12는 당시 checkpoint 기록이다.
+
+이번 M14에는 실제 검증한 raw binding에 한정해 새 static 3개를 동결 포함한다. 후속 frontend 수정은 고정 npm 의존성으로 다시 빌드해야 하며, 아래의 생성 static 미포함 안내는 이전 개발 방식의 기록이다.
+
+M14 게시 후보는 기능/문서/이번 static 17개와, 실제 Windows 실행 raw binding을 원격에 맞추는 비기능 EOL-only companion 37개를 구분한다. CRLF→LF canonical bytes는 동일하며 비선택 blob·기존 Release를 보존한다. 자세한 raw 검증/게시 상태는 M14 보고서를 따른다.
+
 ## M13 후속: 실제 모델 검수 연결
 
 새 `run_models` 승인 action에서 명시 로컬 모델의 full-weight SHA·현재 환경/자원 gate·새 입력·고정 worker·독립 출력 검사·actual receipt를 연결한다. 같은 batch의 새 TTS→16kHz STT 변환 계보와 shared-home 단일 slot·Job active0 회수도 포함한다. [M13 계약](docs/M13_CONTRACT.md)과 [실행 보고](docs/M13_REPORT.md)를 따른다. workflow 처리 완료와 모든 프로필 실제 성공·품질 평가는 구분하며 미준비·자원 부족은 차단으로 남긴다. M14 UI·M15 부분 재개와 새 배포는 별도다. 아래 M12/M11은 당시 구현 기록이다.

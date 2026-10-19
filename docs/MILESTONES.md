@@ -1,5 +1,9 @@
 # 마일스톤과 검증 기준
 
+## M14 후속 구현 기록
+
+자동 검수 UI의 명시 원본 관찰→기존 runtime JSON→새 plan/diff→명시 승인/일회 소비→순차 진행/취소→다축 결과/receipt·이력·새 계획을 기존 Windows UI에 연결했다. [M14 계약](M14_CONTRACT.md)·[실제 검증 보고](M14_REPORT.md)에 최종 source의 363 tests/356 PASS·7 SKIP, native 지정 0.6B 새 실행과 보존·미소비 재검수·미검증 범위를 기록한다. source-host 검증이며 기존 설치본/Release 갱신이나 모든 모델/품질 PASS가 아니다. M15 부분 재개·fresh package/Release는 별도다.
+
 ## M13 후속 구현 기록
 
 고정 6프로필의 file/env/resource gate·새 입력·순차 worker/output/receipt 연결을 source-only CLI에 추가했다. 명시 로컬 여러 root의 새 batch와 TTS→STT 계보, 현재 runtime raw binding·전체 자산 SHA·소유 child 종료 확인을 [M13 계약](M13_CONTRACT.md)에 고정했다. 실제 실행 결과·차단·CPU 검증·환경 제한은 [M13 보고서](M13_REPORT.md)를 따른다. 6프로필 모두 실제 성공 또는 새 앱 UI/출시 완료를 뜻하지 않는다. M14 UI·M15 부분 재개·배포는 남는다. 이전 계획과 아래 M12 이력은 보존한다.

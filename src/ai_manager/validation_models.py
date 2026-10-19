@@ -254,6 +254,8 @@ def execute(store,batch,case,plan,directory,check,closed,dependency=None):
     spec=plan['model_spec'];profile=case['profile_id'];binding=spec['runtimes'].get(profile)
     if binding is None:fail('runtime_not_designated')
     environment=preflight(binding,profile,directory,check,closed)
+    with store.transaction() as db:
+        store.event(db,batch,store._clock(db),'model_environment_ready',dict(case_id=case['case_id'],ready=True,observation=environment['observation'],policy=environment['policy']))
     candidate=next(x for x in plan['observation']['candidates'] if x['candidate_id']==case['candidate_id'])
     source_observation=plan['observation']['observations'][candidate['source_index']] if plan['observation']['kind']=='local_model_scopes' else plan['observation']
     source=safe_path(Path(source_observation['root']),candidate['relative'] or '.')
@@ -271,6 +273,8 @@ def execute(store,batch,case,plan,directory,check,closed,dependency=None):
     def hash_progress(item):
         with store.transaction() as db:store.event(db,batch,store._clock(db),'weight_file_verified',dict(case_id=case['case_id'],path=item['path'],bytes=item['bytes'],sha256=item['sha256']))
     hashes=full_hash(source,manifest,hash_check,hash_progress)
+    with store.transaction() as db:
+        store.event(db,batch,store._clock(db),'model_artifact_verified',dict(case_id=case['case_id'],files=len(hashes),bytes=sum(x['bytes'] for x in hashes)))
     if profile=='tapir':
         _owned([binding['python'],'-I','-B',str(Path(__file__).with_name('validation_video_fixture.py')),str(directory/'input.mp4')],directory,check,closed,30,log_name='fixture.log')
     data,info,lineage=fresh_input(profile,batch,case['case_id'],directory,dependency)

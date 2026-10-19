@@ -34,6 +34,7 @@ import { ComparisonPanel } from "./ComparisonPanel";
 import { DesktopRuntime, TaskRuntime } from "./DesktopHost";
 import { RegistryPanel, type CandidateRegistration } from "./RegistryPanel";
 import { HistoryPanel } from "./HistoryPanel";
+import { ValidationPanel } from "./ValidationPanel";
 import { SettingsPanel } from "./SettingsPanel";
 import {
   defaultPreferences,
@@ -206,6 +207,7 @@ function App() {
       return value &&
         [
           "registry",
+          "validation",
           "history",
           "settings",
           "library",
@@ -251,6 +253,7 @@ function App() {
   const navigationUsed = useRef(
     [
       "registry",
+      "validation",
       "history",
       "settings",
       "library",
@@ -524,6 +527,7 @@ function App() {
         </a>
         <p className="nav-label">내 라이브러리</p>
         <nav aria-label="주 탐색">
+          <button className={section === "validation" ? "nav active" : "nav"} onClick={() => setSection("validation")}><ShieldCheck size={19} />자동 검수</button>
           <button
             className={section === "registry" ? "nav active" : "nav"}
             onClick={() => setSection("registry")}
@@ -602,7 +606,7 @@ function App() {
         <header className="topbar">
           <span>
             Ai-manager <span className="slash">/</span>{" "}
-            {section === "tasks"
+            {section === "validation" ? "보유 모델 자동 검수" : section === "tasks"
               ? "유형별 작업실"
               : section === "history"
                 ? "통합 작업 기록"
@@ -662,7 +666,7 @@ function App() {
             <div>
               <div className="eyebrow">YOUR MODELS, CLEARLY ORGANIZED</div>
               <h1>
-                {section === "tasks"
+                {section === "validation" ? "보유 모델 자동 검수" : section === "tasks"
                   ? "유형별 작업실"
                   : section === "history"
                     ? "통합 작업 기록"
@@ -681,7 +685,7 @@ function App() {
                                 : "계정 및 수집"}
               </h1>
               <p>
-                {section === "tasks"
+                {section === "validation" ? "보유 모델 자동 검수" : section === "tasks"
                   ? "유형별 작업실"
                   : section === "history"
                     ? "수집부터 준비·실행·비교까지, 저장된 원본 기록과 확인 근거를 따라가세요."
@@ -752,6 +756,8 @@ function App() {
               지정한 원본 ID를 확인합니다. 최신 기록으로 바꾸어 표시하지
               않습니다.
             </section>
+          ) : section === "validation" ? (
+            <ValidationPanel csrf={csrf.current} />
           ) : section === "history" ? (
             <HistoryPanel
               preferences={preferences}

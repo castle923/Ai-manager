@@ -25,6 +25,8 @@ def control_code_sha():
     root=Path(__file__).parent
     files=list(root.rglob('*.py'))+list(root.rglob('*.json'))+list(root.rglob('*.lock'))
     files += [root.parents[1]/'requirements-runtime.lock']
+    files += list((root/'static').rglob('*'))
+    files = [p for p in files if p.is_file()]
     try:return observation_sha({str(p.relative_to(root)) if p.is_relative_to(root) else 'requirements-runtime.lock':hashlib.sha256(p.read_bytes()).hexdigest() for p in files if p.is_file()})
     except OSError:fail('control_code_unavailable')
 

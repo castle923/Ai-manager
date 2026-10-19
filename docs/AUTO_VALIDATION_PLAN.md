@@ -1,5 +1,9 @@
 # 보유 모델 자동 검수 프로그램 — M11 이후 설계
 
+## M14 검수 UI checkpoint
+
+기존 React/WebView2 앱에 원본 관찰·서버 소유 계획/diff·명시 action/SHA 승인·일회 실행·진행/취소·다축 종합표·receipt 상세·최근 100개 이력·새 계획을 연결했다. [M14 계약](M14_CONTRACT.md)과 [현재 Windows 실검증·한계](M14_REPORT.md)를 따른다. 최종 native 원본/runtime 입력부터 새 0.6B 1회 실행·출력 계약·Job active0과 미소비 재검수 계획 분리를 확인했다. fresh Drive OAuth/실 scan과 M15의 부분 재개·새 배포는 남고 기존 Release를 변경하지 않는다.
+
 ## M13 실제 검수 연결 checkpoint
 
 [M13 계약](M13_CONTRACT.md)·[보고서](M13_REPORT.md)에 고정 프로필의 full SHA·현재 환경/자원 gate·새 입력·순차 고정 worker·output receipt와 실제 확인 범위를 기록한다. M12 제어 승인과 분리한 `run_models` action·명시 여러 로컬 root·동일 batch TTS→STT 계보를 추가한다. 실제 실행/차단을 구분하며 이미지 환경 부재·자원 제약은 우회하지 않는다. M14 새 검수 UI와 M15 부분 재개·배포는 별도다. 아래 M12 및 설계 당시 문구·공수는 역사로 보존한다.

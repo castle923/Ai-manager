@@ -113,3 +113,12 @@ M6 fresh home에는 사용자가 이번 프로젝트에 지정한 OAuth client J
 새 고유 stage/home/runtime/output을 사용한다. 기존 M6 서버·홈·인증·DB·배포물·WAV는 보존하며 토큰·state·인벤토리·출력 복사는 하지 않는다. 같은 프로젝트 코드와 지정 모델 가중치/config/tokenizer, 지정 OAuth client/allowlist 원본은 허용한다. 두 계정의 새 로그인·동의는 사용자 직접행위다. 모델·자격 증명은 배포물에 포함하지 않는다.
 
 앱 UI는 브라우저 탭이 아닌 독립 창이고 OAuth만 시스템 브라우저를 사용할 수 있다. 정상 native SaveDialog/host API, 명시적인 런타임 준비 상태·정상 TLS, localhost Host/Origin 보호·소유 작업자 종료를 유지한다. user-scope 설치, 버전/해시, no-overwrite/reparse 경계와 PATH/PYTHONHOME/PYTHONPATH 격리 실행을 검증한다. 전역 PATH·보안 정책·관리자 설정 변경, 새 모델·원격 GPU·Drive 쓰기·공개 서비스·서명 구매는 포함하지 않는다.
+
+
+## 2026-10-19 M14 자동 검수 UI 연결 승인
+
+사용자는 자동 검수의 계획·명시 승인·진행·결과·이력을 Windows 앱 UI에 연결하고 기존 기능·자료·보안을 보존하며 실제 동작을 검증하고 저장소에 반영할 것을 요청했다. 같은 Ai-manager의 M12/M13 코드·공식 manifest와 지정 모델/config·기존 public runtime을 사용할 수 있다. 새 작업/source·실행별 독립 home/input/output/receipt를 사용하며 기존 token·DB·과거 WAV/로그를 새 성공 근거로 복사하지 않는다.
+
+이 단계의 local source UI/API·테스트·임시 source-host WebView2 실창·새 지정 0.6B 검수와 문서·비식별 저장소 반영이 범위다. 첫 native 후보의 실행 후 표현 충돌 2곳을 수정했고, 새 code/static binding·새 plan·새 승인·새 input/run의 최종 별도 0.6B 1회를 독립/부모 GO 후 수행했다. 실패한 모델 실행을 자동 재시도하거나 이전 승인을 재사용한 것이 아니다. 두 검증의 raw code SHA와 receipt는 별도로 보존한다.
+
+기존 기능/인증/DB/모델/runtime/보안/브라우저 정책을 보존한다. 모델 다운로드·runtime 설치·원격 GPU·비용·Drive 쓰기·삭제/정리·보안 설정 변경·새 모델로 확대하지 않는다. 새 OAuth 로그인/동의는 사용자 직접행위이며 이번 final home에서는 실 Drive 인증을 수행하지 않았다. M15의 부분 재개·새 Windows 패키지/Release와 기존 설치본 업그레이드는 이 source UI 완료에 포함하지 않는다. [M14 보고서](M14_REPORT.md)에 실제 완료 범위와 제한을 기록한다.
