@@ -2,7 +2,7 @@
 
 ## 작업별 파일 후보 추천 · 0.16.0 로컬 수정 후보
 
-현재 수집된 파일 후보에서 작업 목적을 고르면 메타데이터 검토 우선순위와 이유·기준·미확인을 표시한다. 실측 성능·품질 순위나 실행 보장이 아니다. TTS 준비 화면의 제한과 범용 후보 탐색을 구분한다. [기능 계약](docs/CANDIDATE_RANKING_CONTRACT.md) · [로컬 설치·사용](docs/CANDIDATE_RANKING_INSTALL.md) · [이번 검증 상태](docs/CANDIDATE_RANKING_REPORT.md)를 따른다. 현재는 새 패키지·격리 native UI 검증 전 후보이며 기존 사용 앱·인증을 교체/이관한 것이 아니다. 아래 M15는 이전 출시 이력이다.
+현재 수집된 파일 후보에서 작업 목적을 고르면 메타데이터 검토 우선순위와 이유·기준·미확인을 표시한다. 실측 성능·품질 순위나 실행 보장이 아니다. TTS 준비 화면의 제한과 범용 후보 탐색을 구분한다. [기능 계약](docs/CANDIDATE_RANKING_CONTRACT.md) · [로컬 설치·사용](docs/CANDIDATE_RANKING_INSTALL.md) · [이번 검증 상태](docs/CANDIDATE_RANKING_REPORT.md)를 따른다. 새 Windows 패키지와 격리 설치본에서 목적별 추천·이유·필터·상세·오류 회복을 검증한 로컬 수정본이다. 기존 사용 앱·인증은 교체/이관하지 않았고 새 0.16.0 GitHub Release도 게시하지 않았다. 아래 M15는 이전 출시 이력이다.
 
 ## M15: 부분 재개·중단 복구와 Windows 0.15.0 패키지
 
