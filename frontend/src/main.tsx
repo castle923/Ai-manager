@@ -240,6 +240,7 @@ function App() {
     }),
     [page, setPage] = useState(1),
     [data, setData] = useState<Data | null>(null),
+    [familyOptions, setFamilyOptions] = useState<string[]>([]),
     [status, setStatus] = useState<Status | null>(null),
     [loading, setLoading] = useState(true),
     [error, setError] = useState(""),
@@ -397,6 +398,10 @@ function App() {
   useEffect(() => {
     const controller = new AbortController();
     const id = ++request.current;
+    setData(null);
+    detailRequest.current++;
+    setDetail(null);
+    setDetailLoading(false);
     setLoading(true);
     const params = new URLSearchParams({
       view,
@@ -415,12 +420,15 @@ function App() {
         if (d.recommendation?.purpose !== purpose) throw Error("선택한 작업과 추천 응답이 다릅니다. 다시 확인하세요.");
         if (id === request.current) {
           setData(d);
+          setFamilyOptions(d.families);
           setError("");
         }
       })
       .catch((e) => {
-        if (e.name !== "AbortError" && id === request.current)
+        if (e.name !== "AbortError" && id === request.current) {
+          setData(null);
           setError(e.message);
+        }
       })
       .finally(() => {
         if (id === request.current) setLoading(false);
@@ -510,6 +518,8 @@ function App() {
   const busy = pending || status?.task.status === "running";
   const summary = data?.scans.length ? data.summary : undefined;
   const currentScans = data?.scans || [];
+  const candidateReadState = data === null ? (loading ? "조회 중" : error ? "조회 실패" : "확인 불가") : null;
+  const candidateReadNote = loading ? "현재 수집 상태를 확인 중입니다." : "조회 결과가 없어 현재 수집 상태를 확인할 수 없습니다.";
   const partial = currentScans.some((s) => s.status !== "complete");
   const activeFilters = Boolean(q || account || kind || family || scan);
   return (
@@ -960,31 +970,34 @@ function App() {
                 <Metric
                   title="발견한 후보 파일"
                   value={summary?.files}
+                  text={candidateReadState ?? undefined}
                   icon={<File size={19} />}
-                  note="계정별 관찰 · 중복 모델 수 아님"
+                  note={candidateReadState ? candidateReadNote : "계정별 관찰 · 중복 모델 수 아님"}
                 />
                 <Metric
                   title="폴더별 후보 그룹"
                   value={summary?.groups}
+                  text={candidateReadState ?? undefined}
                   icon={<Folder size={19} />}
-                  note="같은 폴더의 파일 묶음"
+                  note={candidateReadState ? candidateReadNote : "같은 폴더의 파일 묶음"}
                 />
                 <Metric
                   title="가중치 후보"
                   value={summary?.weights}
+                  text={candidateReadState ?? undefined}
                   icon={<Database size={19} />}
-                  note="파일명·확장자 기준 분류"
+                  note={candidateReadState ? candidateReadNote : "파일명·확장자 기준 분류"}
                 />
                 <Metric
                   title="관찰된 파일 크기"
                   text={
-                    summary && summary.unknown_sizes < summary.files
+                    candidateReadState ? candidateReadState : summary && summary.unknown_sizes < summary.files
                       ? bytes(summary.known_bytes)
                       : "미수집"
                   }
                   icon={<HardDrive size={19} />}
                   note={
-                    summary?.unknown_sizes
+                    candidateReadState ? candidateReadNote : summary?.unknown_sizes
                       ? `크기 미수집 ${summary.unknown_sizes}개 제외`
                       : "Drive 메타데이터 합계"
                   }
@@ -1012,7 +1025,7 @@ function App() {
                       <span>
                         <strong>계정 {a}</strong>
                         <small>
-                          {s
+                          {candidateReadState ? candidateReadNote : s
                             ? `${time(s.started_at)} · ${s.files_count}개 파일`
                             : "현재 선택 범위에 수집 기록 없음"}
                         </small>
@@ -1023,7 +1036,7 @@ function App() {
                           (s?.status === "complete" ? "green" : "amber")
                         }
                       >
-                        {s ? labels[s.status] || s.status : "미수집"}
+                        {candidateReadState ?? (s ? labels[s.status] || s.status : "미수집")}
                       </span>
                     </div>
                   );
@@ -1147,7 +1160,7 @@ function App() {
                       }}
                     >
                       <option value="">모든 용도 (이름 추정)</option>
-                      {data?.families.map((f) => (
+                      {familyOptions.map((f) => (
                         <option key={f}>{f}</option>
                       ))}
                     </select>
@@ -1201,6 +1214,7 @@ function App() {
                   <span>
                     {loading
                       ? "목록을 불러오는 중…"
+                      : candidateReadState ? "목록 조회 실패 · 현재 수집 상태 확인 불가"
                       : `${(data?.total ?? 0).toLocaleString()}개 ${view === "models" ? "후보 그룹" : "파일"}`}
                     {activeFilters ? " · 필터 적용됨" : ""}
                   </span>
@@ -1265,7 +1279,7 @@ function App() {
                           </td>
                           <td>
                             <span className="family-label">{item.family}</span>
-                            <small className="cell-note">파일명 기준</small>
+                            <small className="cell-note">이름·경로 추정</small>
                           </td>
                           <td className="recommendation-cell"><RecommendationNotes value={item.recommendation} compact /></td>
                           <td>
@@ -1322,7 +1336,15 @@ function App() {
                     </tbody>
                   </table>
                 </div>
-                {!loading && !data?.rows.length && (
+                {!loading && data === null && (
+                  <div className="empty" role="status">
+                    <AlertTriangle size={30} />
+                    <h3>목록을 불러오지 못했습니다</h3>
+                    <p>현재 수집 상태를 확인할 수 없습니다. 새 수집이 필요하다는 뜻은 아닙니다. 목적이나 필터를 바꾸거나 같은 목록을 다시 조회하세요.</p>
+                    <button onClick={() => setTick(t => t + 1)}>목록 다시 조회</button>
+                  </div>
+                )}
+                {!loading && data !== null && !data.rows.length && (
                   <div className="empty">
                     <Search size={30} />
                     <h3>
@@ -1346,7 +1368,7 @@ function App() {
                 )}
                 <div className="pagination">
                   <span>
-                    {data?.total
+                    {candidateReadState ? candidateReadState : data?.total
                       ? `${((data.page - 1) * data.limit + 1).toLocaleString()}–${Math.min(data.page * data.limit, data.total).toLocaleString()} / ${data.total.toLocaleString()}개`
                       : "0개"}{" "}
                     <small>· 페이지당 24개</small>

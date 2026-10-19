@@ -30,8 +30,8 @@ REASONS = {
     'config_not_observed': '프로필의 root 구성 파일 이름·크기 metadata를 모두 관찰하지 못했습니다.',
     'incomplete_scan': '부분·취소·중단 수집 기록이므로 번호 없이 확인 필요 후보로 표시합니다.',
     'shards_missing': '관찰한 shard 묶음 안에 빠진 조각이 있어 번호를 부여하지 않습니다.',
-    'metadata_observed': 'root의 주 가중치·구성 파일 metadata와 완료 수집 기록을 관찰했습니다.',
-    'file_evidence_only': '파일은 모델 단위가 아닙니다. 관련성순으로 표시하며 모델 추천번호는 후보 그룹에서 확인하세요.',
+    'metadata_observed': '고정 프로필이 요구하는 모델 기준 폴더 파일의 이름·크기 정보와 완료 수집 기록을 관찰했습니다.',
+    'file_evidence_only': '파일은 모델 단위가 아닙니다. 파일에는 관련성 근거만 표시하며, 모델 추천번호는 후보 그룹에서 확인하세요.',
     'component_only': '구성 파일·배포 문서만으로 독립 모델 추천번호를 만들지 않습니다.',
     'catalog_unavailable': '고정 프로필 기준을 읽지 못해 추천번호를 부여하지 않습니다.',
     'duplicate_names': '같은 후보 그룹 안에 중복 파일명이 있어 어느 구성인지 확정할 수 없습니다.',
@@ -50,7 +50,7 @@ def policy(purpose, view):
                 source='current_workspace_drive_inventory_metadata',
                 unit='candidate_groups' if view == 'models' else 'file_relevance_only',
                 criteria=[REASONS[k] for k in ('purpose_match', 'profile_name_only', 'metadata_observed')],
-                rank_requirements=['목적 일치', '단일 고정 프로필 이름 후보', '모델 root와 주 가중치·구성 metadata 관찰', '완료 수집', '관찰 shard 누락 없음'],
+                rank_requirements=['목적 일치', '단일 고정 프로필 이름 후보', '모델 기준 폴더에서 프로필이 요구하는 파일의 이름·크기 관찰', '완료 수집', '관찰 shard 누락 없음'],
                 tie_break='동일 근거는 이름·계정·ID로 고정 정렬합니다. 용량·파라미터 수·파일 수로 품질을 추정하지 않습니다.',
                 limitations=LIMITATIONS + (['현재 고정 이미지 프로필은 이미지 생성용입니다. 이미지 편집 지원을 확인하지 않았습니다.'] if purpose == 'image' else []))
 

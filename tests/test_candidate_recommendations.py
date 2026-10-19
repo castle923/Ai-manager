@@ -59,6 +59,9 @@ class RecommendationTests(unittest.TestCase):
         result=self.dashboard.query({'purpose':['tracking']})
         self.assertEqual(result['recommendation']['recommended'],1)
         self.assertNotIn('config_not_observed',result['rows'][0]['recommendation']['reason_codes'])
+        evidence=result['rows'][0]['recommendation']['reasons'][-1]
+        self.assertIn('프로필이 요구하는',evidence)
+        self.assertNotIn('구성 파일 metadata',evidence)
 
     def test_distributed_image_is_related_and_explicitly_deferred_not_absent(self):
         seed(self.dashboard,[self.group('qwen-image-2.1')])
@@ -109,7 +112,9 @@ class RecommendationTests(unittest.TestCase):
             for sort in ('recommendation','name','size','modified'):
                 result=self.dashboard.query({'purpose':['tts'],'view':[view],'sort':[sort]})
                 self.assertEqual(result['recommendation']['purpose'],'tts')
-                if view=='files':self.assertTrue(all(r['recommendation']['rank'] is None for r in result['rows']))
+                if view=='files':
+                    self.assertTrue(all(r['recommendation']['rank'] is None for r in result['rows']))
+                    self.assertTrue(all('관련성순으로 표시' not in ''.join(r['recommendation']['reasons']) for r in result['rows']))
         row=self.dashboard.query({'purpose':['tts']})['rows'][0]
         detail=self.dashboard.detail(row['id'],row['scan_id'],'tts')
         self.assertTrue(detail['recommendation']['eligible']);self.assertIsNone(detail['recommendation']['rank'])
