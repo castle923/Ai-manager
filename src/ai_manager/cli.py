@@ -11,13 +11,16 @@ from .security import SecretStore
 def services(home=None):
     home = private_home(home)
     settings = SettingsStore(home).load()
-    return home, settings, AuthManager(settings, SecretStore(home / "credentials"))
+    from .local_mode import is_local, NoDriveAuth
+    auth = NoDriveAuth() if is_local(settings) else AuthManager(settings, SecretStore(home / "credentials"))
+    return home, settings, auth
 
 
 def main():
     parser = argparse.ArgumentParser(description="Ai-manager: 읽기 전용 모델 조회와 선정 자산 준비")
     parser.add_argument("--home", help="명시적 절대경로의 별도 앱 홈; 기존 홈을 복사하지 않음")
     sub = parser.add_subparsers(dest="command", required=True)
+    sub.add_parser("init-local", help="새 작업실에만 Drive 미연결 로컬 설정 생성")
     init = sub.add_parser("init", help="명시 지정된 입력으로 새 앱 설정 생성")
     init.add_argument("--allowlist", required=True)
     init.add_argument("--client", required=True)
@@ -48,12 +51,20 @@ def main():
         if args.command in ("db-backup", "db-restore"):
             from .db_recovery import copy_database_to_new_target
             result = copy_database_to_new_target(selected_home / "inventory.sqlite3" if args.command == "db-backup" else args.source, args.destination)
+        elif args.command == "init-local":
+            if not args.home:
+                raise ValueError('explicit_new_local_home_required')
+            SettingsStore(selected_home).initialize_local()
+            result = {"status": "initialized", "settings_version": 2, "mode": "local"}
         elif args.command == "init":
             client_config(args.client)
             SettingsStore(selected_home).initialize(args.allowlist, args.client)
             result = {"status": "initialized", "settings_version": 1}
         else:
             home, settings, auth = services(selected_home)
+            from .local_mode import is_local
+            if is_local(settings) and args.command in ('connect', 'refresh', 'disconnect', 'scan', 'prepare'):
+                raise AuthError('drive_setup_required')
             if args.command == "prepare-local":
                 from .preparation import Preparation
                 state = Preparation(home, settings, auth, model_id=args.model_id).prepare_local(args.source)
@@ -75,7 +86,8 @@ def main():
                 result = Inventory(home).scan(settings, args.account, lambda force_refresh=False: auth.access(args.account, force_refresh=force_refresh))
             elif args.command == "status":
                 from .inventory import Inventory
-                result = {"credential_saved": {a: bool(auth.store.get(a)) for a in ("A", "B")}, "inventory": Inventory(home).summary()}
+                from .local_mode import account_status, drive_status
+                result = {"credential_saved": {a:v['credential_saved'] for a,v in account_status(settings,auth).items()}, "drive":drive_status(settings), "inventory": Inventory(home).summary()}
             else:
                 from .server import serve
                 options = {"port": args.port}

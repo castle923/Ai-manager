@@ -159,6 +159,8 @@ def authenticated_provider(auth_home,account,root_id,**scope):
     from .security import SecretStore
     # Caller must explicitly choose a newly initialized M12 authentication home.
     settings=SettingsStore(auth_home).load()
+    from .local_mode import is_local
+    if is_local(settings): fail('drive_setup_required')
     auth=AuthManager(settings,SecretStore(auth_home/'credentials'))
     auth.access(account)  # Fails before scanning if no user-authorized credential exists.
     session=BoundedSession(requests.Session())

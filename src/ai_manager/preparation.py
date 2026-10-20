@@ -287,6 +287,8 @@ class Preparation:
             ACTIVE.release()
 
     def prepare(self,cancel=None):
+        from .local_mode import is_local
+        if is_local(self.settings): raise PreparationError('drive_setup_required')
         if not ACTIVE.acquire(False):raise PreparationError('operation_running')
         try:
             self.base.mkdir(parents=True,exist_ok=True)

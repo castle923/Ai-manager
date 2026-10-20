@@ -23,6 +23,12 @@ def private_home(override=None):
 
 def validate(settings):
     import re
+    if settings.get('mode') not in (None, 'drive', 'local'):
+        raise ValueError('Unknown workspace mode')
+    if settings.get('mode') == 'local':
+        if type(settings.get('version')) is not int or settings != dict(version=2, mode='local', accounts={}, allowlist=[], sources=[]):
+            raise ValueError('Invalid explicit local workspace settings')
+        return settings
     if set(settings["accounts"]) != {"A", "B"}:
         raise ValueError("Exactly account A and B are required")
     emails = list(settings["accounts"].values())
@@ -48,6 +54,12 @@ class SettingsStore:
 
     def load(self):
         return validate(json.loads(self.path.read_text(encoding="utf-8")))
+
+    def initialize_local(self):
+        settings = dict(version=2, mode='local', accounts={}, allowlist=[], sources=[])
+        with self.path.open('x', encoding='utf-8') as handle:
+            handle.write(json.dumps(settings, indent=2))
+        return settings
 
     def initialize(self, source, client):
         if self.path.exists():

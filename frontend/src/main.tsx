@@ -92,6 +92,7 @@ type Data = {
   };
 };
 type Status = {
+  drive: { configuration: "configured" | "not_configured"; mode: "drive" | "local" };
   accounts: Record<string, { credential_saved: boolean; roots: number }>;
   task: {
     status: string;
@@ -645,11 +646,12 @@ function App() {
                             : "계정 및 수집"}
           </span>
           <div className="top-meta">
-            <ShieldCheck size={15} /> Drive 읽기 전용{" "}
+            <ShieldCheck size={15} /> {status?.drive.configuration === "not_configured" ? "로컬 모드 · Drive 미설정" : "Drive 읽기 전용"}{" "}
             <span className="avatar">ME</span>
           </div>
         </header>
         <main id="main">
+          {status?.drive.configuration === "not_configured" && <div className="banner" role="status">Drive 미연결 로컬 작업실입니다. 로컬 모델 등록·검증을 사용할 수 있으며 자격 증명 저장소는 확인하지 않습니다.</div>}
           <DesktopRuntime />
           {sourceUrlError && (
             <div className="banner danger" role="alert">
@@ -858,7 +860,14 @@ function App() {
             />
           ) : section === "connections" ? (
             <>
-              <div className="connection-grid">
+              {status?.drive.configuration === "not_configured" ? (
+                <section className="panel validation-panel" role="status">
+                  <h2>Drive 미연결 · 로컬 작업실</h2>
+                  <p>로컬 모델을 등록하고 검증할 수 있습니다. Google 계정과 자격 증명 저장소는 확인하지 않습니다.</p>
+                  <p>Drive 연결은 지정 OAuth 원본과 허용 폴더를 선택한 별도 새 작업실에서 설정하세요. 현재 로컬 등록 DB는 자동 이관되지 않습니다.</p>
+                  <button disabled>Drive 설정이 필요합니다</button>
+                </section>
+              ) : <div className="connection-grid">
                 {["A", "B"].map((a) => (
                   <section className="connection-card" key={a}>
                     <div className="account-heading">
@@ -922,7 +931,7 @@ function App() {
                     )}
                   </section>
                 ))}
-              </div>
+              </div>}
               <section className="panel history">
                 <h2>수집 기록</h2>
                 <p className="muted">

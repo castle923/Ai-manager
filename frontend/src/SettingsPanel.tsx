@@ -10,6 +10,7 @@ type SettingsResponse = {
   workspace: {
     paths: Record<string, string>;
     accounts: Record<string, boolean>;
+    drive: { configuration: "configured" | "not_configured" };
     allowed_folder_count: number;
     runtime_dependencies?: {
       role: string;
@@ -256,7 +257,7 @@ export function SettingsPanel({
             </ul>
           </div>
         ) : null}
-        <p>
+        {data?.workspace.drive.configuration === 'not_configured' ? <p>Drive 설정 없음 · 자격 증명 저장소는 확인하지 않았습니다. 로컬 모델과 이 작업실 데이터는 유지됩니다.</p> : <p>
           계정 A:{" "}
           {data?.workspace.accounts.A
             ? "자격 증명 저장됨 · 실제 갱신은 계정 화면에서 확인"
@@ -268,7 +269,7 @@ export function SettingsPanel({
             : "연결 정보 없음"}
           <br />
           설정된 허용 폴더 {data?.workspace.allowed_folder_count ?? "미확인"}개
-        </p>
+        </p>}
         <div className="workspace-caveat">
           <strong>보존·복구 범위</strong>
           <p>

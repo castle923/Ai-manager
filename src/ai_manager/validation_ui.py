@@ -28,6 +28,8 @@ class ValidationUI:
         return dict(drive_scopes=[dict(index=i, account=r['account'], connected=bool(self.auth and self.auth.store.get(r['account']))) for i,r in enumerate((self.settings or {}).get('allowlist',[]))], drive_execution_supported=False)
 
     def provider(self, index):
+        from .local_mode import is_local
+        if is_local(self.settings or {}): fail('drive_setup_required')
         if type(index) is not int: fail('drive_scope_invalid')
         roots=(self.settings or {}).get('allowlist',[])
         if not 0<=index<len(roots): fail('drive_scope_invalid')
@@ -39,6 +41,8 @@ class ValidationUI:
         return LiveDriveIntake(Drive(lambda force_refresh=False:self.auth.access(root['account'],force_refresh=force_refresh),session=BoundedSession(requests.Session())),self.settings,root['account'],root['id'])
 
     def reobserve_drive(self, previous):
+        from .local_mode import is_local
+        if is_local(self.settings or {}): fail('drive_setup_required')
         for i,root in enumerate((self.settings or {}).get('allowlist',[])):
             if root['account']==previous['account'] and root['id']==previous['root_id']:
                 return self.provider(i).reobserve(previous)
@@ -62,6 +66,8 @@ class ValidationUI:
 
     def create_plan(self, data):
         object_fields(data, ('roots', 'action', 'runtimes', 'wall_seconds', 'source', 'drive_scope'))
+        from .local_mode import is_local
+        if data['source'] == 'drive' and is_local(self.settings or {}): fail('drive_setup_required')
         if self.closed: fail('application_closing')
         roots = data['roots']
         if not isinstance(roots, list) or len(roots)>6 or any(not isinstance(p,str) or not p for p in roots):
@@ -202,8 +208,16 @@ class ValidationUI:
         else: result['status']='awaiting_dispatch' if grant else 'awaiting_approval'
         return result
 
+    def _check_plan_mode(self, plan_id):
+        from .local_mode import is_local
+        if is_local(self.settings or {}):
+            record = self.store().plan(plan_id)
+            if record['plan']['observation']['kind'] == 'drive_live_readonly':
+                fail('drive_setup_required')
+
     def approve(self, data):
         object_fields(data, ('plan_id','plan_sha256','confirmed','action'))
+        self._check_plan_mode(data['plan_id'])
         store=self.store()
         record=store.plan(data['plan_id'])
         if record['plan']['action'] != data['action']: fail('approval_action_mismatch')
@@ -212,6 +226,7 @@ class ValidationUI:
 
     def start(self, data):
         object_fields(data, ('plan_id','approval_id'))
+        self._check_plan_mode(data['plan_id'])
         with self.lock:
             if self.closed: fail('application_closing')
             if self.worker and self.worker.is_alive():
@@ -247,6 +262,7 @@ class ValidationUI:
 
     def recover(self,data):
         object_fields(data,('plan_id','batch_id'))
+        self._check_plan_mode(data['plan_id'])
         with self.lock:
             if self.worker and self.worker.is_alive():fail('coordinator_busy')
         store=self.store()
@@ -257,6 +273,7 @@ class ValidationUI:
 
     def approve_resume(self,data):
         object_fields(data,('plan_id','batch_id','plan_sha256','confirmed'))
+        self._check_plan_mode(data['plan_id'])
         store=self.store()
         if store.status(data['batch_id'])['batch']['plan_id']!=data['plan_id']:fail('batch_plan_mismatch')
         from .validation_recovery import approve
@@ -265,6 +282,7 @@ class ValidationUI:
 
     def resume(self,data):
         object_fields(data,('plan_id','batch_id','resume_approval_id'))
+        self._check_plan_mode(data['plan_id'])
         with self.lock:
             if self.closed:fail('application_closing')
             if self.worker and self.worker.is_alive():fail('validation_operation_running')
@@ -292,6 +310,7 @@ class ValidationUI:
 
     def supersede(self, data):
         object_fields(data, ('plan_id','plan_sha256'))
+        self._check_plan_mode(data['plan_id'])
         store=self.store()
         record=store.plan(data['plan_id'])
         if record['sha']!=data['plan_sha256']: fail('approval_plan_mismatch')

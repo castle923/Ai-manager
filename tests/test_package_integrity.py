@@ -16,9 +16,9 @@ class PackageIntegrityTests(unittest.TestCase):
             root=Path(folder);module=root/'_internal/ai_manager/package_integrity.py';module.parent.mkdir(parents=True)
             module.write_bytes(Path(package.__file__).read_bytes());exe=root/'AiManager.exe';exe.write_bytes(b'new synthetic EXE')
             files={'src/ai_manager/package_integrity.py':hashlib.sha256(module.read_bytes()).hexdigest()}
-            provenance=dict(version='0.16.3',source_commit='a'*40,source_files=files)
+            provenance=dict(version='0.16.4',source_commit='a'*40,source_files=files)
             source=root/'SOURCE-PROVENANCE.json';source.write_text(json.dumps(provenance),'utf8')
-            manifest=dict(version='0.16.3',source_files=files,files={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in (exe,source)})
+            manifest=dict(version='0.16.4',source_files=files,files={p.name:hashlib.sha256(p.read_bytes()).hexdigest() for p in (exe,source)})
             (root/'DESKTOP-MANIFEST.json').write_text(json.dumps(manifest),'utf8')
             with patch.object(package,'__file__',str(module)),patch.object(package.sys,'frozen',True,create=True),patch.object(package.sys,'executable',str(exe)):
                 self.assertEqual(package.verify_frozen(full=True)['source_commit'],'a'*40)

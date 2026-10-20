@@ -14,7 +14,7 @@ from .validation_intake import observation_sha, reobserve, safe_path
 DB_NAME='validation-control.sqlite3'
 CODE_FILES=('validation_intake.py','validation_drive.py','validation_store.py','validation_coordinator.py','validation_probe.py',
             'validation_cli.py','validation_contracts.py','validation_profiles.py','execution_slot.py','inference.py',
-            'drive.py','auth.py','config.py','security.py')
+            'drive.py','auth.py','config.py','security.py','local_mode.py')
 
 
 def packed(value):return json.dumps(value,sort_keys=True,separators=(',',':'),ensure_ascii=True,allow_nan=False)
@@ -29,7 +29,7 @@ def control_code_sha():
         expected={k.removeprefix('src/ai_manager/') for k in provenance['source_files']}
         actual={p.relative_to(root).as_posix() for p in root.rglob('*') if p.is_file() and (p.suffix in ('.py','.json','.lock') or 'static' in p.relative_to(root).parts or p.name=='LICENSE')}
         if actual!=expected:fail('package_source_set_changed')
-    for required in ('validation_store.py','validation_recovery.py','validation_coordinator.py','validation_models.py','validation_profiles.py','static/index.html'):
+    for required in ('validation_store.py','validation_recovery.py','validation_coordinator.py','validation_models.py','validation_profiles.py','local_mode.py','static/index.html'):
         if not (root/required).is_file():fail('control_code_unavailable')
     files=list(root.rglob('*.py'))+list(root.rglob('*.json'))+list(root.rglob('*.lock'))
     files += [root.parents[1]/'requirements-runtime.lock']

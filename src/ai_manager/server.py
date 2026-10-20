@@ -73,9 +73,11 @@ def create_application(home, settings, auth, port=0):
     cancel = threading.Event()
     task = {"status": "idle"}
 
+    from .local_mode import is_local, account_status, drive_status
+
     def state():
         with task_state_lock:task_copy=dict(task)
-        return {"accounts": {a: {"credential_saved": bool(auth.store.get(a)), "roots": sum(r["account"] == a for r in settings["allowlist"])} for a in ("A", "B")},
+        return {"accounts": account_status(settings, auth), "drive": drive_status(settings),
                 "task": task_copy, "inventory": Inventory(home).summary()}
 
     def work(action, account, model_id=None, history_id=None, started_at=None):
@@ -176,7 +178,7 @@ def create_application(home, settings, auth, port=0):
                     from .runtime_paths import runtime_directory, runtime_dependencies
                     paths={name:str(Path(home)/relative)for name,relative in {'home':'','settings':'settings.json','preferences':'preferences.json','inventory':'inventory.sqlite3','registry':'registry.sqlite3','outputs':'tts'}.items()}
                     paths['runtime']=str(runtime_directory(home))
-                    return self.reply(200,{'preferences':preferences.read(),'workspace':{'paths':paths,'runtime_dependencies':runtime_dependencies(home),'accounts':{a:bool(auth.store.get(a))for a in('A','B')},'allowed_folder_count':len(settings['allowlist']),'settings_mutable_fields':[],'backup_scope':'inventory_database_only','preference_scope':'this_workspace_display_only'}})
+                    return self.reply(200,{'preferences':preferences.read(),'workspace':{'paths':paths,'runtime_dependencies':runtime_dependencies(home),'accounts':{a:v['credential_saved'] for a,v in account_status(settings,auth).items()},'drive':drive_status(settings),'allowed_folder_count':len(settings['allowlist']),'settings_mutable_fields':[],'backup_scope':'inventory_database_only','preference_scope':'this_workspace_display_only'}})
                 except PreferenceError as error:return self.reply(400,{'error':str(error)})
             performance_match=re.fullmatch(r'/api/performance/([a-f0-9]{32})',path)
             if performance_match:
@@ -366,6 +368,8 @@ def create_application(home, settings, auth, port=0):
                     raise ValueError()
             except (ValueError, KeyError):
                 return self.reply(400, {"error": "invalid_request"})
+            if is_local(settings) and action in ('connect', 'refresh', 'scan', 'disconnect', 'prepare'):
+                return self.reply(409, {'error': 'drive_setup_required'})
             if action in ("prepare", "runtime_check") and account != "B":
                 return self.reply(400, {"error": "invalid_request"})
             model_id = data.get('model_id')
