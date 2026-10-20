@@ -27,7 +27,7 @@
 
 제품 소스는 `0e49906623296cf503b9c9acf047686d4bafa5ae`에 고정했다. 후속 문서 변경은 제품 ZIP을 변경하지 않는다. ZIP은 113,182,896 bytes이며 SHA-256은 `6fa896248582d211cb345f6d8691fc30346ede6cc0162eb74f69bb137de9be0b`다. 새 격리 설치에서 manifest 대상 8,311개 파일의 SHA-256과 manifest 자체를 포함한 실제 8,312개 파일을 확인했다. 포함된 제품 원본은 77개이며 동결 소스와 일치했다. 설치 EXE의 SHA-256은 `1a90cb4b1f1f6923150d6aed5b81f3bc99bba9ef70c2452fc3bf36b85dd9fdbe`다.
 
-설치본의 frozen self-check는 `verified`, 버전 `0.16.2`, 동일 소스 commit을 반환했다. 실행 제어 코드 SHA-256은 `0f7de73284750d509a40817c1fab8d469d5ae9dbd869493980e2da03e5459f79`다. ZIP 전량 CRC·payload SHA·소스·라이선스와 설치본을 독립 검토했다. 새 설치본은 새 합성 home과 비밀 환경변수를 제외한 child 환경에서 실행했고 정상 창 종료 후 startup complete와 설치 파일 해시 보존을 확인했다. 기존 사용자 앱은 실행 상태를 유지했으며 native 검사 전후 선택한 기존 inventory·registry·설정 파일은 존재·바이트 수·SHA-256이 같았다. 인증 파일이나 모델 파일을 읽거나 복사하지 않았다.
+설치본의 frozen self-check는 `verified`, 버전 `0.16.2`, 동일 소스 commit을 반환했다. 실행 제어 코드 SHA-256은 `0f7de73284750d509a40817c1fab8d469d5ae9dbd869493980e2da03e5459f79`다. ZIP 전량 CRC·payload SHA·소스·라이선스와 설치본을 독립 검토했다. 새 설치본은 새 합성 home과 비밀 환경변수를 제외한 child 환경에서 실행했고 정상 창 종료 후 startup complete와 설치 파일 해시 보존을 확인했다. 기존 사용자 앱은 실행 상태를 유지했으며 native 검사 전후 선택한 기존 inventory·registry·설정 파일은 존재·바이트 수·SHA-256이 같았다. 기존 인증 파일이나 모델 파일을 읽거나 복사하지 않았다.
 
 새 설치본에서는 실제로 보이는 요소를 기준으로 탐색과 검색이 안정적이었다. 아래의 화면 확인은 내용 조회이며 각 기능의 모델 실행 완료를 뜻하지 않는다.
 
