@@ -18,6 +18,11 @@ export type Recommendation = {
   reasons: string[];
   reason_codes: string[];
   limitations: string[];
+  observed_name?: string;
+  name_evidence?: { observed: string; profile: string; form: string }[];
+  missing_evidence?: { name: string; status: string }[];
+  task_clues?: string[];
+  defined_profiles?: string[];
 };
 
 export type RecommendationPolicy = {
@@ -37,10 +42,15 @@ export function RecommendationNotes({ value, compact = false }: { value?: Recomm
   const shownReasons = compact && !value.eligible ? value.reasons.filter((_, i) => !["purpose_match", "profile_name_only"].includes(value.reason_codes[i])) : value.reasons;
   return <div className={`recommendation-notes ${compact ? "compact" : ""}`}>
     <strong className={value.rank != null ? "recommendation-rank" : "muted"}>{label}</strong>
+    {value.observed_name && <p className="recommendation-observed">관찰 이름: {value.observed_name}</p>}
     {!compact && <p>목적: {({tts:"음성 생성",stt:"음성 인식·전사",image:"이미지 생성 · 편집 미확인",llm:"텍스트 대화",tracking:"영상의 지정 지점 추적"} as Record<string,string>)[value.purpose] || "미선택 · 전체 후보"}</p>}
     <ul>{shownReasons.slice(0, compact ? 2 : undefined).map(reason => <li key={reason}>{reason}</li>)}</ul>
     {compact && shownReasons.length > 2 && <small>나머지 근거·순위 보류 사유는 상세에서 확인</small>}
     {!compact && <>
+      {!!value.task_clues?.length && <p>작업 관련 경로 이름 단서: {value.task_clues.join(" · ")} · 관련성 추정에만 사용</p>}
+      {!!value.name_evidence?.length && <ul>{value.name_evidence.map((e, i) => <li key={i}>이름 단서: {e.observed} → {e.profile} ({e.form === "official_namespace" ? "프로필 게시자·전체 이름 형식 일치, 실제 출처 미검증" : "전체 별칭 일치"}) · 이름 후보이며 실물 식별 미확인</li>)}</ul>}
+      {value.reason_codes.includes("profile_unconfirmed") && !!value.defined_profiles?.length && <p>이 작업의 현재 고정 검수 프로필: {value.defined_profiles.join(" · ")} · 같은 계열 전체 지원 목록이 아닙니다.</p>}
+      {!!value.missing_evidence?.length && <ul>{value.missing_evidence.map(e => <li key={e.name}>필수 관찰 근거: {e.name} · {e.status === "missing" ? "이 그룹에서 이름 미관찰" : "기대 크기와 불일치"}</li>)}</ul>}
       {value.profile_name_candidates.length > 0 && <p>이름 후보: {value.profile_name_candidates.map(p => p.id).join(" · ")} · 확정 식별 아님</p>}
       <ul className="recommendation-limits">{value.limitations.map(note => <li key={note}>{note}</li>)}</ul>
     </>}

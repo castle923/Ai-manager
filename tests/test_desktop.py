@@ -210,7 +210,7 @@ class DesktopTests(unittest.TestCase):
         package = self.package()
         parent = self.root / 'new-user-install'
         parent.mkdir()
-        target = parent / 'AiManager-0.16.0'
+        target = parent / 'AiManager-0.16.1'
         target.mkdir()
         bridge = DesktopBridge(self.home, self.root, package)
         bridge._guard_ready = True
@@ -230,7 +230,7 @@ class DesktopTests(unittest.TestCase):
         package = self.root / 'portable'
         package.mkdir()
         (package / 'AiManager.exe').write_bytes(b'new synthetic executable placeholder')
-        manifest = {'version': '0.16.0', 'files': {'AiManager.exe': hashlib.sha256((package / 'AiManager.exe').read_bytes()).hexdigest()}}
+        manifest = {'version': '0.16.1', 'files': {'AiManager.exe': hashlib.sha256((package / 'AiManager.exe').read_bytes()).hexdigest()}}
         (package / 'DESKTOP-MANIFEST.json').write_text(json.dumps(manifest))
         return package
 
