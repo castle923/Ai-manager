@@ -2998,9 +2998,6 @@ th {
   left: 12px;
   bottom: 12px;
 }
-.registry-search input {
-  padding-left: 37px;
-}
 .registry-panel input:not([type="checkbox"]),
 .registry-panel textarea,
 .registry-panel select {
@@ -3013,6 +3010,9 @@ th {
   min-width: 0;
   width: 100%;
   box-sizing: border-box;
+}
+.registry-panel .registry-search input {
+  padding-left: 37px;
 }
 .registry-panel textarea {
   resize: vertical;

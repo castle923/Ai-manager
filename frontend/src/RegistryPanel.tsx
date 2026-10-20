@@ -184,7 +184,7 @@ export function RegistryPanel({
   candidate: CandidateRegistration | null;
   onCandidateUsed: () => void;
   onExplore: () => void;
-  onPrepare: () => void;
+  onPrepare: (modelId?: string) => void;
   onTasks?: () => void;
 }) {
   const [data, setData] = useState<Data | null>(null),
@@ -210,10 +210,23 @@ export function RegistryPanel({
     [text, setText] = useState("");
   const [modelType, setModelType] = useState("");
   const [tick, setTick] = useState(0);
+  const [loadError, setLoadError] = useState("");
+  const queryKey = JSON.stringify([search, filter, archived]);
+  const [loadedQuery, setLoadedQuery] = useState("");
+  const [selectedFresh, setSelectedFresh] = useState(false);
+  const currentList = loadedQuery === queryKey && !loadError;
+  const currentSelection = currentList && selectedFresh;
+  const canRun =
+    currentSelection &&
+    selected?.execution_eligibility === "requires_run_preflight" &&
+    !selected.configuration_attention;
   const selection = useRef(""),
     heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     const controller = new AbortController();
+    setData(null);
+    setLoadedQuery("");
+    setSelectedFresh(false);
     let live = true;
     let inflight = false;
     async function load() {
@@ -229,21 +242,29 @@ export function RegistryPanel({
             }),
           { signal: controller.signal },
         );
-        if (live) setData(result);
+        if (!live) return;
+        setData(result);
+        setLoadedQuery(queryKey);
+        setLoadError("");
         const target = selection.current;
         if (target) {
           const detail = await request<{ model: Model }>(
             "/api/registry/" + target,
             { signal: controller.signal },
           );
-          if (live && selection.current === target)
+          if (live && selection.current === target) {
             setSelected((old) =>
               old?.id === detail.model.id ? detail.model : old,
             );
+            setSelectedFresh(true);
+          }
         }
       } catch (e) {
-        if (live && (e as Error).name !== "AbortError")
-          setError((e as Error).message);
+        if (live && (e as Error).name !== "AbortError") {
+          setLoadError((e as Error).message);
+          setData(null);
+          setSelectedFresh(false);
+        }
       } finally {
         inflight = false;
       }
@@ -273,6 +294,7 @@ export function RegistryPanel({
     onCandidateUsed();
   }, [candidate, onCandidateUsed]);
   function choose(model: Model) {
+    setSelectedFresh(false);
     selection.current = model.id;
     setSelected(model);
     setEditing(false);
@@ -315,6 +337,7 @@ export function RegistryPanel({
     });
   }
   async function save() {
+    if (selected && !currentSelection) return;
     if (busy || !csrf.current) return;
     setBusy(true);
     setError("");
@@ -361,7 +384,7 @@ export function RegistryPanel({
     }
   }
   async function archiveModel() {
-    if (!selected || busy) return;
+    if (!selected || busy || !currentSelection) return;
     setBusy(true);
     setError("");
     try {
@@ -390,7 +413,7 @@ export function RegistryPanel({
     }
   }
   async function run() {
-    if (!selected || busy || !text.trim()) return;
+    if (!selected || busy || !text.trim() || !canRun) return;
     setBusy(true);
     setError("");
     setMessage("등록한 원본의 파일 해시를 확인하고 새 실행을 준비합니다…");
@@ -535,9 +558,9 @@ export function RegistryPanel({
           모델 등록
         </button>
       </div>
-      {error ? (
+      {error || loadError ? (
         <div className="banner danger" role="alert">
-          {error}
+          {error || loadError}
           {editing && selected ? (
             <button
               onClick={() => {
@@ -561,8 +584,12 @@ export function RegistryPanel({
             <h2>등록 모델</h2>
             <button onClick={onExplore}>파일 후보에서 등록</button>
           </div>
-          {!data ? (
-            <p className="empty">등록 목록을 불러오는 중입니다.</p>
+          {!data || !currentList ? (
+            <p className="empty">
+              {loadError
+                ? "등록 목록을 확인하지 못했습니다. 다음 조회에서 다시 확인합니다."
+                : "등록 목록을 불러오는 중입니다."}
+            </p>
           ) : visibleModels.length === 0 ? (
             <div className="empty">
               <Boxes size={28} />
@@ -672,7 +699,9 @@ export function RegistryPanel({
                 관리 정보는 자유롭게 편집할 수 있습니다. 실행 대상 구성·보관
                 참조 변경 시 현재 검증이 해제됩니다.
               </p>
-              <fieldset disabled={busy}>
+              <fieldset
+                disabled={busy || Boolean(selected && !currentSelection)}
+              >
                 <label>
                   모델 이름 *
                   <input
@@ -836,7 +865,11 @@ export function RegistryPanel({
                 <button
                   type="submit"
                   className="primary"
-                  disabled={busy || !csrf.current}
+                  disabled={
+                    busy ||
+                    !csrf.current ||
+                    Boolean(selected && !currentSelection)
+                  }
                 >
                   {busy ? "저장 중…" : "모델 정보 저장"}
                 </button>
@@ -855,10 +888,19 @@ export function RegistryPanel({
                 <h2 ref={heading} tabIndex={-1}>
                   {selected.metadata.name}
                 </h2>
-                <button onClick={() => edit(selected)} disabled={busy}>
+                <button
+                  onClick={() => edit(selected)}
+                  disabled={busy || !currentSelection}
+                >
                   정보 편집
                 </button>
               </div>
+              {!currentSelection ? (
+                <p role="status" className="registry-notice">
+                  현재 조회 결과를 확인하는 중입니다. 이전 상세 정보로
+                  변경하거나 실행할 수 없습니다.
+                </p>
+              ) : null}
               <span
                 className={
                   "badge " +
@@ -999,15 +1041,16 @@ export function RegistryPanel({
                       className="primary"
                       onClick={() => void run()}
                       disabled={
-                        busy ||
-                        !text.trim() ||
-                        selected.configuration_attention ||
-                        !csrf.current
+                        busy || !text.trim() || !canRun || !csrf.current
                       }
                     >
                       이 모델 새로 실행
                     </button>
-                    <button onClick={onPrepare}>모델 준비 확인</button>
+                    <button
+                      onClick={() => onPrepare(selected.artifact.adapter_id)}
+                    >
+                      모델 준비 확인
+                    </button>
                   </div>
                 </>
               ) : (
@@ -1099,7 +1142,7 @@ export function RegistryPanel({
               </details>
               <button
                 className="registry-archive"
-                disabled={busy}
+                disabled={busy || !currentSelection}
                 onClick={() => void archiveModel()}
               >
                 {selected.archived

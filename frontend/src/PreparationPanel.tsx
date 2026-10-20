@@ -229,12 +229,18 @@ export function PreparationPanel({
   busy,
   canCancel,
   csrf,
+  initialModelId,
 }: {
   busy: boolean;
   canCancel: boolean;
   csrf: RefObject<string>;
+  initialModelId?: string;
 }) {
-  const [modelId, setModelId] = useState("qwen3-tts-0.6b-customvoice");
+  const [modelId, setModelId] = useState(
+    initialModelId === "qwen3-tts-1.7b-customvoice"
+      ? initialModelId
+      : "qwen3-tts-0.6b-customvoice",
+  );
   const [data, setData] = useState<PreparationData | null>(null);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);

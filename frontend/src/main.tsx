@@ -205,6 +205,7 @@ function App() {
   }
   const [registration, setRegistration] =
     useState<CandidateRegistration | null>(null);
+  const [preparationModelId, setPreparationModelId] = useState("qwen3-tts-0.6b-customvoice");
   const [section, setSectionState] = useState(() => {
       const value = appViewParams().get("section");
       return value &&
@@ -810,7 +811,10 @@ function App() {
               onCandidateUsed={() => setRegistration(null)}
               onExplore={() => setSection("library")}
               onTasks={() => setSection("tasks")}
-              onPrepare={() => setSection("preparation")}
+              onPrepare={(modelId) => {
+                setPreparationModelId(modelId === "qwen3-tts-1.7b-customvoice" ? modelId : "qwen3-tts-0.6b-customvoice");
+                setSection("preparation");
+              }}
             />
           ) : section === "comparison" ? (
             <ComparisonPanel
@@ -844,6 +848,7 @@ function App() {
             />
           ) : section === "preparation" ? (
             <PreparationPanel
+              initialModelId={preparationModelId}
               busy={Boolean(busy)}
               canCancel={
                 status?.task.status === "running" &&
@@ -989,7 +994,7 @@ function App() {
                   note={candidateReadState ? candidateReadNote : "파일명·확장자 기준 분류"}
                 />
                 <Metric
-                  title="관찰된 파일 크기"
+                  title="수집 파일의 관찰 크기"
                   text={
                     candidateReadState ? candidateReadState : summary && summary.unknown_sizes < summary.files
                       ? bytes(summary.known_bytes)
@@ -998,8 +1003,8 @@ function App() {
                   icon={<HardDrive size={19} />}
                   note={
                     candidateReadState ? candidateReadNote : summary?.unknown_sizes
-                      ? `크기 미수집 ${summary.unknown_sizes}개 제외`
-                      : "Drive 메타데이터 합계"
+                      ? `선택 수집 기록 전체 · 크기 미수집 ${summary.unknown_sizes}개 제외`
+                      : "선택 수집 기록 전체 · 파일 메타데이터 합계"
                   }
                 />
               </div>
