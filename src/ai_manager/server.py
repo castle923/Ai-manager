@@ -52,6 +52,9 @@ def create_application(home, settings, auth, port=0):
     from .config import private_home
     home=private_home(home)
     from .inventory import Inventory
+    # Publish no HTTP endpoint until the first inventory schema is complete.
+    # Status and dashboard requests can otherwise race on a new, empty DB file.
+    Inventory(home)
     from .dashboard import Dashboard
     from .preparation import Preparation
     preparation = Preparation(home, settings, auth)
