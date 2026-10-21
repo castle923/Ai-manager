@@ -124,7 +124,7 @@ class AuthManager:
                 self.send_header("Cache-Control", "no-store")
                 self.send_header("Content-Security-Policy", "default-src 'none'")
                 self.end_headers()
-                self.wfile.write("인증 응답을 받았습니다. Ai-manager로 돌아가세요.".encode())
+                self.wfile.write("인증 응답을 받았습니다. Ai Manager로 돌아가세요.".encode())
 
         with HTTPServer(("127.0.0.1", 0), Callback) as server:
             server.timeout = .25

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
-import { AudioDownload } from "./DesktopHost";
+import { AudioDownload, ModelFolderPicker } from "./DesktopHost";
 import {
   Boxes,
   Check,
@@ -785,7 +785,7 @@ export function RegistryPanel({
                   />
                 </label>
                 <label>
-                  실행 대상 구성
+                  실행 프로필 · 보관 등록과 별도
                   <select
                     value={artifact.adapter_id}
                     onChange={(e) => {
@@ -840,7 +840,7 @@ export function RegistryPanel({
                   </label>
                 ) : null}
                 <label>
-                  로컬 검증 자산 폴더 (선택)
+                  모델 보관 폴더 · 내장/외장 드라이브 (선택)
                   <input
                     value={local}
                     onChange={(e) => setLocal(e.target.value)}
@@ -854,6 +854,12 @@ export function RegistryPanel({
                     복사·다운로드는 시작하지 않습니다.
                   </small>
                 </label>
+                <ModelFolderPicker onSelected={setLocal} disabled={busy} />
+                <p className="caption">
+                  보관 위치 등록과 실행 프로필은 별개입니다. 실행 미지원 모델도
+                  설명과 위치를 관리할 수 있습니다. 원격 저장소의 모델을
+                  실행하려면 실행할 PC나 런타임에 실제 가중치가 있어야 합니다.
+                </p>
                 {selected && !replaceRefs ? (
                   <p className="caption">
                     기존 보관 참조 {selected.references.length}개를 유지하고

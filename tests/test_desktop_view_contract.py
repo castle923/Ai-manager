@@ -23,6 +23,7 @@ class DesktopViewContractTests(unittest.TestCase):
     def trusted(self, url):
         bridge = DesktopBridge.__new__(DesktopBridge)
         bridge._guard_ready = True
+        bridge._transitioning = False
         bridge._application = SimpleNamespace(url='http://127.0.0.1:54321/')
         bridge._window = SimpleNamespace(get_current_url=lambda: url)
         return bridge._trusted()

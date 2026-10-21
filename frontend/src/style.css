@@ -3711,3 +3711,35 @@ input::placeholder, textarea::placeholder { color: #63758e; opacity: 1; }
   .desktop-runtime .desktop-path-entry label:not(:first-child) { margin-top: 8px; }
   .desktop-runtime .desktop-path-entry button { grid-column: 1; margin-top: 5px; }
 }
+
+/* Personal model management flow; the side navigation can scroll independently. */
+.sidebar { overflow-y: auto; max-height: 100vh; }
+.nav-group-label { color: #70829e; font-size: 12px; font-weight: 700; margin: 20px 12px 8px; }
+.sidebar nav button.nav-group-toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; margin: 15px 0 5px; padding: 10px 12px; min-height: 44px; border: 1px solid #405878; border-radius: 8px; color: #f5f8ff; background: #23354e; font: inherit; font-size: 13px; font-weight: 700; cursor: pointer; text-align: left; }
+.sidebar nav button.nav-group-toggle[aria-expanded="false"] { color: #f5f8ff; background: #1e3048; }
+.sidebar nav button.nav-group-toggle:hover { color: #fff; background: #2c4262; }
+.sidebar nav button.nav-group-toggle:focus-visible { color: #fff; background: #2c4262; outline: 3px solid #99bdff; outline-offset: 2px; }
+.workshop-chevron { margin-left: 5px; font-size: 15px; }
+.nav-submenu { padding-left: 9px; border-left: 1px solid #344358; margin-left: 12px; }
+.nav-submenu .nav { font-size: 13px; min-height: 40px; padding-top: 9px; padding-bottom: 9px; }
+.drive-connection-setup { display: grid; gap: 16px; width: 100%; max-width: 900px; box-sizing: border-box; padding: 24px; border: 1px solid #d9e2f0; border-radius: 16px; background: #fff; color: #243750; overflow-wrap: anywhere; }
+.drive-connection-setup h2 { margin: 0; color: #172d49; font-size: 21px; }
+.drive-connection-setup p { margin: 0; color: #435671; font-size: 14px; line-height: 1.8; }
+.drive-connection-setup p.caption { font-size: 12px; color: #62728a; }
+.drive-connection-setup label { display: grid; gap: 10px; font-size: 14px; font-weight: 600; color: #243750; min-width: 0; }
+.drive-connection-setup input { width: 100%; min-width: 0; box-sizing: border-box; min-height: 44px; border: 1px solid #afbdd1; border-radius: 8px; padding: 10px 12px; font: inherit; color: #243750; background: #fff; }
+.drive-connection-setup input:focus-visible { outline: 3px solid #85a8f6; outline-offset: 2px; }
+.drive-connection-setup button { justify-self: start; max-width: 100%; min-height: 44px; white-space: normal; text-align: left; }
+.drive-connection-setup p[role="status"] { padding: 12px; border-radius: 8px; background: #f0f4fb; color: #293f61; }
+.folder-picker { display: grid; gap: 8px; margin: 10px 0; }
+[hidden] { display: none !important; }
+@media (max-width: 900px) {
+  .sidebar .nav, .sidebar .nav.active, .sidebar .nav:not(.active) { display: flex; flex-direction: column; justify-content: center; gap: 5px; min-height: 56px; padding: 8px 2px; margin-top: 6px; font-size: 10px; text-align: center; white-space: normal; word-break: keep-all; overflow-wrap: anywhere; }
+  .sidebar .nav > svg:first-child { display: block; width: 18px; height: 18px; flex-shrink: 0; }
+  .nav-group-label { font-size: 10px; text-align: center; margin: 16px 0 6px; line-height: 1.6; word-break: keep-all; }
+  .sidebar nav button.nav-group-toggle { flex-direction: column; padding: 8px 2px; gap: 3px; font-size: 10px; text-align: center; }
+  .nav-submenu { padding-left: 0; border-left: 0; margin-left: 0; }
+}
+.preparation-overview { padding: 22px; margin-bottom: 20px; border: 1px solid #d9e2f0; border-radius: 16px; background: #fff; color: #243750; }
+.preparation-overview h2 { margin: 0 0 10px; font-size: 20px; }
+.preparation-overview p { margin: 8px 0; font-size: 14px; line-height: 1.8; color: #435671; }

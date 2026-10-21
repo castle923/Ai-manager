@@ -3,6 +3,8 @@ import json
 from pathlib import Path
 import threading
 import uuid
+import sqlite3
+from contextlib import closing
 
 from .validation_contracts import fail, identifier, object_fields
 from .validation_store import ValidationStore, build_plan, packed, DB_NAME, control_code_sha
@@ -63,6 +65,18 @@ class ValidationUI:
         with store.connection() as db:
             rows = db.execute('SELECT p.id,p.sha,p.created_ms,p.expires_ms,p.invalid,a.id approval_id,a.used,b.id batch_id,b.status FROM plans p LEFT JOIN approvals a ON a.plan_id=p.id LEFT JOIN batches b ON b.plan_id=p.id ORDER BY p.created_ms DESC,p.id LIMIT 100').fetchall()
         return dict(initialized=True, plans=[dict(r) for r in rows], limit=100)
+
+    def has_pending_work(self):
+        """Admission must inspect all batches, independently of UI pagination."""
+        with self.lock:
+            if self.worker and self.worker.is_alive():
+                return True
+            if not (self.home/DB_NAME).exists():
+                return False
+            database = safe_path(self.home, DB_NAME)
+            with closing(sqlite3.connect(database.as_uri()+'?mode=ro', uri=True)) as db:
+                db.execute('PRAGMA query_only=ON')
+                return db.execute("SELECT 1 FROM batches WHERE status IN ('pending','running') LIMIT 1").fetchone() is not None
 
     def create_plan(self, data):
         object_fields(data, ('roots', 'action', 'runtimes', 'wall_seconds', 'source', 'drive_scope'))

@@ -14,7 +14,7 @@ from .validation_intake import observation_sha, reobserve, safe_path
 DB_NAME='validation-control.sqlite3'
 CODE_FILES=('validation_intake.py','validation_drive.py','validation_store.py','validation_coordinator.py','validation_probe.py',
             'validation_cli.py','validation_contracts.py','validation_profiles.py','execution_slot.py','inference.py',
-            'drive.py','auth.py','config.py','security.py','local_mode.py')
+            'drive.py','auth.py','config.py','security.py','local_mode.py','drive_setup.py')
 
 
 def packed(value):return json.dumps(value,sort_keys=True,separators=(',',':'),ensure_ascii=True,allow_nan=False)

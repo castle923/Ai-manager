@@ -19,12 +19,31 @@ from datetime import datetime, timezone
 
 class LocalApplication:
     """An explicitly owned loopback server with deterministic host shutdown."""
-    def __init__(self, server, inference, cancel, tasks=None, validation=None):
+    def __init__(self, server, inference, cancel, tasks=None, validation=None, admission=None, mutation_lock=None, busy=None):
         self.server, self.inference, self.cancel, self.tasks = server, inference, cancel, tasks
         self.url = f"http://127.0.0.1:{server.server_port}/"
         self.validation = validation
         self.thread = None
         self.closed = False
+        self.admission = admission if admission is not None else {'accepting': True}
+        self.mutation_lock = mutation_lock or threading.RLock()
+        self._busy = busy or (lambda: False)
+
+    def quiesce(self):
+        if not self.mutation_lock.acquire(False):
+            return False
+        try:
+            if self.closed or not self.admission['accepting'] or self._busy():
+                return False
+            self.admission['accepting'] = False
+            return True
+        finally:
+            self.mutation_lock.release()
+
+    def resume_requests(self):
+        with self.mutation_lock:
+            if not self.closed:
+                self.admission['accepting'] = True
 
     def start(self):
         if self.closed or self.thread is not None:
@@ -49,6 +68,19 @@ class LocalApplication:
 
 
 def create_application(home, settings, auth, port=0):
+    constructed = []
+    try:
+        return _create_application(home, settings, auth, port, constructed)
+    except BaseException:
+        for resource in reversed(constructed):
+            try:
+                resource.close()
+            except Exception:
+                pass  # Preserve the construction failure; all owners get a close attempt.
+        raise
+
+
+def _create_application(home, settings, auth, port, constructed):
     from .config import private_home
     home=private_home(home)
     from .inventory import Inventory
@@ -59,9 +91,11 @@ def create_application(home, settings, auth, port=0):
     from .preparation import Preparation
     preparation = Preparation(home, settings, auth)
     inference = Inference(home)
+    constructed.append(inference)
     from .registry import Registry, RegistryError
     from .task_inference import TaskInference
     tasks = TaskInference(home)
+    constructed.append(tasks)
     registry = Registry(home, settings, inference, tasks)
     from .history import History, HistoryError
     from .preferences import Preferences, PreferenceError
@@ -70,11 +104,26 @@ def create_application(home, settings, auth, port=0):
     from .validation_ui import ValidationUI
     from .validation_contracts import ContractError
     validation = ValidationUI(home, settings, auth)
+    constructed.append(validation)
     csrf = secrets.token_urlsafe(32)
     job_lock = threading.Lock()
     task_state_lock = threading.RLock()
     cancel = threading.Event()
     task = {"status": "idle"}
+    mutation_lock = threading.RLock()
+    admission = {'accepting': True}
+
+    def busy():
+        if job_lock.locked():
+            return True
+        with inference.lock, tasks.lock, validation.lock:
+            if inference.active is not None or tasks.active is not None:
+                return True
+            if any(r['status'] in {'queued', 'staged'} for r in inference._runs()):
+                return True
+            if any(r['status'] == 'queued' for r in tasks._runs()):
+                return True
+            return validation.has_pending_work()
 
     from .local_mode import is_local, account_status, drive_status
 
@@ -272,6 +321,11 @@ def create_application(home, settings, auth, port=0):
             return self.reply(404, {"error": "not_found"})
 
         def do_POST(self):
+            # Same gate as workspace reconfiguration: admission cannot race POST.
+            with mutation_lock:
+                return self._do_POST()
+
+        def _do_POST(self):
             if not self.allowed() or not secrets.compare_digest(self.headers.get("X-AiManager-CSRF", ""), csrf):
                 # Consume only a bounded rejected body so Windows can deliver the
                 # denial response reliably; authentication is never bypassed.
@@ -283,6 +337,9 @@ def create_application(home, settings, auth, port=0):
                         self.rfile.read(rejected_length)
                 except (ValueError, OSError): pass
                 return self.reply(403, {"error": "forbidden"})
+            if not admission['accepting']:
+                self.close_connection = True
+                return self.reply(409, {'error': 'workspace_reconfiguring'})
             if self.headers.get("Content-Type") != "application/json":
                 return self.reply(415, {"error": "json_required"})
             try:
@@ -394,29 +451,24 @@ def create_application(home, settings, auth, port=0):
             threading.Thread(target=work, args=(action, account, model_id,history_id,started_at), daemon=True).start()
             self.reply(202, {"status": "started"})
 
-    try:
-        server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
-    except OSError:
-        tasks.close()
-        inference.close()
-        raise
+    server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     server.daemon_threads = True
     server.timeout = 1
-    return LocalApplication(server, inference, cancel, tasks, validation)
+    return LocalApplication(server, inference, cancel, tasks, validation, admission, mutation_lock, busy)
 
 
 def serve(home, settings, auth, browser=webbrowser.open, port=0):
     application = create_application(home, settings, auth, port)
     try:
         application.start()
-        print("Ai-manager 로컬 화면: " + application.url, flush=True)
+        print("Ai Manager 로컬 화면: " + application.url, flush=True)
         browser(application.url)
         application.thread.join()
     finally:
         application.close()
 
 
-HTML = """<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ai-manager · M1</title><link rel="stylesheet" href="/style.css"><body><main><p class="eyebrow">AI-MANAGER / M1</p><h1>내 모델 목록 연결</h1><p>두 계정의 지정 폴더를 읽기 전용으로 확인합니다. 파일 내용 다운로드와 모델 실행은 이후 단계입니다.</p><section id="accounts" aria-label="계정 연결"></section><section><h2>진행 상태</h2><p id="task" role="status" aria-live="polite"></p><button id="cancel">현재 작업 취소</button></section><section><h2>이번 앱의 수집 기록</h2><p>완료·부분 실패·과거 스캔을 구분합니다. 파일 발견은 구성·무결성·실행 검증을 뜻하지 않습니다.</p><label for="scan-select">조회할 수집 기록</label><select id="scan-select"></select><p id="inventory"></p><p id="scan-errors" role="status"></p><div class="table-wrap"><table><thead><tr><th scope="col">파일 이름</th><th scope="col">후보 종류</th><th scope="col">크기</th><th scope="col">수정일</th><th scope="col">발견 위치</th></tr></thead><tbody id="files"></tbody></table></div><p id="page-info"></p><button id="previous">이전 50개</button><button id="next">다음 50개</button></section><p id="error" role="alert"></p></main><script src="/app.js"></script></body></html>"""
+HTML = """<!doctype html><html lang="ko"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ai Manager · M1</title><link rel="stylesheet" href="/style.css"><body><main><p class="eyebrow">Ai Manager / M1</p><h1>내 모델 목록 연결</h1><p>두 계정의 지정 폴더를 읽기 전용으로 확인합니다. 파일 내용 다운로드와 모델 실행은 이후 단계입니다.</p><section id="accounts" aria-label="계정 연결"></section><section><h2>진행 상태</h2><p id="task" role="status" aria-live="polite"></p><button id="cancel">현재 작업 취소</button></section><section><h2>이번 앱의 수집 기록</h2><p>완료·부분 실패·과거 스캔을 구분합니다. 파일 발견은 구성·무결성·실행 검증을 뜻하지 않습니다.</p><label for="scan-select">조회할 수집 기록</label><select id="scan-select"></select><p id="inventory"></p><p id="scan-errors" role="status"></p><div class="table-wrap"><table><thead><tr><th scope="col">파일 이름</th><th scope="col">후보 종류</th><th scope="col">크기</th><th scope="col">수정일</th><th scope="col">발견 위치</th></tr></thead><tbody id="files"></tbody></table></div><p id="page-info"></p><button id="previous">이전 50개</button><button id="next">다음 50개</button></section><p id="error" role="alert"></p></main><script src="/app.js"></script></body></html>"""
 SCRIPT = """
 const labels={connect:'Google 로그인',refresh:'토큰 갱신 검증',scan:'허용 폴더 새로 수집',disconnect:'연결 해제'};
 const statusLabels={idle:'대기 중',running:'진행 중',finished:'작업 완료',failed:'작업 실패',complete:'수집 완료',partial:'부분 수집 · 오류 있음',cancelled:'취소됨',interrupted:'중단됨'};

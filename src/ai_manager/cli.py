@@ -17,7 +17,7 @@ def services(home=None):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Ai-manager: 읽기 전용 모델 조회와 선정 자산 준비")
+    parser = argparse.ArgumentParser(description="Ai Manager: 읽기 전용 모델 조회와 선정 자산 준비")
     parser.add_argument("--home", help="명시적 절대경로의 별도 앱 홈; 기존 홈을 복사하지 않음")
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("init-local", help="새 작업실에만 Drive 미연결 로컬 설정 생성")

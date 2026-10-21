@@ -220,9 +220,11 @@ async function inspectAudio(file: File): Promise<AudioInput> {
 export function TaskPanel({
   csrf,
   initialRunId,
+  taskType = "",
 }: {
   csrf: string;
   initialRunId?: string;
+  taskType?: string;
 }) {
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [models, setModels] = useState<RegisteredModel[]>([]);
@@ -290,6 +292,7 @@ export function TaskPanel({
       snapshot?.catalog.some(
         (adapter) =>
           adapter.id === model.artifact.adapter_id &&
+          (!taskType || adapter.task_type === taskType) &&
           adapter.implementation_available,
       ),
   );
@@ -474,7 +477,7 @@ export function TaskPanel({
     <section className="task-panel registry-panel" aria-label="모델 작업 실행">
       <div className="section-title">
         <div>
-          <h2>모델 작업 실행</h2>
+          <h2>{taskLabels[taskType] || "지원 작업 전체"} 작업실</h2>
           <p className="muted">
             등록한 모델의 지원 범위와 준비 상태를 확인하고, 새 입력으로
             실행합니다.
@@ -516,67 +519,72 @@ export function TaskPanel({
       ) : (
         <>
           <div className="task-catalog" aria-label="종류별 지원 상태">
-            {snapshot.catalog.map((item) => (
-              <article className="task-catalog-card registry-run" key={item.id}>
-                <strong>{item.name}</strong>
-                <p>{taskLabels[item.task_type] || item.task_type}</p>
-                <span className="badge">
+            {snapshot.catalog
+              .filter((item) => !taskType || item.task_type === taskType)
+              .map((item) => (
+                <article
+                  className="task-catalog-card registry-run"
+                  key={item.id}
+                >
+                  <strong>{item.name}</strong>
+                  <p>{taskLabels[item.task_type] || item.task_type}</p>
+                  <span className="badge">
+                    {item.execution_blockers?.length &&
+                    item.implementation_available
+                      ? "현재 로컬 실행 차단"
+                      : item.implementation_available
+                        ? item.runtime.status === "ready"
+                          ? "실행 환경 준비 확인"
+                          : "구현됨 · 환경 준비 필요"
+                        : "실행 미지원"}
+                  </span>
                   {item.execution_blockers?.length &&
-                  item.implementation_available
-                    ? "현재 로컬 실행 차단"
-                    : item.implementation_available
-                      ? item.runtime.status === "ready"
-                        ? "실행 환경 준비 확인"
-                        : "구현됨 · 환경 준비 필요"
-                      : "실행 미지원"}
-                </span>
-                {item.execution_blockers?.length &&
-                item.implementation_available ? (
-                  <p>{item.execution_blockers.map(explain).join(" ")}</p>
-                ) : !item.implementation_available ? (
-                  <p>
-                    {item.blocker
-                      ? explain(item.blocker)
-                      : "실행 어댑터가 아직 구현되지 않았습니다."}
-                  </p>
-                ) : item.runtime.status !== "ready" ? (
-                  <p>
-                    {(item.runtime.blockers?.length
-                      ? item.runtime.blockers
-                      : ["adapter_runtime_not_ready"]
-                    )
-                      .map(explain)
-                      .join(" ")}
-                  </p>
-                ) : (
-                  <p className="caption">
-                    환경 준비는 실제 실행 성공을 뜻하지 않습니다. 실행별 결과를
-                    확인하세요.
-                  </p>
-                )}
-                {item.execution_advisories?.length ? (
-                  <p className="caption">
-                    참고: {item.execution_advisories.map(explain).join(" ")}{" "}
-                    실행 시 실제 자원 조건으로 판단합니다.
-                  </p>
-                ) : null}
-                {item.memory_requirements ? (
-                  <p className="caption">
-                    로컬 자원 사전 조건: GPU 전체{" "}
-                    {item.memory_requirements.gpu_total_min_bytes / 1024 ** 3}{" "}
-                    GiB 이상·여유{" "}
-                    {item.memory_requirements.gpu_free_min_bytes / 1024 ** 3}{" "}
-                    GiB 이상, RAM 여유{" "}
-                    {item.memory_requirements.ram_available_min_bytes /
-                      1024 ** 3}{" "}
-                    GiB 이상, 저장 공간 여유{" "}
-                    {item.memory_requirements.disk_free_min_bytes / 1024 ** 3}{" "}
-                    GiB 이상입니다. 현재 여유량을 측정한 표시가 아니며, 모델
-                    로딩 전에 다시 확인합니다.
-                  </p>
-                ) : null}
-              </article>
-            ))}
+                  item.implementation_available ? (
+                    <p>{item.execution_blockers.map(explain).join(" ")}</p>
+                  ) : !item.implementation_available ? (
+                    <p>
+                      {item.blocker
+                        ? explain(item.blocker)
+                        : "실행 어댑터가 아직 구현되지 않았습니다."}
+                    </p>
+                  ) : item.runtime.status !== "ready" ? (
+                    <p>
+                      {(item.runtime.blockers?.length
+                        ? item.runtime.blockers
+                        : ["adapter_runtime_not_ready"]
+                      )
+                        .map(explain)
+                        .join(" ")}
+                    </p>
+                  ) : (
+                    <p className="caption">
+                      환경 준비는 실제 실행 성공을 뜻하지 않습니다. 실행별
+                      결과를 확인하세요.
+                    </p>
+                  )}
+                  {item.execution_advisories?.length ? (
+                    <p className="caption">
+                      참고: {item.execution_advisories.map(explain).join(" ")}{" "}
+                      실행 시 실제 자원 조건으로 판단합니다.
+                    </p>
+                  ) : null}
+                  {item.memory_requirements ? (
+                    <p className="caption">
+                      로컬 자원 사전 조건: GPU 전체{" "}
+                      {item.memory_requirements.gpu_total_min_bytes / 1024 ** 3}{" "}
+                      GiB 이상·여유{" "}
+                      {item.memory_requirements.gpu_free_min_bytes / 1024 ** 3}{" "}
+                      GiB 이상, RAM 여유{" "}
+                      {item.memory_requirements.ram_available_min_bytes /
+                        1024 ** 3}{" "}
+                      GiB 이상, 저장 공간 여유{" "}
+                      {item.memory_requirements.disk_free_min_bytes / 1024 ** 3}{" "}
+                      GiB 이상입니다. 현재 여유량을 측정한 표시가 아니며, 모델
+                      로딩 전에 다시 확인합니다.
+                    </p>
+                  ) : null}
+                </article>
+              ))}
           </div>
           <p className="caption">
             이 앱은 현재 PC에서 실행합니다. 파일 발견·구성 확인·환경 준비와 실제

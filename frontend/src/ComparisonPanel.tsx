@@ -267,7 +267,12 @@ export function ComparisonPanel({
         </div>
         <div>
           <span className="eyebrow">FRESH A/B COMPARISON</span>
-          <h2>같은 문장, 두 모델의 새 목소리</h2>
+          <h2>TTS A/B 비교 · 같은 문장, 두 모델의 새 목소리</h2>
+          <p className="muted">
+            이 비교는 Qwen3-TTS CustomVoice 0.6B와 1.7B 두 실행 프로필의 음성
+            합성에 한정됩니다. 다른 종류의 모델이나 파일 보관 위치를 비교하는
+            기능은 아닙니다.
+          </p>
           <p>
             모델을 하나씩 새로 로딩하고 동일한 한국어 입력과 seed로 실행합니다.
           </p>

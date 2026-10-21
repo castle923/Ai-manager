@@ -9,6 +9,8 @@ type HostResult = {
   files_verified?: number;
   instance_id?: string;
   source_directory?: string;
+  path?: string;
+  backup?: string;
   preflight?: {
     component: string;
     expected_bytes: number;
@@ -16,6 +18,13 @@ type HostResult = {
   };
 };
 type HostApi = {
+  choose_model_directory: () => Promise<HostResult>;
+  choose_drive_original: (kind: "client" | "allowlist") => Promise<HostResult>;
+  configure_drive: (
+    clientPath: string,
+    allowlistPath: string,
+  ) => Promise<HostResult>;
+  drive_setup_status: () => Promise<HostResult>;
   task_runtime_status: (identifier?: string) => Promise<HostResult>;
   prepare_task_runtime: (identifier?: string) => Promise<HostResult>;
   save_task: (id: string, outputId: string) => Promise<HostResult>;
@@ -43,6 +52,207 @@ function useHost() {
     return () => window.removeEventListener("pywebviewready", ready);
   }, []);
   return host;
+}
+
+export function ModelFolderPicker({
+  onSelected,
+  disabled,
+}: {
+  onSelected: (path: string) => void;
+  disabled?: boolean;
+}) {
+  const host = useHost();
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  if (!host?.choose_model_directory) return null;
+  return (
+    <div className="folder-picker">
+      <button
+        type="button"
+        className="secondary"
+        disabled={disabled || busy}
+        onClick={async () => {
+          setBusy(true);
+          setMessage("");
+          try {
+            const result = await host.choose_model_directory();
+            if (result.status === "selected" && result.path)
+              onSelected(result.path);
+            else
+              setMessage(
+                result.status === "cancelled"
+                  ? "선택을 취소했습니다. 입력한 위치는 유지합니다."
+                  : "모델 보관 폴더를 선택하지 못했습니다.",
+              );
+          } catch {
+            setMessage("앱 폴더 선택에 연결하지 못했습니다.");
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        {busy ? "폴더 선택 중…" : "내장·외장 드라이브에서 폴더 선택"}
+      </button>
+      {message && <small role="status">{message}</small>}
+    </div>
+  );
+}
+
+const driveSetupErrors: Record<string, string> = {
+  workspace_busy:
+    "진행 중이거나 대기 중인 작업을 먼저 마친 뒤 연결 설정을 적용하세요.",
+  drive_setup_inputs_invalid:
+    "지정한 OAuth client와 허용 목록 JSON의 전체 경로·형식을 확인하세요. 기존 설정은 유지했습니다.",
+  drive_setup_settings_invalid:
+    "현재 작업실 설정을 읽지 못했습니다. 기존 파일을 보존하고 설정 경로·무결성을 확인하세요.",
+  drive_setup_failed_local_preserved:
+    "Drive 설정을 적용하지 못해 로컬 작업실 설정을 복구했습니다. 지정 원본을 확인하세요.",
+  drive_setup_recovery_requires_restart:
+    "안전한 복구를 완료하지 못했습니다. 기존 자료를 보존했습니다. 앱을 정상 종료한 뒤 현재 설정을 확인하고 다시 열어주세요.",
+  drive_already_configured:
+    "이미 Drive 설정이 있는 작업실입니다. 아래 계정 연결 상태를 확인하세요.",
+};
+
+export function DriveConnectionSetup() {
+  const host = useHost();
+  const [client, setClient] = useState("");
+  const [allowlist, setAllowlist] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  useEffect(() => {
+    if (!host?.drive_setup_status) return;
+    let live = true;
+    const update = async () => {
+      try {
+        const result = await host.drive_setup_status();
+        if (live && result.status === "failed")
+          setMessage(
+            driveSetupErrors[result.error || ""] ||
+              "연결 설정 상태를 확인하세요.",
+          );
+      } catch {
+        /* The explicit submit still reports bridge errors. */
+      }
+    };
+    void update();
+    const timer = window.setInterval(update, 1500);
+    return () => {
+      live = false;
+      window.clearInterval(timer);
+    };
+  }, [host]);
+  async function choose(kind: "client" | "allowlist") {
+    if (!host?.choose_drive_original || busy) return;
+    setBusy(true);
+    setMessage("");
+    try {
+      const result = await host.choose_drive_original(kind);
+      if (result.status === "selected" && result.path)
+        (kind === "client" ? setClient : setAllowlist)(result.path);
+      else
+        setMessage(
+          result.status === "cancelled"
+            ? "선택을 취소했습니다. 기존 입력을 유지합니다."
+            : "지정한 JSON 원본을 선택할 수 없습니다.",
+        );
+    } catch {
+      setMessage("앱 파일 선택에 연결하지 못했습니다.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section
+      className="panel drive-connection-setup"
+      aria-label="현재 로컬 작업실에 Google Drive 연결 설정 추가"
+    >
+      <h2>이 작업실에 Google Drive 연결하기</h2>
+      <p>
+        현재 작업실은 Drive를 연결하지 않은 로컬 모드입니다. 이전 작업실의
+        로그인이 해제됐다는 뜻은 아닙니다. 이 작업실의 모델 등록·DB는 유지하면서
+        연결 설정을 추가할 수 있습니다.
+      </p>
+      <p>
+        이번 프로젝트에 지정한 OAuth client와 두 계정의 허용 목록 JSON 원본을
+        선택하세요. 설정 원본을 백업하고 연결 화면을 다시 엽니다. 다음 계정
+        로그인과 Google 동의는 직접 진행합니다.
+      </p>
+      <label>
+        OAuth client JSON 원본 전체 경로
+        <input
+          value={client}
+          onChange={(event) => setClient(event.target.value)}
+          disabled={busy}
+        />
+      </label>
+      <button
+        type="button"
+        className="secondary"
+        disabled={busy || !host?.choose_drive_original}
+        onClick={() => choose("client")}
+      >
+        OAuth client 원본 선택
+      </button>
+      <label>
+        허용 목록 JSON 원본 전체 경로
+        <input
+          value={allowlist}
+          onChange={(event) => setAllowlist(event.target.value)}
+          disabled={busy}
+        />
+      </label>
+      <button
+        type="button"
+        className="secondary"
+        disabled={busy || !host?.choose_drive_original}
+        onClick={() => choose("allowlist")}
+      >
+        허용 목록 원본 선택
+      </button>
+      <p className="caption">
+        기존 작업실의 토큰을 복사하거나 자동으로 계정에 로그인하지 않습니다.
+        Drive 권한은 읽기 전용입니다.
+      </p>
+      <button
+        type="button"
+        className="primary"
+        disabled={
+          busy || !host?.configure_drive || !client.trim() || !allowlist.trim()
+        }
+        onClick={async () => {
+          if (!host || busy) return;
+          setBusy(true);
+          setMessage("설정 원본과 작업 상태를 확인합니다…");
+          try {
+            const result = await host.configure_drive(
+              client.trim(),
+              allowlist.trim(),
+            );
+            setMessage(
+              result.status === "configured"
+                ? "설정을 백업하고 연결 화면을 다시 엽니다. 계정별 로그인은 직접 진행하세요."
+                : driveSetupErrors[result.error || ""] ||
+                    "연결 설정을 완료하지 못했습니다.",
+            );
+          } catch {
+            setMessage(
+              "앱 연결 설정에 응답이 없습니다. 현재 화면과 설정을 확인하세요.",
+            );
+          } finally {
+            setBusy(false);
+          }
+        }}
+      >
+        {busy ? "연결 설정 확인 중…" : "현재 작업실을 보존하고 Drive 설정 적용"}
+      </button>
+      {!host?.configure_drive && (
+        <p role="status">
+          이 연결 설정은 Ai Manager Windows 앱에서 사용할 수 있습니다.
+        </p>
+      )}
+      {message && <p role="status">{message}</p>}
+    </section>
+  );
 }
 
 export function AudioDownload({
@@ -164,7 +374,7 @@ export function DesktopRuntime() {
         <div className="desktop-runtime-row">
           <div className="desktop-preparation-heading">
             <span className="desktop-step">1단계</span>
-            <h2>앱 추론 환경</h2>
+            <h2>TTS 추론 환경</h2>
             <p
               className="desktop-preparation-status"
               data-state={denied ? "denied" : state.status}
@@ -175,7 +385,9 @@ export function DesktopRuntime() {
                 : stages[state.stage || ""] || "준비 상태 확인"}
               {state.error ? " · 연결·저장 공간·앱 무결성을 확인해주세요." : ""}
             </p>
-            <p className="desktop-preparation-requirement">첫 준비에는 인터넷과 수 GB의 저장 공간이 필요합니다.</p>
+            <p className="desktop-preparation-requirement">
+              첫 준비에는 인터넷과 수 GB의 저장 공간이 필요합니다.
+            </p>
           </div>
           <button
             className="primary"
@@ -214,7 +426,11 @@ export function DesktopRuntime() {
         <div className="desktop-runtime-row">
           <div className="desktop-preparation-heading">
             <span className="desktop-step">2단계</span>
-            <h2>모델 파일 준비</h2>
+            <h2>TTS 프로필 파일 준비</h2>
+            <p className="caption">
+              0.6B와 1.7B는 Qwen3-TTS 실행 프로필 크기입니다. 드라이브 종류가
+              아닙니다. 일반 모델 위치는 모델 관리에서 등록하세요.
+            </p>
             <p
               className="desktop-preparation-status"
               data-state={denied ? "denied" : model.status}
@@ -263,14 +479,14 @@ export function DesktopRuntime() {
               disabled={modelBusy}
               onClick={() => prepareModel("qwen3-tts-0.6b-customvoice")}
             >
-              0.6B 폴더 선택
+              0.6B TTS 원본 폴더 선택
             </button>
             <button
               className="secondary"
               disabled={modelBusy}
               onClick={() => prepareModel("qwen3-tts-1.7b-customvoice")}
             >
-              1.7B 폴더 선택
+              1.7B TTS 원본 폴더 선택
             </button>
             {model.status === "running" && (
               <button

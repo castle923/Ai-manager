@@ -31,12 +31,22 @@ import { PreparationPanel } from "./PreparationPanel";
 import { TaskPanel } from "./TaskPanel";
 import { TtsPanel } from "./TtsPanel";
 import { ComparisonPanel } from "./ComparisonPanel";
-import { DesktopRuntime, TaskRuntime } from "./DesktopHost";
+import {
+  DesktopRuntime,
+  TaskRuntime,
+  DriveConnectionSetup,
+} from "./DesktopHost";
 import { RegistryPanel, type CandidateRegistration } from "./RegistryPanel";
 import { HistoryPanel } from "./HistoryPanel";
 import { ValidationPanel } from "./ValidationPanel";
 import { SettingsPanel } from "./SettingsPanel";
-import { RecommendationNotes, RecommendationSummary, purposeOptions, type Recommendation, type RecommendationPolicy } from "./CandidateRecommendation";
+import {
+  RecommendationNotes,
+  RecommendationSummary,
+  purposeOptions,
+  type Recommendation,
+  type RecommendationPolicy,
+} from "./CandidateRecommendation";
 import {
   defaultPreferences,
   workspaceApi,
@@ -92,7 +102,10 @@ type Data = {
   };
 };
 type Status = {
-  drive: { configuration: "configured" | "not_configured"; mode: "drive" | "local" };
+  drive: {
+    configuration: "configured" | "not_configured";
+    mode: "drive" | "local";
+  };
   accounts: Record<string, { credential_saved: boolean; roots: number }>;
   task: {
     status: string;
@@ -183,7 +196,19 @@ async function api<T>(url: string, init?: RequestInit): Promise<T> {
   return d;
 }
 
+const workshopLabels: Record<string, string> = {
+  stt: "음성 인식 (STT)",
+  llm: "텍스트 생성",
+  image: "이미지 생성",
+  tracking: "영상 점 추적",
+};
+
 function App() {
+  const [workshopsOpen, setWorkshopsOpen] = useState(true);
+  const [workshopType, setWorkshopType] = useState(() => {
+    const value = appViewParams().get("task_type") || "";
+    return Object.hasOwn(workshopLabels, value) ? value : "";
+  });
   function sourceFromUrl() {
     const p = appViewParams(),
       kind = p.get("source_kind"),
@@ -206,7 +231,9 @@ function App() {
   }
   const [registration, setRegistration] =
     useState<CandidateRegistration | null>(null);
-  const [preparationModelId, setPreparationModelId] = useState("qwen3-tts-0.6b-customvoice");
+  const [preparationModelId, setPreparationModelId] = useState(
+    "qwen3-tts-0.6b-customvoice",
+  );
   const [section, setSectionState] = useState(() => {
       const value = appViewParams().get("section");
       return value &&
@@ -319,8 +346,10 @@ function App() {
     };
   }, [sourceSelection, activeSourceKey]);
   function setSection(value: string) {
+    if (value === "tasks") setWorkshopType("");
     navigationUsed.current = true;
     setSectionState(value);
+    window.scrollTo({ top: 0 });
   }
   useEffect(() => {
     let live = true;
@@ -340,8 +369,11 @@ function App() {
   useEffect(() => {
     const view = appViewParams();
     view.set("section", section);
+    if (section === "tasks" && workshopType)
+      view.set("task_type", workshopType);
+    else view.delete("task_type");
     replaceAppView(view);
-  }, [section]);
+  }, [section, workshopType]);
   useEffect(() => {
     const view = appViewParams();
     if (
@@ -419,7 +451,8 @@ function App() {
     });
     api<Data>("/api/dashboard?" + params, { signal: controller.signal })
       .then((d) => {
-        if (d.recommendation?.purpose !== purpose) throw Error("선택한 작업과 추천 응답이 다릅니다. 다시 확인하세요.");
+        if (d.recommendation?.purpose !== purpose)
+          throw Error("선택한 작업과 추천 응답이 다릅니다. 다시 확인하세요.");
         if (id === request.current) {
           setData(d);
           setFamilyOptions(d.families);
@@ -472,8 +505,19 @@ function App() {
         "/api/detail?" +
           new URLSearchParams({ id: item.id, scan: item.scan_id, purpose }),
       );
-      if (result.recommendation?.purpose !== purpose) throw Error("상세 추천의 작업 목적이 다릅니다. 다시 확인하세요.");
-      if (id === detailRequest.current) setDetail({ ...result, recommendation: result.recommendation && { ...result.recommendation, rank: listRequest === request.current ? item.recommendation?.rank ?? null : null } });
+      if (result.recommendation?.purpose !== purpose)
+        throw Error("상세 추천의 작업 목적이 다릅니다. 다시 확인하세요.");
+      if (id === detailRequest.current)
+        setDetail({
+          ...result,
+          recommendation: result.recommendation && {
+            ...result.recommendation,
+            rank:
+              listRequest === request.current
+                ? (item.recommendation?.rank ?? null)
+                : null,
+          },
+        });
     } catch (e) {
       if (id === detailRequest.current) setError((e as Error).message);
     } finally {
@@ -520,8 +564,17 @@ function App() {
   const busy = pending || status?.task.status === "running";
   const summary = data?.scans.length ? data.summary : undefined;
   const currentScans = data?.scans || [];
-  const candidateReadState = data === null ? (loading ? "조회 중" : error ? "조회 실패" : "확인 불가") : null;
-  const candidateReadNote = loading ? "현재 수집 상태를 확인 중입니다." : "조회 결과가 없어 현재 수집 상태를 확인할 수 없습니다.";
+  const candidateReadState =
+    data === null
+      ? loading
+        ? "조회 중"
+        : error
+          ? "조회 실패"
+          : "확인 불가"
+      : null;
+  const candidateReadNote = loading
+    ? "현재 수집 상태를 확인 중입니다."
+    : "조회 결과가 없어 현재 수집 상태를 확인할 수 없습니다.";
   const partial = currentScans.some((s) => s.status !== "complete");
   const activeFilters = Boolean(q || account || kind || family || scan);
   return (
@@ -542,19 +595,19 @@ function App() {
             <Boxes size={23} />
           </span>
           <span>
-            ai<span className="brand-light">manager</span>
+            Ai Manager
             <small>PERSONAL MODEL HUB</small>
           </span>
         </a>
         <p className="nav-label">내 라이브러리</p>
-        <nav aria-label="주 탐색">
-          <button className={section === "validation" ? "nav active" : "nav"} onClick={() => setSection("validation")}><ShieldCheck size={19} />자동 검수</button>
+        <nav aria-label="준비 순서와 주 탐색">
+          <p className="nav-group-label">준비 순서</p>
           <button
-            className={section === "registry" ? "nav active" : "nav"}
-            onClick={() => setSection("registry")}
+            className={section === "connections" ? "nav active" : "nav"}
+            onClick={() => setSection("connections")}
           >
-            <Boxes size={19} />
-            모델 관리
+            <Link2 size={19} />
+            1. 저장소 연결
           </button>
           <button
             className={section === "library" ? "nav active" : "nav"}
@@ -562,97 +615,182 @@ function App() {
           >
             <Layers size={19} />
             파일 후보 탐색
-            <ArrowRight size={15} />
           </button>
           <button
-            className={section === "connections" ? "nav active" : "nav"}
-            onClick={() => setSection("connections")}
+            className={section === "registry" ? "nav active" : "nav"}
+            onClick={() => setSection("registry")}
           >
-            <Link2 size={19} />
-            계정 및 수집
+            <Boxes size={19} />
+            2. 모델 관리
           </button>
           <button
             className={section === "preparation" ? "nav active" : "nav"}
             aria-label="선정 모델 준비"
             onClick={() => setSection("preparation")}
           >
-            <HardDrive size={19} /> 모델 준비
+            <HardDrive size={19} />
+            3. 실행 준비
           </button>
           <button
-            className={section === "tts" ? "nav active" : "nav"}
-            aria-label="음성 실행 작업실"
-            onClick={() => setSection("tts")}
+            type="button"
+            className="nav-group-toggle"
+            aria-expanded={workshopsOpen}
+            aria-controls="workshop-submenu"
+            onClick={() => setWorkshopsOpen((open) => !open)}
           >
-            <Play size={19} /> 음성 작업실
+            <span>4. 작업실</span>
+            <span className="workshop-chevron" aria-hidden="true">
+              {workshopsOpen ? "▾" : "▸"}
+            </span>
           </button>
-          <button
-            className={section === "tasks" ? "nav active" : "nav"}
-            onClick={() => setSection("tasks")}
+          <div
+            id="workshop-submenu"
+            className="nav-submenu"
+            role="group"
+            aria-label="작업별 실행 화면"
+            hidden={!workshopsOpen}
           >
-            <Play size={19} /> 유형별 작업실
-          </button>
+            <button
+              className={section === "tts" ? "nav active" : "nav"}
+              aria-label="음성 실행 작업실"
+              onClick={() => setSection("tts")}
+            >
+              <Play size={17} />
+              음성 합성 (TTS)
+            </button>
+            {Object.entries(workshopLabels).map(([type, label]) => (
+              <button
+                key={type}
+                className={
+                  section === "tasks" && workshopType === type
+                    ? "nav active"
+                    : "nav"
+                }
+                onClick={() => {
+                  setSourceSelection(null);
+                  setSection("tasks");
+                  setWorkshopType(type);
+                }}
+              >
+                <Play size={17} />
+                {label}
+              </button>
+            ))}
+            <button
+              className={
+                section === "tasks" && !workshopType ? "nav active" : "nav"
+              }
+              onClick={() => setSection("tasks")}
+            >
+              <Layers size={17} />
+              유형별 작업실 전체
+            </button>
+            <button
+              className={section === "comparison" ? "nav active" : "nav"}
+              onClick={() => setSection("comparison")}
+            >
+              <Layers size={17} />
+              TTS A/B 비교
+            </button>
+          </div>
+          <p className="nav-group-label">검수와 기록</p>
           <button
-            className={section === "comparison" ? "nav active" : "nav"}
-            onClick={() => setSection("comparison")}
+            className={section === "validation" ? "nav active" : "nav"}
+            onClick={() => setSection("validation")}
           >
-            <Layers size={19} /> 새 A/B 비교
+            <ShieldCheck size={19} />
+            자동 검수
           </button>
           <button
             className={section === "history" ? "nav active" : "nav"}
             onClick={() => setSection("history")}
           >
-            <Database size={19} /> 통합 작업 기록
+            <Database size={19} />
+            통합 작업 기록
           </button>
           <button
             className={section === "settings" ? "nav active" : "nav"}
             onClick={() => setSection("settings")}
           >
-            <Settings2 size={19} /> 설정
+            <Settings2 size={19} />
+            설정
           </button>
         </nav>
         <div className="sidebar-note">
           <ShieldCheck size={20} />
           <strong>로컬 · 읽기 전용</strong>
           <p>
-            허용한 폴더를 읽고 선정 모델을
-            <br />이 PC에서 준비합니다.
+            내장·외장 드라이브와 Google Drive의
+            <br />
+            개인 모델을 관리합니다.
           </p>
         </div>
         <div className="sidebar-foot">
           <span className="dot" /> 개인 PC에서 실행 중
-          <small>M9 · 기록과 근거 연결</small>
+          <small>보관 위치 · 실행 지원 구분</small>
         </div>
       </aside>
       <div className="workspace">
         <header className="topbar">
           <span>
-            Ai-manager <span className="slash">/</span>{" "}
-            {section === "validation" ? "보유 모델 자동 검수" : section === "tasks"
-              ? "유형별 작업실"
-              : section === "history"
-                ? "통합 작업 기록"
-                : section === "settings"
-                  ? "설정"
-                  : section === "registry"
-                    ? "모델 관리"
-                    : section === "library"
-                      ? "파일 후보 탐색"
-                      : section === "preparation"
-                        ? "모델 준비"
-                        : section === "tts"
-                          ? "음성 작업실"
-                          : section === "comparison"
-                            ? "새 A/B 비교"
-                            : "계정 및 수집"}
+            Ai Manager <span className="slash">/</span>{" "}
+            {section === "validation"
+              ? "보유 모델 자동 검수"
+              : section === "tasks"
+                ? workshopLabels[workshopType] || "작업실 전체"
+                : section === "history"
+                  ? "통합 작업 기록"
+                  : section === "settings"
+                    ? "설정"
+                    : section === "registry"
+                      ? "모델 관리"
+                      : section === "library"
+                        ? "파일 후보 탐색"
+                        : section === "preparation"
+                          ? "모델 준비"
+                          : section === "tts"
+                            ? "음성 합성 (TTS)"
+                            : section === "comparison"
+                              ? "TTS A/B 비교"
+                              : "저장소 연결"}
           </span>
           <div className="top-meta">
-            <ShieldCheck size={15} /> {status?.drive.configuration === "not_configured" ? "로컬 모드 · Drive 미설정" : "Drive 읽기 전용"}{" "}
+            <ShieldCheck size={15} />{" "}
+            {status?.drive.configuration === "not_configured"
+              ? "로컬 모드 · Drive 미설정"
+              : "Drive 읽기 전용"}{" "}
             <span className="avatar">ME</span>
           </div>
         </header>
         <main id="main">
-          {status?.drive.configuration === "not_configured" && <div className="banner" role="status">Drive 미연결 로컬 작업실입니다. 로컬 모델 등록·검증을 사용할 수 있으며 자격 증명 저장소는 확인하지 않습니다.</div>}
-          <DesktopRuntime />
+          {status?.drive.configuration === "not_configured" && (
+            <div className="banner" role="status">
+              Drive 미연결 로컬 작업실입니다. 로컬 모델 등록·검증을 사용할 수
+              있으며 자격 증명 저장소는 확인하지 않습니다.
+            </div>
+          )}
+          <div hidden={section !== "preparation"}>
+            <section
+              className="preparation-overview"
+              aria-label="보관 위치와 실행 준비의 차이"
+            >
+              <h2>보관 위치를 정한 뒤, 실행할 프로필을 준비하세요</h2>
+              <p>
+                모델 관리의 폴더 선택은 내장·외장 드라이브의 보관 위치를
+                등록합니다. 아래 TTS 준비는 지정한 두 프로필의 파일을 새 준비
+                폴더로 복사·검증하며, 다른 네 유형의 작업은 등록한 원본 폴더를
+                검증해 사용합니다. 로컬 모델을 다시 인터넷에서 받을 필요는
+                없습니다.
+              </p>
+              <p>
+                Google Drive 같은 원격 저장소의 가중치는 실행할 PC나 런타임에서
+                실제 파일에 접근할 수 있어야 합니다. 현재 앱의 실행 위치는 이
+                PC이며 RunPod 원격 실행 연동은 아직 구현되지 않았습니다.
+              </p>
+            </section>
+            <DesktopRuntime />
+            <TaskRuntime />
+          </div>
           {sourceUrlError && (
             <div className="banner danger" role="alert">
               URL의 원본 종류와 ID를 확인하세요. 잘못된 선택을 최신 기록으로
@@ -688,42 +826,46 @@ function App() {
             <div>
               <div className="eyebrow">YOUR MODELS, CLEARLY ORGANIZED</div>
               <h1>
-                {section === "validation" ? "보유 모델 자동 검수" : section === "tasks"
-                  ? "유형별 작업실"
-                  : section === "history"
-                    ? "통합 작업 기록"
-                    : section === "settings"
-                      ? "작업실 설정"
-                      : section === "registry"
-                        ? "모델 관리"
-                        : section === "library"
-                          ? "파일 후보 탐색"
-                          : section === "preparation"
-                            ? "모델 준비"
-                            : section === "tts"
-                              ? "음성 작업실"
-                              : section === "comparison"
-                                ? "새 A/B 비교"
-                                : "계정 및 수집"}
+                {section === "validation"
+                  ? "보유 모델 자동 검수"
+                  : section === "tasks"
+                    ? workshopLabels[workshopType] || "작업실 전체"
+                    : section === "history"
+                      ? "통합 작업 기록"
+                      : section === "settings"
+                        ? "작업실 설정"
+                        : section === "registry"
+                          ? "모델 관리"
+                          : section === "library"
+                            ? "파일 후보 탐색"
+                            : section === "preparation"
+                              ? "모델 준비"
+                              : section === "tts"
+                                ? "음성 합성 (TTS)"
+                                : section === "comparison"
+                                  ? "TTS A/B 비교"
+                                  : "저장소 연결"}
               </h1>
               <p>
-                {section === "validation" ? "보유 모델 자동 검수" : section === "tasks"
-                  ? "유형별 작업실"
-                  : section === "history"
-                    ? "수집부터 준비·실행·비교까지, 저장된 원본 기록과 확인 근거를 따라가세요."
-                    : section === "settings"
-                      ? "이 작업실의 보기 옵션과 자료 위치·적용 범위를 확인하세요."
-                      : section === "registry"
-                        ? "내 모델의 설명과 보관 위치를 등록하고, 확인된 근거에 따라 현재 상태를 살펴보세요."
-                        : section === "library"
-                          ? "흩어져 있는 모델 파일을 모으고, 현재 확인 수준을 한눈에 살펴보세요."
-                          : section === "preparation"
-                            ? "선정 모델의 파일과 환경을 준비하고, 확인 근거를 단계별로 살펴보세요."
-                            : section === "tts"
-                              ? "새 한국어 문장을 음성으로 만들고, 이번 실행의 검증 결과를 확인하세요."
-                              : section === "comparison"
-                                ? "같은 새 입력으로 두 모델을 실행하고, 실제 조건과 결과를 함께 비교하세요."
-                                : "두 계정의 연결과 허용 폴더 수집을 관리하세요."}
+                {section === "validation"
+                  ? "보유 모델 자동 검수"
+                  : section === "tasks"
+                    ? workshopLabels[workshopType] || "작업실 전체"
+                    : section === "history"
+                      ? "수집부터 준비·실행·비교까지, 저장된 원본 기록과 확인 근거를 따라가세요."
+                      : section === "settings"
+                        ? "이 작업실의 보기 옵션과 자료 위치·적용 범위를 확인하세요."
+                        : section === "registry"
+                          ? "내장·외장 드라이브와 Google Drive의 개인 모델을 관리합니다. 보관 위치와 실행 지원 상태를 구분해 확인하세요."
+                          : section === "library"
+                            ? "흩어져 있는 모델 파일을 모으고, 현재 확인 수준을 한눈에 살펴보세요."
+                            : section === "preparation"
+                              ? "실행 프로필에 맞는 환경과 모델 파일을 준비합니다. 보관 위치 등록과는 별도 단계입니다."
+                              : section === "tts"
+                                ? "새 한국어 문장을 음성으로 만들고, 이번 실행의 검증 결과를 확인하세요."
+                                : section === "comparison"
+                                  ? "같은 새 입력으로 두 모델을 실행하고, 실제 조건과 결과를 함께 비교하세요."
+                                  : "로컬·외장 폴더는 모델 관리에서 등록하고, Google Drive는 두 계정의 지정 범위를 읽기 전용으로 연결합니다."}
               </p>
             </div>
             <button
@@ -814,7 +956,11 @@ function App() {
               onExplore={() => setSection("library")}
               onTasks={() => setSection("tasks")}
               onPrepare={(modelId) => {
-                setPreparationModelId(modelId === "qwen3-tts-1.7b-customvoice" ? modelId : "qwen3-tts-0.6b-customvoice");
+                setPreparationModelId(
+                  modelId === "qwen3-tts-1.7b-customvoice"
+                    ? modelId
+                    : "qwen3-tts-0.6b-customvoice",
+                );
                 setSection("preparation");
               }}
             />
@@ -831,8 +977,9 @@ function App() {
             />
           ) : section === "tasks" ? (
             <>
-              <TaskRuntime />
               <TaskPanel
+                key={workshopType || "all"}
+                taskType={workshopType}
                 csrf={csrf.current}
                 initialRunId={
                   sourceSelection?.kind === "model_run"
@@ -861,77 +1008,80 @@ function App() {
           ) : section === "connections" ? (
             <>
               {status?.drive.configuration === "not_configured" ? (
-                <section className="panel validation-panel" role="status">
-                  <h2>Drive 미연결 · 로컬 작업실</h2>
-                  <p>로컬 모델을 등록하고 검증할 수 있습니다. Google 계정과 자격 증명 저장소는 확인하지 않습니다.</p>
-                  <p>Drive 연결은 지정 OAuth 원본과 허용 폴더를 선택한 별도 새 작업실에서 설정하세요. 현재 로컬 등록 DB는 자동 이관되지 않습니다.</p>
-                  <button disabled>Drive 설정이 필요합니다</button>
-                </section>
-              ) : <div className="connection-grid">
-                {["A", "B"].map((a) => (
-                  <section className="connection-card" key={a}>
-                    <div className="account-heading">
-                      <span className="account-symbol">{a}</span>
-                      <div>
-                        <h2>계정 {a}</h2>
-                        <p>
-                          {status?.accounts[a].credential_saved
-                            ? "자격 증명 저장됨"
-                            : "연결이 필요합니다"}
-                        </p>
+                <DriveConnectionSetup />
+              ) : (
+                <div className="connection-grid">
+                  {["A", "B"].map((a) => (
+                    <section className="connection-card" key={a}>
+                      <div className="account-heading">
+                        <span className="account-symbol">{a}</span>
+                        <div>
+                          <h2>계정 {a}</h2>
+                          <p>
+                            {status?.accounts[a].credential_saved
+                              ? "자격 증명 저장됨"
+                              : "연결이 필요합니다"}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                    <p className="muted">
-                      저장된 자격 증명은 현재 인증 성공을 보장하지 않습니다.
-                      갱신 확인으로 현재 연결을 검증하세요.
-                    </p>
-                    <dl className="connection-info">
-                      <div>
-                        <dt>승인된 폴더</dt>
-                        <dd>{status?.accounts[a].roots ?? "미확인"}개</dd>
-                      </div>
-                      <div>
-                        <dt>권한</dt>
-                        <dd>Drive 읽기 전용</dd>
-                      </div>
-                    </dl>
-                    <div className="connection-actions">
-                      <button
-                        className="primary"
-                        disabled={busy}
-                        onClick={() => act("scan", a)}
-                      >
-                        <RefreshCw size={16} /> 새로 수집
-                      </button>
-                      <button disabled={busy} onClick={() => act("refresh", a)}>
-                        인증 갱신 확인
-                      </button>
-                      <button disabled={busy} onClick={() => act("connect", a)}>
-                        Google 로그인
-                      </button>
-                      <button
-                        className="subtle danger-text"
-                        disabled={busy}
-                        onClick={() => setConfirm(a)}
-                      >
-                        연결 해제
-                      </button>
-                    </div>
-                    {confirm === a && (
-                      <div className="banner danger">
-                        <span>
-                          이 PC의 계정 {a} 자격 증명을 지웁니다. 기존 수집
-                          기록은 보존됩니다.
-                        </span>
-                        <button onClick={() => act("disconnect", a)}>
-                          해제 확인
+                      <p className="muted">
+                        저장된 자격 증명은 현재 인증 성공을 보장하지 않습니다.
+                        갱신 확인으로 현재 연결을 검증하세요.
+                      </p>
+                      <dl className="connection-info">
+                        <div>
+                          <dt>승인된 폴더</dt>
+                          <dd>{status?.accounts[a].roots ?? "미확인"}개</dd>
+                        </div>
+                        <div>
+                          <dt>권한</dt>
+                          <dd>Drive 읽기 전용</dd>
+                        </div>
+                      </dl>
+                      <div className="connection-actions">
+                        <button
+                          className="primary"
+                          disabled={busy}
+                          onClick={() => act("scan", a)}
+                        >
+                          <RefreshCw size={16} /> 새로 수집
                         </button>
-                        <button onClick={() => setConfirm("")}>취소</button>
+                        <button
+                          disabled={busy}
+                          onClick={() => act("refresh", a)}
+                        >
+                          인증 갱신 확인
+                        </button>
+                        <button
+                          disabled={busy}
+                          onClick={() => act("connect", a)}
+                        >
+                          Google 로그인
+                        </button>
+                        <button
+                          className="subtle danger-text"
+                          disabled={busy}
+                          onClick={() => setConfirm(a)}
+                        >
+                          연결 해제
+                        </button>
                       </div>
-                    )}
-                  </section>
-                ))}
-              </div>}
+                      {confirm === a && (
+                        <div className="banner danger">
+                          <span>
+                            이 PC의 계정 {a} 자격 증명을 지웁니다. 기존 수집
+                            기록은 보존됩니다.
+                          </span>
+                          <button onClick={() => act("disconnect", a)}>
+                            해제 확인
+                          </button>
+                          <button onClick={() => setConfirm("")}>취소</button>
+                        </div>
+                      )}
+                    </section>
+                  ))}
+                </div>
+              )}
               <section className="panel history">
                 <h2>수집 기록</h2>
                 <p className="muted">
@@ -986,34 +1136,50 @@ function App() {
                   value={summary?.files}
                   text={candidateReadState ?? undefined}
                   icon={<File size={19} />}
-                  note={candidateReadState ? candidateReadNote : "계정별 관찰 · 중복 모델 수 아님"}
+                  note={
+                    candidateReadState
+                      ? candidateReadNote
+                      : "계정별 관찰 · 중복 모델 수 아님"
+                  }
                 />
                 <Metric
                   title="폴더별 후보 그룹"
                   value={summary?.groups}
                   text={candidateReadState ?? undefined}
                   icon={<Folder size={19} />}
-                  note={candidateReadState ? candidateReadNote : "같은 폴더의 파일 묶음"}
+                  note={
+                    candidateReadState
+                      ? candidateReadNote
+                      : "같은 폴더의 파일 묶음"
+                  }
                 />
                 <Metric
                   title="가중치 후보"
                   value={summary?.weights}
                   text={candidateReadState ?? undefined}
                   icon={<Database size={19} />}
-                  note={candidateReadState ? candidateReadNote : "파일명·확장자 기준 분류"}
+                  note={
+                    candidateReadState
+                      ? candidateReadNote
+                      : "파일명·확장자 기준 분류"
+                  }
                 />
                 <Metric
                   title="수집 파일의 관찰 크기"
                   text={
-                    candidateReadState ? candidateReadState : summary && summary.unknown_sizes < summary.files
-                      ? bytes(summary.known_bytes)
-                      : "미수집"
+                    candidateReadState
+                      ? candidateReadState
+                      : summary && summary.unknown_sizes < summary.files
+                        ? bytes(summary.known_bytes)
+                        : "미수집"
                   }
                   icon={<HardDrive size={19} />}
                   note={
-                    candidateReadState ? candidateReadNote : summary?.unknown_sizes
-                      ? `선택 수집 기록 전체 · 크기 미수집 ${summary.unknown_sizes}개 제외`
-                      : "선택 수집 기록 전체 · 파일 메타데이터 합계"
+                    candidateReadState
+                      ? candidateReadNote
+                      : summary?.unknown_sizes
+                        ? `선택 수집 기록 전체 · 크기 미수집 ${summary.unknown_sizes}개 제외`
+                        : "선택 수집 기록 전체 · 파일 메타데이터 합계"
                   }
                 />
               </div>
@@ -1039,9 +1205,11 @@ function App() {
                       <span>
                         <strong>계정 {a}</strong>
                         <small>
-                          {candidateReadState ? candidateReadNote : s
-                            ? `${time(s.started_at)} · ${s.files_count}개 파일`
-                            : "현재 선택 범위에 수집 기록 없음"}
+                          {candidateReadState
+                            ? candidateReadNote
+                            : s
+                              ? `${time(s.started_at)} · ${s.files_count}개 파일`
+                              : "현재 선택 범위에 수집 기록 없음"}
                         </small>
                       </span>
                       <span
@@ -1050,7 +1218,8 @@ function App() {
                           (s?.status === "complete" ? "green" : "amber")
                         }
                       >
-                        {candidateReadState ?? (s ? labels[s.status] || s.status : "미수집")}
+                        {candidateReadState ??
+                          (s ? labels[s.status] || s.status : "미수집")}
                       </span>
                     </div>
                   );
@@ -1103,9 +1272,24 @@ function App() {
                 <div className="search-row">
                   <label className="purpose-select">
                     <span>하고 싶은 작업</span>
-                    <select aria-label="하고 싶은 작업" value={purpose} onChange={e => { close(); setData(null); setLoading(true); setPurpose(e.target.value); setSort("recommendation"); setPage(1); }}>
+                    <select
+                      aria-label="하고 싶은 작업"
+                      value={purpose}
+                      onChange={(e) => {
+                        close();
+                        setData(null);
+                        setLoading(true);
+                        setPurpose(e.target.value);
+                        setSort("recommendation");
+                        setPage(1);
+                      }}
+                    >
                       <option value="">작업 선택 · 전체 후보</option>
-                      {purposeOptions.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
+                      {purposeOptions.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.label}
+                        </option>
+                      ))}
                     </select>
                   </label>
                   <div className="search-field">
@@ -1139,7 +1323,9 @@ function App() {
                         setPage(1);
                       }}
                     >
-                      <option value="recommendation">{view === "models" ? "추천 우선순" : "작업 관련성순"}</option>
+                      <option value="recommendation">
+                        {view === "models" ? "추천 우선순" : "작업 관련성순"}
+                      </option>
                       <option value="name">이름순</option>
                       <option value="size">큰 용량순</option>
                       <option value="modified">최근 수정순</option>
@@ -1228,8 +1414,9 @@ function App() {
                   <span>
                     {loading
                       ? "목록을 불러오는 중…"
-                      : candidateReadState ? "목록 조회 실패 · 현재 수집 상태 확인 불가"
-                      : `${(data?.total ?? 0).toLocaleString()}개 ${view === "models" ? "후보 그룹" : "파일"}`}
+                      : candidateReadState
+                        ? "목록 조회 실패 · 현재 수집 상태 확인 불가"
+                        : `${(data?.total ?? 0).toLocaleString()}개 ${view === "models" ? "후보 그룹" : "파일"}`}
                     {activeFilters ? " · 필터 적용됨" : ""}
                   </span>
                   <span>
@@ -1238,7 +1425,12 @@ function App() {
                       : "파일 내용은 내려받지 않았습니다."}
                   </span>
                 </div>
-                {!loading && <RecommendationSummary policy={data?.recommendation} files={view === "files"} />}
+                {!loading && (
+                  <RecommendationSummary
+                    policy={data?.recommendation}
+                    files={view === "files"}
+                  />
+                )}
                 <div className="table-wrap" aria-busy={loading}>
                   <table>
                     <thead>
@@ -1262,91 +1454,103 @@ function App() {
                       </tr>
                     </thead>
                     <tbody>
-                      {!loading && data?.rows.map((item) => (
-                        <tr key={item.id}>
-                          <td>
-                            <button
-                              className="name-button"
-                              onClick={() => open(item)}
-                            >
+                      {!loading &&
+                        data?.rows.map((item) => (
+                          <tr key={item.id}>
+                            <td>
+                              <button
+                                className="name-button"
+                                onClick={() => open(item)}
+                              >
+                                <span
+                                  className={
+                                    "file-icon " +
+                                    (item.family === "음성 합성"
+                                      ? "violet"
+                                      : item.family === "언어 모델"
+                                        ? "blue"
+                                        : "")
+                                  }
+                                >
+                                  {view === "models" ? (
+                                    <Folder size={20} />
+                                  ) : (
+                                    <File size={20} />
+                                  )}
+                                </span>
+                                <span className="name-content">
+                                  <strong title={item.name}>{item.name}</strong>
+                                  <small title={item.path}>{item.path}</small>
+                                </span>
+                              </button>
+                            </td>
+                            <td>
+                              <span className="family-label">
+                                {item.family}
+                              </span>
+                              <small className="cell-note">
+                                이름·경로 추정
+                              </small>
+                            </td>
+                            <td className="recommendation-cell">
+                              <RecommendationNotes
+                                value={item.recommendation}
+                                compact
+                              />
+                            </td>
+                            <td>
+                              <span className="account-chip">
+                                {item.account}
+                              </span>
+                            </td>
+                            <td>
+                              {view === "models" ? (
+                                <>
+                                  <strong className="count">
+                                    {item.count}개 파일
+                                  </strong>
+                                  <small className="cell-note">
+                                    가중치 {item.observations?.weight_files}개
+                                  </small>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="family-label">
+                                    {labels[item.kind || ""] || "미분류"}
+                                  </span>
+                                  <small className="cell-note">
+                                    {item.format}
+                                  </small>
+                                </>
+                              )}
+                            </td>
+                            <td className="size-cell">{bytes(item.size)}</td>
+                            <td>
                               <span
                                 className={
-                                  "file-icon " +
-                                  (item.family === "음성 합성"
-                                    ? "violet"
-                                    : item.family === "언어 모델"
-                                      ? "blue"
-                                      : "")
+                                  "badge " +
+                                  (item.scan_status === "complete"
+                                    ? "neutral"
+                                    : "amber")
                                 }
                               >
-                                {view === "models" ? (
-                                  <Folder size={20} />
-                                ) : (
-                                  <File size={20} />
-                                )}
+                                {item.scan_status === "complete"
+                                  ? "발견됨"
+                                  : labels[item.scan_status] || "부분 관찰"}
                               </span>
-                              <span className="name-content">
-                                <strong title={item.name}>{item.name}</strong>
-                                <small title={item.path}>{item.path}</small>
-                              </span>
-                            </button>
-                          </td>
-                          <td>
-                            <span className="family-label">{item.family}</span>
-                            <small className="cell-note">이름·경로 추정</small>
-                          </td>
-                          <td className="recommendation-cell"><RecommendationNotes value={item.recommendation} compact /></td>
-                          <td>
-                            <span className="account-chip">{item.account}</span>
-                          </td>
-                          <td>
-                            {view === "models" ? (
-                              <>
-                                <strong className="count">
-                                  {item.count}개 파일
-                                </strong>
-                                <small className="cell-note">
-                                  가중치 {item.observations?.weight_files}개
-                                </small>
-                              </>
-                            ) : (
-                              <>
-                                <span className="family-label">
-                                  {labels[item.kind || ""] || "미분류"}
-                                </span>
-                                <small className="cell-note">
-                                  {item.format}
-                                </small>
-                              </>
-                            )}
-                          </td>
-                          <td className="size-cell">{bytes(item.size)}</td>
-                          <td>
-                            <span
-                              className={
-                                "badge " +
-                                (item.scan_status === "complete"
-                                  ? "neutral"
-                                  : "amber")
-                              }
-                            >
-                              {item.scan_status === "complete"
-                                ? "발견됨"
-                                : labels[item.scan_status] || "부분 관찰"}
-                            </span>
-                            <small className="cell-note">실행 미확인</small>
-                          </td>
-                          <td>
-                            <button
-                              className="icon-button"
-                              aria-label={item.name + " 상세 보기"}
-                              onClick={() => open(item)}
-                            >
-                              <ArrowUpRight size={18} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
+                              <small className="cell-note">실행 미확인</small>
+                            </td>
+                            <td>
+                              <button
+                                className="icon-button"
+                                aria-label={item.name + " 상세 보기"}
+                                onClick={() => open(item)}
+                              >
+                                <ArrowUpRight size={18} />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
                     </tbody>
                   </table>
                 </div>
@@ -1354,8 +1558,14 @@ function App() {
                   <div className="empty" role="status">
                     <AlertTriangle size={30} />
                     <h3>목록을 불러오지 못했습니다</h3>
-                    <p>현재 수집 상태를 확인할 수 없습니다. 새 수집이 필요하다는 뜻은 아닙니다. 목적이나 필터를 바꾸거나 같은 목록을 다시 조회하세요.</p>
-                    <button onClick={() => setTick(t => t + 1)}>목록 다시 조회</button>
+                    <p>
+                      현재 수집 상태를 확인할 수 없습니다. 새 수집이 필요하다는
+                      뜻은 아닙니다. 목적이나 필터를 바꾸거나 같은 목록을 다시
+                      조회하세요.
+                    </p>
+                    <button onClick={() => setTick((t) => t + 1)}>
+                      목록 다시 조회
+                    </button>
                   </div>
                 )}
                 {!loading && data !== null && !data.rows.length && (
@@ -1382,9 +1592,11 @@ function App() {
                 )}
                 <div className="pagination">
                   <span>
-                    {candidateReadState ? candidateReadState : data?.total
-                      ? `${((data.page - 1) * data.limit + 1).toLocaleString()}–${Math.min(data.page * data.limit, data.total).toLocaleString()} / ${data.total.toLocaleString()}개`
-                      : "0개"}{" "}
+                    {candidateReadState
+                      ? candidateReadState
+                      : data?.total
+                        ? `${((data.page - 1) * data.limit + 1).toLocaleString()}–${Math.min(data.page * data.limit, data.total).toLocaleString()} / ${data.total.toLocaleString()}개`
+                        : "0개"}{" "}
                     <small>· 페이지당 24개</small>
                   </span>
                   <div>
@@ -1421,7 +1633,7 @@ function App() {
             </>
           )}
           <footer>
-            AI-MANAGER{" "}
+            Ai Manager{" "}
             <span>
               메타데이터를 읽고, 근거를 확인하고, 다음 단계를 준비합니다.
             </span>

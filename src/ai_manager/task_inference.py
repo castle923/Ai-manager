@@ -13,7 +13,7 @@ from . import adapters, task_contracts, task_runtime
 from .inference import FileOwner, OwnedChild, digest, regular, TERMINAL
 from .preparation import atomic_text, now, safe_relative
 
-CODE_FILES=('task_inference.py','task_contracts.py','task_runtime.py','adapters.py','stt_worker.py','execution_slot.py','registry.py','server.py','desktop.py','desktop_files.py','inference.py','runtime_paths.py','runtime_reuse.py','runtime_bootstrap.py')
+CODE_FILES=('task_inference.py','task_contracts.py','task_runtime.py','adapters.py','stt_worker.py','execution_slot.py','registry.py','server.py','desktop.py','desktop_files.py','drive_setup.py','inference.py','runtime_paths.py','runtime_reuse.py','runtime_bootstrap.py')
 WORKER_ERRORS={'inference_failed','inference_out_of_memory','generation_limit_reached','output_invalid','input_changed','adapter_runtime_not_ready',
                'request_invalid','input_text_invalid','input_token_limit','model_invalid','generation_timeout','output_exists',
                'tracking_parameters_invalid','tracking_points_invalid','input_video_invalid','input_video_resource_limit','tracking_checkpoint_invalid','tracking_checkpoint_hash_mismatch','tracking_output_invalid',
