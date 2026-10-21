@@ -981,7 +981,7 @@ function App() {
             </>
           ) : section === "tasks" ? (
             <>
-              <WorkshopModelsPanel key={workshopType || "all-references"} task={workshopType} csrf={csrf.current} onManage={() => setSection("registry")} onPrepare={() => setSection("preparation")} onCandidate={(item) => { setRegistration(item); setSection("registry"); }} />
+              <WorkshopModelsPanel key={`references-${workshopType || "all"}`} task={workshopType} csrf={csrf.current} onManage={() => setSection("registry")} onPrepare={() => setSection("preparation")} onCandidate={(item) => { setRegistration(item); setSection("registry"); }} />
               <TaskPanel
                 key={workshopType || "all"}
                 taskType={workshopType}
