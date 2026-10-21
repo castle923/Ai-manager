@@ -1,6 +1,6 @@
 # Ai Manager
 
-개인 PC의 내장·외장 드라이브와 Google Drive에 있는 개인 모델의 설명·보관 위치·확인 상태를 관리합니다. 0.18.0에서는 작업실에서 [유형별 대표·연결 후보·참고용 근거](docs/WORKSHOP_REFERENCES_0180.md)를 실행 모델과 구분해 확인합니다. [0.17.0 설정·탐색 개선](docs/PERSONAL_MODEL_HUB_0170.md)의 실제 검증 범위도 보존합니다.
+개인 PC의 내장·외장 드라이브와 Google Drive에 있는 개인 모델의 설명·보관 위치·확인 상태를 관리합니다. 0.19.0에서는 [Claude 후보 분류·추천](docs/CLAUDE_RECOMMENDATIONS_0190.md)을 명시 동의 후 사용할 수 있도록 구현했습니다(실 API 검증 전). 0.18.0에서는 작업실에서 [유형별 대표·연결 후보·참고용 근거](docs/WORKSHOP_REFERENCES_0180.md)를 실행 모델과 구분해 확인합니다. [0.17.0 설정·탐색 개선](docs/PERSONAL_MODEL_HUB_0170.md)의 실제 검증 범위도 보존합니다.
 
 ## 파일 후보 이름·보류 이유 수정 · 0.16.1 로컬 후보
 

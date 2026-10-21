@@ -24,6 +24,7 @@ class LocalApplication:
         self.server, self.inference, self.cancel, self.tasks = server, inference, cancel, tasks
         self.url = f"http://127.0.0.1:{server.server_port}/"
         self.validation = validation
+        self.recommendations = None
         self.thread = None
         self.closed = False
         self.admission = admission if admission is not None else {'accepting': True}
@@ -60,6 +61,7 @@ class LocalApplication:
         self.cancel.set()
         if self.thread is not None:
             self.server.shutdown()
+        if self.recommendations: self.recommendations.close()
         if self.validation: self.validation.close()
         if self.tasks: self.tasks.close()
         self.inference.close()
@@ -103,6 +105,9 @@ def _create_application(home, settings, auth, port, constructed):
     history, preferences = History(home), Preferences(home)
     from .workshop_models import WorkshopModels, ReferenceError
     workshop_models = WorkshopModels(home, settings)
+    from .claude_recommendations import ClaudeRecommendations, RecommendationError, strict_json
+    recommendations = ClaudeRecommendations(home, settings, source=workshop_models)
+    constructed.append(recommendations)
     diagnostics = DownloadDiagnostics(home, enabled=os.environ.get("AI_MANAGER_DOWNLOAD_DIAGNOSTICS") == "1")
     from .validation_ui import ValidationUI
     from .validation_contracts import ContractError
@@ -117,6 +122,8 @@ def _create_application(home, settings, auth, port, constructed):
     admission = {'accepting': True}
 
     def busy():
+        if recommendations.busy():
+            return True
         if job_lock.locked():
             return True
         with inference.lock, tasks.lock, validation.lock:
@@ -248,6 +255,16 @@ def _create_application(home, settings, auth, port, constructed):
                     return self.reply(200,result)
                 except RegistryError as error:
                     return self.reply(404 if str(error)=='model_not_found' else 400,{'error':str(error)})
+            if path == '/api/claude-recommendations':
+                try:
+                    query=parse_qs(urlsplit(self.path).query,keep_blank_values=True)
+                    if set(query)!={'task'} or len(query['task'])!=1:
+                        raise RecommendationError('invalid_request')
+                    return self.reply(200,recommendations.overview(query['task'][0]))
+                except RecommendationError as error:
+                    return self.reply(400,{'error':str(error)})
+                except (OSError,ValueError,KeyError,TypeError,sqlite3.DatabaseError):
+                    return self.reply(400,{'error':'invalid_request'})
             if path in {"/api/workshop-models", "/api/workshop-models/preview"}:
                 try:
                     query = parse_qs(urlsplit(self.path).query, keep_blank_values=True)
@@ -359,7 +376,7 @@ def _create_application(home, settings, auth, port, constructed):
                 return self.reply(415, {"error": "json_required"})
             try:
                 length = int(self.headers.get("Content-Length", "0"))
-                limit = 65536 if self.path.startswith('/api/validation/') or self.path == '/api/registry' or re.fullmatch(r'/api/registry/[a-f0-9]{32}(/runs)?',self.path) else 4096
+                limit = 65536 if self.path.startswith('/api/claude-recommendations/') or self.path.startswith('/api/validation/') or self.path == '/api/registry' or re.fullmatch(r'/api/registry/[a-f0-9]{32}(/runs)?',self.path) else 4096
                 typed_limit=re.fullmatch(r'/api/registry/([a-f0-9]{32})/tasks',self.path)
                 if typed_limit:
                     try: input_type=registry.get(typed_limit[1])['task_type']
@@ -367,7 +384,14 @@ def _create_application(home, settings, auth, port, constructed):
                     limit={'stt':1_300_000,'tracking':6_680_000,'llm':50_000,'image':50_000}.get(input_type,4096)
                 if not 0 < length <= limit:
                     raise ValueError()
-                data = json.loads(self.rfile.read(length))
+                raw_body=self.rfile.read(length)
+                data = strict_json(raw_body) if self.path.startswith('/api/claude-recommendations/') else json.loads(raw_body)
+                if self.path.startswith('/api/claude-recommendations/'):
+                    method={'preview':recommendations.preview,'run':recommendations.run,'cancel':recommendations.cancel,'key':recommendations.save_key}.get(self.path.rsplit('/',1)[1])
+                    if not method:return self.reply(404,{'error':'not_found'})
+                    try:return self.reply(200,method(data))
+                    except RecommendationError as error:return self.reply(409,{'error':str(error)})
+                    except (OSError,ValueError,KeyError,TypeError,sqlite3.DatabaseError):return self.reply(400,{'error':'invalid_request'})
                 if self.path.startswith('/api/validation/'):
                     methods={'observe':validation.observe,'plan':validation.create_plan,'approve':validation.approve,'start':validation.start,'cancel':validation.cancel,'supersede':validation.supersede,'recover':validation.recover,'approve-resume':validation.approve_resume,'resume':validation.resume,'pause':validation.pause}
                     method=methods.get(self.path.rsplit('/',1)[1])
@@ -473,7 +497,9 @@ def _create_application(home, settings, auth, port, constructed):
     server = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     server.daemon_threads = True
     server.timeout = 1
-    return LocalApplication(server, inference, cancel, tasks, validation, admission, mutation_lock, busy)
+    application=LocalApplication(server, inference, cancel, tasks, validation, admission, mutation_lock, busy)
+    application.recommendations=recommendations
+    return application
 
 
 def serve(home, settings, auth, browser=webbrowser.open, port=0):

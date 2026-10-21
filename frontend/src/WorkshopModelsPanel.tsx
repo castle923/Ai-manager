@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { ClaudeRecommendationsPanel } from "./ClaudeRecommendationsPanel";
 
 type Reference = {
   kind: "profile" | "candidate" | "registered";
@@ -500,6 +501,7 @@ export function WorkshopModelsPanel({
           </details>
         </>
       )}
+      <ClaudeRecommendationsPanel key={`claude-${currentTask}`} task={currentTask} csrf={csrf} />
     </section>
   );
 }

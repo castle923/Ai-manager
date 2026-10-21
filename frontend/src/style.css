@@ -3767,3 +3767,5 @@ input::placeholder, textarea::placeholder { color: #63758e; opacity: 1; }
 .reference-readiness summary, .reference-preview summary { color:#263f65; font-weight:600; cursor:pointer; }
 .reference-readiness article { margin-top:18px; border-top:1px solid #e1e7f0; padding-top:14px; }
 @media (max-width:900px) { .workshop-reference-summary { grid-template-columns:1fr; } .workshop-reference-heading, .reference-candidates article { align-items:stretch; flex-direction:column; } .workshop-models { padding:20px; } }
+
+.workshop-models .validation-consent { flex-direction:row; align-items:flex-start; gap:10px; }

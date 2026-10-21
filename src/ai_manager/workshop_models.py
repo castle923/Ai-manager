@@ -111,7 +111,7 @@ class WorkshopModels:
             values.append(item)
         return values
 
-    def _candidates(self, task, profiles, catalog):
+    def _candidates(self, task, profiles, catalog, include_unrelated=False):
         dashboard = Dashboard(self.home, read_only=True)
         snapshot = dashboard.snapshot(include_scan_settings=True)
         allowed = {(r['account'], r['alias'], r['id']) for r in self.settings.get('allowlist', [])}
@@ -130,7 +130,7 @@ class WorkshopModels:
         manifests = {p['id']: p['manifest_sha256'] for p in profiles}
         for row in ordered:
             recommendation = row['recommendation']
-            if not recommendation['related']:
+            if not recommendation['related'] and not include_unrelated:
                 continue
             hints = [p['id'] for p in recommendation['profile_name_candidates'] if p['purpose'] == task]
             item = dict(kind='candidate', id=row['id'], name=row['name'], task=task,
@@ -145,6 +145,8 @@ class WorkshopModels:
             item['fingerprint'] = digest(dict(policy=POLICY, task=task, scan=row['scan_id'],
                 identity=row['id'], facts=[{k: f[k] for k in ('id', 'root', 'kind', 'size', 'modified', 'name')} for f in row['files']],
                 scope=sorted(allowed), manifests=manifests, reasons=recommendation['reason_codes']))
+            if include_unrelated:
+                item['local_related'] = bool(recommendation['related'])
             result.append(item)
         return result
 

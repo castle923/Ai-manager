@@ -30,6 +30,7 @@ import "./style.css";
 import { PreparationPanel } from "./PreparationPanel";
 import { TaskPanel } from "./TaskPanel";
 import { WorkshopModelsPanel } from "./WorkshopModelsPanel";
+import { ClaudeRecommendationsPanel } from "./ClaudeRecommendationsPanel";
 import { TtsPanel } from "./TtsPanel";
 import { ComparisonPanel } from "./ComparisonPanel";
 import {
@@ -1439,6 +1440,12 @@ function App() {
                     files={view === "files"}
                   />
                 )}
+                {view === "models" && (["tts", "stt", "llm", "image", "tracking"].includes(purpose) ? (
+                  <div style={{ padding: "0 20px 20px" }}>
+                    <p className="caption">기본 목록은 로컬 규칙 순서입니다. 아래 Claude 순위는 현재 허용 범위의 최신 수집 후보 중 직접 선택한 최대 20개끼리의 별도 검토 추정입니다. 위 목록의 과거 기록·검색 필터와 구분합니다.</p>
+                    <ClaudeRecommendationsPanel key={`library-claude-${purpose}`} task={purpose} csrf={csrf.current} />
+                  </div>
+                ) : <p className="caption" style={{ padding: "0 20px 20px" }}>Claude 분류·추천을 보려면 위에서 작업 목적을 먼저 선택하세요. 자동 외부 전송은 하지 않습니다.</p>)}
                 <div className="table-wrap" aria-busy={loading}>
                   <table>
                     <thead>
