@@ -54,4 +54,8 @@ RunPod native Cloud Sync의 Google Cloud Storage는 Google Drive와 다르며 Go
 
 최종 동결 소스에서 전체 438개 테스트를 실행해 431개 통과, 7개 건너뜀으로 오류 없이 종료했다(240.937초). 건너뛴 항목은 별도 추적 CPU/영상 decode 의존성이 필요한 6개와 현재 OS에서 허용되지 않는 비관리자 symlink 1개다. 신규 설정 전환 반례 16개는 독립 검토자가 별도로 실행해 모두 통과했다. 앞선 전체 실행에서는 기존 `__new__` fixture에 새 전환 상태 필드가 없어 7개 subcase 오류가 났으며, fixture를 명시적으로 보완한 뒤 최종 전체 실행으로 다시 확인했다. 제품 guard를 완화하지 않았다.
 
-TypeScript/Vite 빌드와 합성 UI의 폴더 선택·취소 입력 보존, 모의 Drive 설정 실패 안내, STT 필터, TTS 비교 한계, inherited key를 포함한 잘못된 workshop URL, 1266/768px 표본을 확인했다. 작업실 목록 접기·펼치기는 click·Enter·Space로 검사했고 선택 URL과 전송하지 않은 입력이 유지됐다. 새 문서·소스·UI·설정 전환에 독립 검토를 수행했다. 패키지·native·실제 OAuth 결과는 수행한 뒤 별도로 갱신하며 이전 테스트 결과를 이번 성공 근거로 대체하지 않는다.
+TypeScript/Vite 빌드와 합성 UI의 폴더 선택·취소 입력 보존, 모의 Drive 설정 실패 안내, STT 필터, TTS 비교 한계, inherited key를 포함한 잘못된 workshop URL, 1266/768px 표본을 확인했다. 작업실 목록 접기·펼치기는 click·Enter·Space로 검사했고 선택 URL과 전송하지 않은 입력이 유지됐다. 새 문서·소스·UI·설정 전환에 독립 검토를 수행했다. 이전 테스트 결과를 이번 성공 근거로 대체하지 않는다.
+
+0.17.0 제품 소스는 `3fab95deb040fca42c29f9ee85e784d57d858b9e`에 고정했고 215개 tracked 원본 바이트를 해당 Git blob과 대조했다. 새 Windows portable 패키지의 manifest 8,317개 파일 해시, 79개 제품 소스와 고정 커밋의 바이트 일치, ZIP 8,318개 항목의 바이트·CRC, 묶인 안내 문서를 전량 확인했다. 독립 검토자도 같은 범위를 다시 확인했다. ZIP은 113,211,587 bytes, SHA-256 `f233198a37458ef638aa0b3f712b2319edea9c775707caad5133b3040ea4aab4`다. 정식 무창 package self-check는 frozen·version·source 일치 상태로 통과했다.
+
+이 문서의 패키지 결과 갱신은 제품 소스 커밋 뒤의 문서 변경이다. 패키지 안의 안내 문서는 빌드 시점의 스냅샷이며 패키지 해시나 제품 소스를 바꾸지 않았다. 실제 native 창의 새 버전 사용 흐름, 사용자가 선택한 실제 OAuth 원본으로의 전환, Google 로그인·토큰 갱신·Drive 목록 수집은 아직 미검증이다. 합성 전환·UI·패키지 검사만으로 실제 Google 로그인 복구가 완료됐다고 판정하지 않는다.
