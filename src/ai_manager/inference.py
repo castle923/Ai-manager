@@ -306,7 +306,7 @@ class Inference:
             provenance = json.loads(regular(directory / 'provenance.json', self.home).read_text(encoding='utf8'))
             if provenance.get('registry_binding') != binding or provenance.get('manifest_sha256') != binding.get('manifest_sha256'): return False
             if provenance.get('input_sha256') != run['input_sha256']: return False
-            required = {'inference.py','tts_worker.py','models.py','preparation.py','server.py','external_process.py','runtime_bootstrap.py','runtime_paths.py','runtime_reuse.py','desktop.py','security.py','config.py','drive_setup.py','registry.py'}
+            required = {'inference.py','tts_worker.py','models.py','preparation.py','server.py','external_process.py','runtime_bootstrap.py','runtime_paths.py','runtime_reuse.py','desktop.py','security.py','config.py','drive_setup.py','workshop_models.py','registry.py'}
             if set(provenance.get('code_sha256',{})) != required: return False
             for name, expected in provenance['code_sha256'].items():
                 if Path(name).name != name or digest(Path(__file__).with_name(name)) != expected: return False
@@ -517,7 +517,7 @@ class Inference:
         worker = Path(__file__).with_name('tts_worker.py')
         provenance = dict(run_id=run['id'], checked_at=now(), inputs=[dict(item, kind='official_model_component' if item.get('official_supplement') else 'designated_model_component', local_path=str(assets / safe_relative(item['path'])), source=item.get('official_supplement',{}).get('url',m['source'])) for item in verified],
                           input_sha256=run['input_sha256'], preparation_provenance_sha256=digest(prep.base / state['id'] / 'inputs.json') if (prep.base / state['id'] / 'inputs.json').is_file() else None, manifest_sha256=digest(manifest_path(model_id)),
-                          code_sha256={p.name: digest(p) for p in (Path(__file__), worker, *[Path(__file__).with_name(name) for name in ('models.py', 'preparation.py', 'server.py', 'external_process.py', 'runtime_bootstrap.py', 'runtime_paths.py', 'runtime_reuse.py', 'desktop.py', 'security.py', 'config.py', 'drive_setup.py', 'registry.py')])},
+                          code_sha256={p.name: digest(p) for p in (Path(__file__), worker, *[Path(__file__).with_name(name) for name in ('models.py', 'preparation.py', 'server.py', 'external_process.py', 'runtime_bootstrap.py', 'runtime_paths.py', 'runtime_reuse.py', 'desktop.py', 'security.py', 'config.py', 'drive_setup.py','workshop_models.py', 'registry.py')])},
                           comparison_id=run.get('comparison_id'), comparison_side=run.get('comparison_side'), registry_binding=run.get('registry_binding'),
                           runtime=prep.environment(), runtime_directory=str(runtime),runtime_lock_sha256=digest(runtime / 'requirements.lock') if (runtime / 'requirements.lock').is_file() else None,
                           cold_loading=True, timeout_seconds=self.timeout, offline=True)

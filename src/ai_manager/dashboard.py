@@ -40,17 +40,19 @@ class Dashboard:
     def __init__(self, home, read_only=False):
         self.inventory = Inventory(home, read_only=read_only)
 
-    def snapshot(self, scan=None):
+    def snapshot(self, scan=None, *, include_scan_settings=False):
         if self.inventory.read_only and not self.inventory.db.exists():
             if scan:raise ValueError('unknown scan')
             return {'scans':[], 'files':[], 'models':[]}
         with self.inventory.connect() as db:
+            if self.inventory.read_only: db.execute("BEGIN")
             if scan:
                 rows = db.execute("SELECT * FROM scans WHERE scan_id=?", (scan,)).fetchall()
                 if not rows:
                     raise ValueError("unknown scan")
             else:
                 rows = db.execute("SELECT * FROM scans s WHERE scan_id=(SELECT scan_id FROM scans WHERE account=s.account ORDER BY started_at DESC,scan_id DESC LIMIT 1) ORDER BY account").fetchall()
+            scan_settings = {row["scan_id"]:json.loads(row["settings_json"]) for row in rows} if include_scan_settings else None
             scans = [self.inventory._public(row) for row in rows]
             files = []
             for s in scans:
@@ -81,7 +83,9 @@ class Dashboard:
             group["size"] = sum(f["size"] or 0 for f in group["files"]) if all(f["size"] is not None for f in group["files"]) else None
             group["observations"] = observations(group["files"])
             models.append(group)
-        return {"scans": scans, "files": files, "models": models}
+        result = {"scans": scans, "files": files, "models": models}
+        if include_scan_settings: result["_scan_settings"] = scan_settings
+        return result
 
     def query(self, params):
         def arg(name, default=""):

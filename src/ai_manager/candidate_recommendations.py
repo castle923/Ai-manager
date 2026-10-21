@@ -57,10 +57,10 @@ def policy(purpose, view):
                 limitations=LIMITATIONS + (['현재 고정 이미지 프로필은 이미지 생성용입니다. 이미지 편집 지원을 확인하지 않았습니다.'] if purpose == 'image' else []))
 
 
-def _profiles():
+def _profiles(catalog=None):
     result=[]
-    for filename, purpose in RECIPES:
-        value=json.loads(Path(__file__).with_name(filename).read_text(encoding='utf8'))
+    catalog = catalog if catalog is not None else [(json.loads(Path(__file__).with_name(filename).read_text(encoding='utf8')), purpose) for filename, purpose in RECIPES]
+    for value, purpose in catalog:
         assert value['model_id'] and value['files']
         aliases={value['model_id'].casefold(), value['name'].rsplit('/', 1)[-1].casefold()}
         if value['model_id']=='tapir':aliases.add('tapnet')
@@ -186,9 +186,10 @@ def stable_key(row):
     return (row['name'].casefold(), row['account'], row['id'])
 
 
-def annotate_and_rank(rows, purpose='', view='models'):
-    try:profiles=_profiles()
-    except (OSError,ValueError,KeyError,TypeError,AssertionError):profiles=[]
+def annotate_and_rank(rows, purpose='', view='models', profiles=None):
+    if profiles is None:
+        try:profiles=_profiles()
+        except (OSError,ValueError,KeyError,TypeError,AssertionError):profiles=[]
     enriched=[dict(row,recommendation=explain(row,purpose,view,profiles)) for row in rows]
     ordered=sorted(enriched,key=lambda row:(not row['recommendation']['eligible'],not row['recommendation']['related'],*stable_key(row)))
     rank=0

@@ -1,6 +1,7 @@
 """Loopback dashboard, approved asset preparation and bounded local TTS."""
 import json
 import secrets
+import sqlite3
 import threading
 import webbrowser
 from pathlib import Path
@@ -100,6 +101,8 @@ def _create_application(home, settings, auth, port, constructed):
     from .history import History, HistoryError
     from .preferences import Preferences, PreferenceError
     history, preferences = History(home), Preferences(home)
+    from .workshop_models import WorkshopModels, ReferenceError
+    workshop_models = WorkshopModels(home, settings)
     diagnostics = DownloadDiagnostics(home, enabled=os.environ.get("AI_MANAGER_DOWNLOAD_DIAGNOSTICS") == "1")
     from .validation_ui import ValidationUI
     from .validation_contracts import ContractError
@@ -245,6 +248,18 @@ def _create_application(home, settings, auth, port, constructed):
                     return self.reply(200,result)
                 except RegistryError as error:
                     return self.reply(404 if str(error)=='model_not_found' else 400,{'error':str(error)})
+            if path in {"/api/workshop-models", "/api/workshop-models/preview"}:
+                try:
+                    query = parse_qs(urlsplit(self.path).query, keep_blank_values=True)
+                    required = {"task"} if path == "/api/workshop-models" else {"task", "kind", "id", "fingerprint"}
+                    if set(query) != required or any(len(v) != 1 for v in query.values()):
+                        raise ReferenceError("reference_query_invalid")
+                    result = workshop_models.overview(query["task"][0]) if path == "/api/workshop-models" else workshop_models.preview(query["task"][0], {k:query[k][0] for k in ("kind", "id", "fingerprint")})
+                    return self.reply(200, result)
+                except ReferenceError as error:
+                    return self.reply(410 if str(error) == "reference_expired" else 400, {"error":str(error)})
+                except (OSError, ValueError, KeyError, TypeError, sqlite3.DatabaseError):
+                    return self.reply(400, {"error":"reference_read_failed_preserved"})
             if path == "/api/diagnostics/health":
                 return self.reply(200 if diagnostics.enabled else 404, diagnostics.health() if diagnostics.enabled else {"error": "not_found"})
             if path == '/api/tasks/status':
@@ -360,6 +375,10 @@ def _create_application(home, settings, auth, port, constructed):
                     try: return self.reply(200,method(data))
                     except ContractError as error: return self.reply(409,{'error':str(error)})
                     except (OSError,ValueError,TypeError,KeyError): return self.reply(400,{'error':'validation_operation_failed_preserved'})
+                if self.path == '/api/workshop-models/representative':
+                    try: return self.reply(200, workshop_models.choose(data))
+                    except ReferenceError as error: return self.reply(409 if str(error) in {'representative_stale','representative_stale_preserved','representative_busy','reference_expired'} else 400, {'error':str(error)})
+                    except (OSError, ValueError, KeyError, TypeError, sqlite3.DatabaseError): return self.reply(400, {'error':'reference_write_failed_preserved'})
                 if self.path=='/api/preferences':
                     try:return self.reply(200,{'preferences':preferences.update(data)})
                     except PreferenceError as error:return self.reply(409 if str(error)in('preferences_stale','preferences_busy') else 400,{'error':str(error)})

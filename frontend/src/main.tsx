@@ -29,6 +29,7 @@ import {
 import "./style.css";
 import { PreparationPanel } from "./PreparationPanel";
 import { TaskPanel } from "./TaskPanel";
+import { WorkshopModelsPanel } from "./WorkshopModelsPanel";
 import { TtsPanel } from "./TtsPanel";
 import { ComparisonPanel } from "./ComparisonPanel";
 import {
@@ -850,7 +851,7 @@ function App() {
                 {section === "validation"
                   ? "보유 모델 자동 검수"
                   : section === "tasks"
-                    ? workshopLabels[workshopType] || "작업실 전체"
+                    ? ({ stt: "음성을 텍스트로 옮기는 작업과 관련 모델을 확인하세요.", llm: "텍스트 응답을 만드는 작업과 관련 모델을 확인하세요.", image: "이미지를 만드는 작업과 현재 준비 조건을 확인하세요.", tracking: "영상 속 지정 지점을 추적합니다. 영상 생성과는 다른 작업입니다." } as Record<string, string>)[workshopType] || "작업 유형을 골라 대표·참고 후보·등록된 실행 모델을 구분해 확인하세요."
                     : section === "history"
                       ? "수집부터 준비·실행·비교까지, 저장된 원본 기록과 확인 근거를 따라가세요."
                       : section === "settings"
@@ -965,6 +966,8 @@ function App() {
               }}
             />
           ) : section === "comparison" ? (
+            <>
+            <WorkshopModelsPanel key="comparison-references" task="tts" csrf={csrf.current} onManage={() => setSection("registry")} onPrepare={() => setSection("preparation")} onCandidate={(item) => { setRegistration(item); setSection("registry"); }} />
             <ComparisonPanel
               csrf={csrf}
               onPrepare={() => setSection("preparation")}
@@ -975,8 +978,10 @@ function App() {
               }
               preferences={preferences}
             />
+            </>
           ) : section === "tasks" ? (
             <>
+              <WorkshopModelsPanel key={workshopType || "all-references"} task={workshopType} csrf={csrf.current} onManage={() => setSection("registry")} onPrepare={() => setSection("preparation")} onCandidate={(item) => { setRegistration(item); setSection("registry"); }} />
               <TaskPanel
                 key={workshopType || "all"}
                 taskType={workshopType}
@@ -989,12 +994,15 @@ function App() {
               />
             </>
           ) : section === "tts" ? (
+            <>
+            <WorkshopModelsPanel key="tts-references" task="tts" csrf={csrf.current} onManage={() => setSection("registry")} onPrepare={() => setSection("preparation")} onCandidate={(item) => { setRegistration(item); setSection("registry"); }} />
             <TtsPanel
               csrf={csrf}
               initialRunId={
                 sourceSelection?.kind === "run" ? sourceSelection.id : undefined
               }
             />
+            </>
           ) : section === "preparation" ? (
             <PreparationPanel
               initialModelId={preparationModelId}

@@ -19,7 +19,7 @@ def verify_frozen(*,full=False):
     try:
         manifest=json.loads((root/'DESKTOP-MANIFEST.json').read_text('utf8'))
         provenance=json.loads((root/'SOURCE-PROVENANCE.json').read_text('utf8'))
-        if manifest['version']!='0.17.0' or provenance['version']!='0.17.0' or manifest['source_files']!=provenance['source_files']:fail('package_source_manifest_mismatch')
+        if manifest['version']!='0.18.0' or provenance['version']!='0.18.0' or manifest['source_files']!=provenance['source_files']:fail('package_source_manifest_mismatch')
         if len(provenance['source_commit'])!=40 or not provenance['source_files']:fail('package_source_provenance_invalid')
         package=Path(__file__).parent
         for relative,expected in provenance['source_files'].items():

@@ -3743,3 +3743,27 @@ input::placeholder, textarea::placeholder { color: #63758e; opacity: 1; }
 .preparation-overview { padding: 22px; margin-bottom: 20px; border: 1px solid #d9e2f0; border-radius: 16px; background: #fff; color: #243750; }
 .preparation-overview h2 { margin: 0 0 10px; font-size: 20px; }
 .preparation-overview p { margin: 8px 0; font-size: 14px; line-height: 1.8; color: #435671; }
+/* Display-only workshop references, separate from execution controls. */
+.workshop-models { margin-bottom:28px; padding:24px; }
+.workshop-models h2 { margin:4px 0 16px; font-size:22px; }
+.workshop-models h3 { font-size:17px; line-height:1.6; }
+.workshop-models p { color:#425570; line-height:1.85; overflow-wrap:anywhere; }
+.workshop-reference-heading, .reference-candidates article { display:flex; justify-content:space-between; align-items:center; gap:16px; }
+.workshop-reference-summary { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin:20px 0; }
+.workshop-reference-summary article, .reference-preview, .reference-readiness, .reference-candidates { min-width:0; border:1px solid #d6e0ed; border-radius:12px; padding:20px; background:#fff; }
+.workshop-reference-summary article:first-child { background:#f0f5ff; }
+.workshop-models label { display:flex; flex-direction:column; gap:8px; color:#243b59; font-weight:600; font-size:14px; }
+.workshop-models select { width:100%; min-width:0; min-height:44px; padding:10px 12px; border:1px solid #a9b9cc; border-radius:8px; font:inherit; background:white; color:#243b59; }
+.workshop-models select:focus-visible, .workshop-models button:focus-visible, .workshop-models summary:focus-visible { outline:3px solid #245fc4; outline-offset:3px; }
+.reference-actions { display:flex; flex-wrap:wrap; gap:10px; margin:14px 0; }
+.reference-counts { display:flex; flex-wrap:wrap; gap:6px 14px; }
+.reference-counts span { white-space:nowrap; }
+.workshop-models button { min-height:42px; padding:10px 14px; font-size:14px; border-radius:8px; }
+.reference-candidates, .reference-preview, .reference-readiness { margin-top:20px; }
+.reference-candidates article { border-top:1px solid #e1e7f0; padding:16px 0; }
+.reference-candidates article > div { min-width:0; }
+.reference-candidates strong { overflow-wrap:anywhere; }
+.reference-candidates button { flex-shrink:0; }
+.reference-readiness summary, .reference-preview summary { color:#263f65; font-weight:600; cursor:pointer; }
+.reference-readiness article { margin-top:18px; border-top:1px solid #e1e7f0; padding-top:14px; }
+@media (max-width:900px) { .workshop-reference-summary { grid-template-columns:1fr; } .workshop-reference-heading, .reference-candidates article { align-items:stretch; flex-direction:column; } .workshop-models { padding:20px; } }
