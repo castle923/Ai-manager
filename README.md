@@ -1,5 +1,7 @@
 # Ai Manager
 
+**다른 PC·새 세션에서 개발을 이어갈 때는 [개발 인계서](HANDOFF.md)를 먼저 읽으세요.** 최신 제품 소스는 0.19.0이며 공개 v0.15.0 Release·아래 과거 단계의 기록과 구분합니다. 인계서는 새 로컬 개발 시작, 개인 자료/비밀을 제외한 이동 범위, 아직 승인받지 않은 다음 API 계획과 검증 한계를 설명합니다.
+
 개인 PC의 내장·외장 드라이브와 Google Drive에 있는 개인 모델의 설명·보관 위치·확인 상태를 관리합니다. 0.19.0에서는 [Claude 후보 분류·추천](docs/CLAUDE_RECOMMENDATIONS_0190.md)을 명시 동의 후 사용할 수 있도록 구현했습니다(승인된 1회 API 시험 확인; 상세 검증 범위는 문서 참조). 0.18.0에서는 작업실에서 [유형별 대표·연결 후보·참고용 근거](docs/WORKSHOP_REFERENCES_0180.md)를 실행 모델과 구분해 확인합니다. [0.17.0 설정·탐색 개선](docs/PERSONAL_MODEL_HUB_0170.md)의 실제 검증 범위도 보존합니다.
 
 ## 파일 후보 이름·보류 이유 수정 · 0.16.1 로컬 후보
@@ -100,7 +102,7 @@ ZIP 전체를 기존 설치를 덮어쓰지 않는 새 폴더에 푼다. Python 
 
 Windows Python 3.10 이상과 Node.js가 필요합니다. Vite 7의 Node 요구 버전은 20.19 이상 또는 22.12 이상이며, 이번 빌드는 Node 24.21.0 / npm 11.19.0에서 확인했습니다. React 19.2.0·TypeScript 5.9.3·Vite 7.3.7 및 전이 의존성은 `frontend/package-lock.json`으로 고정합니다. Python 직접 런타임 의존성은 `requests==2.32.5`, 빌드 의존성은 `setuptools>=68`입니다.
 
-생성된 화면 번들은 Git에 포함하지 않습니다. 새 소스 설치에서는 먼저 아래처럼 UI를 빌드해야 `serve`로 화면을 열 수 있습니다. `npm.cmd run build`는 TypeScript 검사 후 `src/ai_manager/static`에 HTML·JavaScript·CSS를 생성합니다. Python wheel을 만들 때도 UI 빌드를 먼저 수행하며, 생성 번들은 package-data로 wheel에 포함됩니다. 기존 앱 설정이 있다면 `init`·`connect`·`scan`을 반복할 필요 없이 빌드·설치 후 `serve`를 실행합니다.
+`src/ai_manager/static`에는 ignore 규칙이 있지만 현재 제품의 HTML·JavaScript·CSS 번들 3파일은 Git에 추적된 snapshot으로 새 clone에 포함됩니다. 프런트엔드 수정이나 재패키징 시 아래처럼 UI를 새로 빌드하고 소스 정합성을 확인합니다. `npm.cmd run build`는 TypeScript 검사 후 해당 경로에 HTML·JavaScript·CSS를 생성합니다. Python wheel을 만들 때도 UI 빌드를 먼저 수행하며, 생성 번들은 package-data로 wheel에 포함됩니다. 기존 앱 설정이 있다면 `init`·`connect`·`scan`을 반복할 필요 없이 빌드·설치 후 `serve`를 실행합니다.
 
 아래 명령은 저장소 루트의 PowerShell에서 시작합니다.
 
