@@ -36,12 +36,14 @@ git rev-parse HEAD
 
 ## 모델·로그인 없이 소스 개발 시작
 
-Windows Python 3.10과 Node.js/npm, Git을 준비한다. Vite 7의 Node 요구 범위는 20.19 이상 또는 22.12 이상이다. 잠금 파일은 `frontend/package-lock.json`, `requirements.lock`이며 모델별 런타임은 별도다. Windows 독립 창을 빌드하려면 추가로 `requirements-desktop.lock`과 WebView2 Runtime이 필요하다. 브라우저 개발 실행과 frozen 독립 앱 검증은 별개다.
+Windows 소스 개발에는 Python과 Node.js/npm, Git을 준비한다. 이번 새 격리 환경에서는 Python `3.12.14`로 오프라인 회귀 477개 중 470개 통과·7개 skip·실패 0을 확인했다. 아래 venv 예시는 Python 3.12를 사용한다. 자세한 범위와 skip 사유는 [새 개발 환경 회귀 보고서](docs/DEVELOPMENT_REGRESSION_20261022.md)를 따른다. 이 결과는 기존 Python 3.10 기반 모델별 런타임이나 frozen 패키지를 3.12로 전환·검증한 것이 아니다. 전역 Python·PATH나 다른 프로젝트 환경을 바꾸지 않고 프로젝트 전용 venv를 사용한다.
+
+Vite 7의 Node 요구 범위는 20.19 이상 또는 22.12 이상이다. 잠금 파일은 `frontend/package-lock.json`, `requirements.lock`이며 모델별 런타임은 별도다. Windows 독립 창을 빌드하려면 추가로 `requirements-desktop.lock`과 WebView2 Runtime이 필요하다. 전체 회귀에는 desktop 경계 테스트도 있으므로 `requirements-desktop.lock`을 같은 개발 venv에 설치한다. 브라우저 개발 실행과 frozen 독립 앱 검증은 별개다.
 
 저장소 루트 PowerShell에서 실행한다. `<new_private_absolute_home>`은 이번 작업을 위한 새 절대경로로 바꾸고 Git 저장소 밖에 둔다. 다른 home의 settings/token/DB/output을 복사하지 않는다. `.venv`가 이미 있으면 기존 환경을 보존하고 별도 새 경로를 선택한다.
 
 ```powershell
-py -3.10 -m venv .venv
+py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.lock
 .\.venv\Scripts\python.exe -m pip install -e .
 Set-Location frontend
@@ -62,6 +64,8 @@ Set-Location ..
 ```powershell
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
 ```
+
+전체 회귀 전에 `requirements-desktop.lock`을 설치하고, 테스트는 저장소 루트에서 실행한다. 한국어 Windows에서도 JSON·Node 파이프의 UTF-8 계약을 유지한다. Windows DPAPI·개인 디렉터리 ACL 검증은 제한된 sandbox에서 실패할 수 있으며 정상 사용자 컨텍스트의 새 합성 자료로 환경 원인을 구분한다. 검사를 skip하거나 보안 보호를 완화해 통과시키지 않는다.
 
 ## 개인 자산·비밀과 PC 이동
 

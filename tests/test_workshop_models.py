@@ -1,5 +1,5 @@
 """Fresh synthetic metadata and display-only choices; no model/API execution."""
-from contextlib import contextmanager
+from contextlib import contextmanager, closing
 import copy
 import hashlib
 import json
@@ -243,7 +243,7 @@ class WorkshopModelsTests(unittest.TestCase):
 
     def test_concurrent_new_scan_does_not_mix_scope_and_files_in_reference_snapshot(self):
         first=self.scan()
-        with sqlite3.connect(self.home/'inventory.sqlite3') as db:db.execute('PRAGMA journal_mode=WAL')
+        with closing(sqlite3.connect(self.home/'inventory.sqlite3')) as db, db:db.execute('PRAGMA journal_mode=WAL')
         original=Inventory._public
         advanced=[]
         def after_scan_read(row):
@@ -259,7 +259,8 @@ class WorkshopModelsTests(unittest.TestCase):
 class WorkshopModelsHttpTests(unittest.TestCase):
     def test_host_csrf_admission_and_display_only_post(self):
         with tempfile.TemporaryDirectory() as root:
-            home=Path(root);settings=SettingsStore(home).initialize_local()
+            # Keep the workspace separate from tempfile's platform-managed root ACL.
+            home=Path(root)/'home';settings=SettingsStore(home).initialize_local()
             app=create_application(home,settings,NoDriveAuth());app.start()
             try:
                 def call(path,body=None,csrf=None):

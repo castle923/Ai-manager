@@ -1,5 +1,6 @@
 """Read-only, source-linked history snapshots and bounded task records."""
 from datetime import datetime, timezone
+from contextlib import closing
 import copy
 import hashlib
 import json
@@ -120,7 +121,7 @@ class History:
         if database.exists():
             try:
                 regular(database,self.home)
-                with sqlite3.connect(database.as_uri()+'?mode=ro',uri=True,timeout=1)as db:
+                with closing(sqlite3.connect(database.as_uri()+'?mode=ro',uri=True,timeout=1))as db:
                     db.row_factory=sqlite3.Row
                     for row in db.execute('SELECT scan_id,account,started_at,finished_at,status,files_count,folders_count,excluded_count FROM scans'):
                         v=dict(row)

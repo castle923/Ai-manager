@@ -20,7 +20,7 @@ from ai_manager.inference import Inference, InferenceError, validate_wav
 
 FAKE_WORKER = r'''
 import hashlib,json,pathlib,struct,sys,time,wave,subprocess
-p=pathlib.Path(sys.argv[1]); d=p.parent; r=json.loads(p.read_text()); mode=r['text']
+p=pathlib.Path(sys.argv[1]); d=p.parent; r=json.loads(p.read_text(encoding='utf8')); mode=r['text']
 if mode in ('sleep','late'): time.sleep(30)
 if mode=='crash': sys.exit(9)
 if mode=='tree':
@@ -164,7 +164,7 @@ class IndependentInferenceTests(unittest.TestCase):
         self.manager._path(run['id']).mkdir()
         with patch('ai_manager.inference.manifest',return_value=model):
             self.manager._prepare(run)
-            provenance=json.loads((self.manager._path(run['id'])/'provenance.json').read_text())
+            provenance=json.loads((self.manager._path(run['id'])/'provenance.json').read_text(encoding='utf8'))
             self.assertEqual(provenance['run_id'],run['id'])
             self.assertEqual(provenance['inputs'][0]['sha256'],model['files'][0]['sha256'])
             # A catalogue binding must prove both the registered source and prepared copy.
@@ -175,7 +175,7 @@ class IndependentInferenceTests(unittest.TestCase):
                 manifest_sha256=hashlib.sha256(manifest_path(model['model_id']).read_bytes()).hexdigest(),
                 asset_sha256=sha([{k:i[k] for k in ('path','size','sha256')} for i in model['files']]),registered_source=str(registered))
             self.manager._prepare(run)
-            self.assertEqual(json.loads((self.manager._path(run['id'])/'provenance.json').read_text())['registry_binding'],run['registry_binding'])
+            self.assertEqual(json.loads((self.manager._path(run['id'])/'provenance.json').read_text(encoding='utf8'))['registry_binding'],run['registry_binding'])
             (registered/'config.json').write_bytes(b'changed registered source')
             with self.assertRaisesRegex(InferenceError,'registered_artifact_mismatch'):self.manager._prepare(run)
             (registered/'config.json').write_bytes(content)
@@ -190,7 +190,7 @@ class IndependentInferenceTests(unittest.TestCase):
         second=self.terminal(self.manager.create('valid'))
         self.assertNotEqual(first['id'],second['id'])
         self.assertNotEqual(self.manager._path(first['id']),self.manager._path(second['id']))
-        self.assertEqual(set(json.loads((self.manager._path(second['id'])/'input.json').read_text())),{'text','sha256','parameters'})
+        self.assertEqual(set(json.loads((self.manager._path(second['id'])/'input.json').read_text(encoding='utf8'))),{'text','sha256','parameters'})
 
     def test_cancel_during_output_validation_wins_over_late_success(self):
         entered,release=threading.Event(),threading.Event()
@@ -212,7 +212,7 @@ class IndependentInferenceTests(unittest.TestCase):
         from ctypes import wintypes
         run=self.terminal(self.manager.create('tree'))
         self.assertEqual(run['status'],'succeeded')
-        pid=int((self.manager._path(run['id'])/'descendant.pid').read_text())
+        pid=int((self.manager._path(run['id'])/'descendant.pid').read_text(encoding='utf8'))
         kernel=ctypes.WinDLL('kernel32',use_last_error=True)
         kernel.OpenProcess.argtypes=[wintypes.DWORD,wintypes.BOOL,wintypes.DWORD]
         kernel.OpenProcess.restype=wintypes.HANDLE

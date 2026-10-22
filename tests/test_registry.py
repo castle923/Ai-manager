@@ -1,4 +1,5 @@
 import copy
+from contextlib import closing
 import hashlib
 import json
 from pathlib import Path
@@ -99,7 +100,7 @@ class RegistryTests(unittest.TestCase):
     def test_unknown_schema_no_mutation_and_foreign_key(self):
         with self.registry.connect() as db:
             with self.assertRaises(sqlite3.IntegrityError):db.execute("INSERT INTO model_references VALUES('missing','x','{}')")
-        with sqlite3.connect(self.registry.path) as db:db.execute('PRAGMA user_version=99')
+        with closing(sqlite3.connect(self.registry.path)) as db, db:db.execute('PRAGMA user_version=99')
         before=hashlib.sha256(self.registry.path.read_bytes()).hexdigest()
         with self.assertRaisesRegex(RegistryError,'schema_unsupported'):Registry(self.home)
         self.assertEqual(hashlib.sha256(self.registry.path.read_bytes()).hexdigest(),before)
@@ -157,7 +158,7 @@ class RegistryTests(unittest.TestCase):
 
     def test_candidate_query_never_recovers_or_writes_running_scan(self):
         candidate=self.scan('running-observation','running')
-        with sqlite3.connect(self.home/'inventory.sqlite3') as db:db.execute('UPDATE scans SET pid=2147483000')
+        with closing(sqlite3.connect(self.home/'inventory.sqlite3')) as db, db:db.execute('UPDATE scans SET pid=2147483000')
         before=(self.home/'inventory.sqlite3').read_bytes()
         self.registry.create(payload()|{'references':[dict(candidate_id=candidate['id'],scan_id='running-observation')]})
         self.assertEqual((self.home/'inventory.sqlite3').read_bytes(),before)
@@ -167,7 +168,7 @@ class RegistryTests(unittest.TestCase):
         from ai_manager.registry import SCHEMA
         with patch('ai_manager.registry.SCHEMA',SCHEMA+'; INVALID SQL;'):
             with self.assertRaises(sqlite3.DatabaseError):Registry(other)
-        with sqlite3.connect(other/'registry.sqlite3') as db:
+        with closing(sqlite3.connect(other/'registry.sqlite3')) as db, db:
             self.assertEqual(db.execute('PRAGMA user_version').fetchone()[0],0)
             self.assertEqual(db.execute("SELECT count(*) FROM sqlite_master WHERE type='table'").fetchone()[0],0)
         self.assertEqual(Registry(other).query()['summary']['registered'],0)
