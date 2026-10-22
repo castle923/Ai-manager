@@ -123,9 +123,9 @@ class ValidationStore:
             if stat.S_ISLNK(info.st_mode) or getattr(info,'st_file_attributes',0)&0x400 or not stat.S_ISREG(info.st_mode):fail('store_auxiliary_path_unsafe')
         try:db=sqlite3.connect(self.db.as_uri()+'?mode=rw',uri=True,timeout=10,isolation_level=None)
         except sqlite3.Error:fail('store_unavailable_no_auto_reset')
-        db.row_factory=sqlite3.Row
-        db.execute('PRAGMA foreign_keys=ON');db.execute('PRAGMA synchronous=FULL')
         try:
+            db.row_factory=sqlite3.Row
+            db.execute('PRAGMA foreign_keys=ON');db.execute('PRAGMA synchronous=FULL')
             if hasattr(self,'store_id'):
                 values=dict(db.execute('SELECT key,value FROM meta'))
                 if values.get('store_id')!=self.store_id or values.get('scope')!=observation_sha(str(self.home)):fail('store_scope_mismatch')

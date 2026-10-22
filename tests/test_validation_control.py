@@ -164,6 +164,31 @@ class ControlTests(unittest.TestCase):
             with self.assertRaises(ContractError):ValidationStore(home)
             self.assertEqual((home/DB_NAME).read_bytes(),b'not-sqlite')
 
+    def test_corrupt_store_initialization_closes_connection_before_cleanup(self):
+        connect=sqlite3.connect
+        connections=[]
+        class TrackedConnection(sqlite3.Connection):
+            closed=False
+            def close(self):
+                self.closed=True
+                super().close()
+        def tracked(*args,**kwargs):
+            db=connect(*args,**kwargs,factory=TrackedConnection)
+            connections.append(db)
+            return db
+        with tempfile.TemporaryDirectory() as directory:
+            home=Path(directory);database=home/DB_NAME
+            database.write_bytes(b'new synthetic corrupt database')
+            try:
+                with patch('ai_manager.validation_store.sqlite3.connect',side_effect=tracked):
+                    with self.assertRaisesRegex(ContractError,'store_unavailable_no_auto_reset'):
+                        ValidationStore(home)
+                self.assertEqual(database.read_bytes(),b'new synthetic corrupt database')
+                self.assertEqual(len(connections),1)
+                self.assertTrue(connections[0].closed)
+            finally:
+                for db in connections:db.close()
+
     def test_multiprocess_consume_exactly_one_transaction(self):
         with tempfile.TemporaryDirectory() as directory:
             folder=Path(directory);root=folder/'source';root.mkdir()

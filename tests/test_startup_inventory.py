@@ -1,6 +1,6 @@
 """Fresh-workspace readiness, with a forced file-before-schema interleaving."""
 from concurrent.futures import ThreadPoolExecutor
-from contextlib import contextmanager
+from contextlib import contextmanager, closing
 import hashlib
 from pathlib import Path
 import sqlite3
@@ -55,7 +55,7 @@ class StartupInventoryTests(unittest.TestCase):
                 self.assertTrue((self.home / 'inventory.sqlite3').exists())
                 self.assertFalse(finished.is_set())
                 bind.assert_not_called()
-                with sqlite3.connect((self.home/'inventory.sqlite3').as_uri()+'?mode=ro', uri=True) as db:
+                with closing(sqlite3.connect((self.home/'inventory.sqlite3').as_uri()+'?mode=ro', uri=True)) as db:
                     with self.assertRaisesRegex(sqlite3.OperationalError, 'no such table'):
                         db.execute('SELECT * FROM scans')
             finally:

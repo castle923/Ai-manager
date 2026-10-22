@@ -24,6 +24,30 @@ class WorkspaceTests(unittest.TestCase):
     def setUp(self):self.temp=tempfile.TemporaryDirectory();self.home=Path(self.temp.name);self.history=History(self.home)
     def tearDown(self):self.temp.cleanup()
 
+    def test_scan_history_closes_database_on_success_and_query_error(self):
+        Inventory(self.home)
+        connect=sqlite3.connect
+        connections=[]
+        class TrackedConnection(sqlite3.Connection):
+            closed=False
+            def close(self):
+                self.closed=True
+                super().close()
+        def tracked(*args,**kwargs):
+            db=connect(*args,**kwargs,factory=TrackedConnection)
+            connections.append(db)
+            return db
+        try:
+            for malformed in (False,True):
+                if malformed:
+                    with Inventory(self.home).connect() as db:db.execute('DROP TABLE scans')
+                with patch('ai_manager.history.sqlite3.connect',side_effect=tracked):
+                    records,issues=self.history._records()
+                self.assertEqual('scan_records_unavailable' in issues,malformed)
+                self.assertTrue(connections[-1].closed)
+        finally:
+            for db in connections:db.close()
+
     def fixture(self):
         pairid='a'*32;params={k:copy.deepcopy(RUN_DEFAULTS[k])for k in('language','speaker','batch_size','instruct','max_new_tokens','sampling')};params['seed']=123
         text='새 합성 비교 테스트 입력';inputsha=hashlib.sha256(text.encode()).hexdigest();runs=[]

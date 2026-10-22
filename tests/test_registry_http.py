@@ -86,7 +86,7 @@ class RegistryHttpTests(unittest.TestCase):
             body=copy.deepcopy(self.body)|{'artifact':{'adapter_id':DEFAULT_MODEL,'revision':fixture['revision']},'references':[{'local_directory':str(directory)}]}
             created=self.post('/api/registry',body);self.assertEqual(created.status_code,200)
             raw=created.json()['model']
-            result=subprocess.run([node,'-e',"process.stdout.write(JSON.stringify(JSON.parse(require('fs').readFileSync(0,'utf8'))))"],input=created.text,text=True,capture_output=True,timeout=10,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+            result=subprocess.run([node,'-e',"process.stdout.write(JSON.stringify(JSON.parse(require('fs').readFileSync(0,'utf8'))))"],input=created.text,text=True,encoding='utf8',capture_output=True,timeout=10,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
             self.assertEqual(result.returncode,0)
             browser=json.loads(result.stdout)['model']
             self.assertNotEqual(raw['references'][0]['components'][0]['mtime_ns'],browser['references'][0]['components'][0]['mtime_ns'])

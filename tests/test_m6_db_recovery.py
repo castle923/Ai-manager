@@ -1,4 +1,5 @@
 import hashlib,json,os,sqlite3,subprocess,tempfile,unittest
+from contextlib import closing
 from pathlib import Path
 from unittest.mock import patch
 from ai_manager.db_recovery import copy_database_to_new_target
@@ -26,12 +27,12 @@ class M6DatabaseRecoveryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'database_unreadable_or_corrupt'):copy_database_to_new_target(corrupt,self.root/'new.sqlite3')
         self.assertEqual(corrupt.read_bytes(),b'fresh deliberate database corruption');self.assertFalse((self.root/'new.sqlite3').exists())
         wrong=self.root/'wrong.sqlite3'
-        with sqlite3.connect(wrong) as db:db.execute('CREATE TABLE arbitrary(value TEXT)')
+        with closing(sqlite3.connect(wrong)) as db, db:db.execute('CREATE TABLE arbitrary(value TEXT)')
         with self.assertRaisesRegex(ValueError,'database_schema_unsupported'):copy_database_to_new_target(wrong,self.root/'new2.sqlite3')
 
     def test_same_column_names_without_constraints_rejected(self):
         clone=self.root/'clone.sqlite3'
-        with sqlite3.connect(clone) as output, sqlite3.connect(self.inventory.db) as original:
+        with closing(sqlite3.connect(clone)) as output, output, closing(sqlite3.connect(self.inventory.db)) as original, original:
             for table in ('scans','files'):
                 names=[row[1] for row in original.execute('PRAGMA table_info('+table+')')]
                 output.execute('CREATE TABLE '+table+'('+','.join(names)+')')

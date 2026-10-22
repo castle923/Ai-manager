@@ -138,8 +138,11 @@ class ReviewTests(unittest.TestCase):
     def test_runtime_process_timeout_blocks(self):
         import subprocess
         fake=self.home/'runtime'/'venv'/'Scripts'/'python.exe';fake.parent.mkdir(parents=True);fake.write_bytes(b'synthetic executable placeholder')
-        with patch('ai_manager.preparation.subprocess.run',side_effect=subprocess.TimeoutExpired('synthetic',120)):
+        with patch('ai_manager.external_process.run_external',side_effect=subprocess.TimeoutExpired('synthetic',120)) as run:
             result=self.prep.probe_runtime()
+        run.assert_called_once()
+        self.assertEqual(run.call_args.kwargs['timeout'],120)
+        self.assertEqual(run.call_args.args[0][0],str(fake))
         self.assertEqual(result['status'],'blocked');self.assertEqual(result['blockers'],['runtime_probe_failed'])
     def test_crossprocess_lock_rejects_before_media(self):
         import msvcrt

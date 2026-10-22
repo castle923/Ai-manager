@@ -1,5 +1,5 @@
 """Fresh synthetic workspaces: configuration transaction and server generations."""
-from contextlib import ExitStack
+from contextlib import ExitStack, closing
 import hashlib
 import json
 from pathlib import Path
@@ -165,7 +165,7 @@ class DriveSetupTests(unittest.TestCase):
         bridge=self.start_bridge();validation=bridge._application.validation
         validation.home.mkdir()
         database=validation.home/'validation-control.sqlite3'
-        with sqlite3.connect(database) as db:
+        with closing(sqlite3.connect(database)) as db, db:
             db.execute('CREATE TABLE batches(id INTEGER PRIMARY KEY,status TEXT)')
             db.executemany('INSERT INTO batches VALUES (?,?)',[(i,'pending' if i==0 else 'succeeded')for i in range(151)])
         before=database.read_bytes()

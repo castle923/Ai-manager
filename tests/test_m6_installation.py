@@ -36,13 +36,13 @@ class M6LocalPreparationTests(unittest.TestCase):
         self.assertNotEqual(first['id'],second['id']);self.assertEqual(first['status'],'ready');self.assertEqual(first['files_verified'],1)
         assets=prep.base/first['id']/'assets';self.assertEqual([p.name for p in assets.iterdir()],['config.json'])
         self.assertEqual((assets/'config.json').read_bytes(),self.content)
-        provenance=json.loads((assets.parent/'inputs.json').read_text());self.assertEqual(provenance['files'][0]['sha256'],self.manifest['files'][0]['sha256'])
+        provenance=json.loads((assets.parent/'inputs.json').read_text(encoding='utf8'));self.assertEqual(provenance['files'][0]['sha256'],self.manifest['files'][0]['sha256'])
 
     def test_bad_hash_and_missing_component_fail_preserve_source(self):
         (self.source/'config.json').write_bytes(b'x'*len(self.content))
         with self.assertRaisesRegex(PreparationError,'hash_mismatch'):Preparation(self.home).prepare_local(self.source)
         self.assertEqual((self.source/'config.json').read_bytes(),b'x'*len(self.content))
-        state=json.loads((self.home/'preparations/current.json').read_text());self.assertEqual(state['status'],'failed')
+        state=json.loads((self.home/'preparations/current.json').read_text(encoding='utf8'));self.assertEqual(state['status'],'failed')
 
     @unittest.skipUnless(os.name=='nt','Windows junction boundary')
     def test_junction_source_escape_rejected(self):
