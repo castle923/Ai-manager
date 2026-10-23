@@ -64,7 +64,15 @@ python -m unittest discover -s tests -p test_colab_watchdog.py -v
 
 30개는 기존 20개와 신규 결정적 회귀 10개다. 신규 검증은 identity 소실/오래된 생존 관측 사이 종료, nonzero 종료, gate 전 종료, 살아 있는 PID 재사용, 계속 살아 있는 소유권 불명, 남은 소유 자손, OS/cgroup floor·deadline·로그 오류의 우선 처리를 확인한다. 최종 종료코드가 중단 사유를 덮지 않는 것도 검사한다. red/green은 동결 원본을 변경하지 않고 모듈을 주입해 같은 종료 경쟁을 재현한 결과다.
 
-독립 정적 검토는 GO이며 부모의 새 타깃 실행도 통과했다. 이 명령은 CPU 합성 watchdog 타깃 검증으로 제품 전체 회귀는 이번에 실행하지 않았다. 과거 전체 회귀의 수치를 이번 결과로 옮겨 쓰지 않는다.
+독립 정적 검토는 GO이며 부모의 새 타깃 실행도 통과했다. 위 명령은 CPU 합성 watchdog 타깃 검증이며, 아래 전체 회귀와 구분한다.
+
+### 병합 소스의 새 전체 오프라인 회귀
+
+PR #2 병합 commit `6dce414b2cd46afba74e879e6237dab8edc0a109`와 동일 tree의 소스에서, 기존 격리 개발 venv의 Python 3.12.14와 Node 24.20.0으로 `python -m unittest discover -s tests -v`에 해당하는 전체 발견을 한 번 실행했다. 새 패키지 설치 없이 현재 저장소 `src`를 우선하고, 새 임시 폴더·실행 로그·전후 추적 소스 해시를 사용했다. 하위 프로세스에는 필수 OS 환경만 전달하고 이번 TEMP·PYTHONPATH를 설정했다.
+
+507개 중 **500개 통과·7개 skip·실패/오류 0**, unittest 실행 71.789초다. skip은 격리 tracking CPU 의존성 미설치 4개, decode 의존성 미설치 2개, OS의 비특권 symlink 생성 불가 1개다. 보안 검사나 모델 결과를 성공으로 대체한 skip이 아니다. 실행 전후 추적 소스 해시는 동일했고 C 드라이브의 600,000,000,000 bytes 여유 조건을 전후 충족했다.
+
+테스트는 합성 자료·모의 provider/Drive transport·loopback HTTP를 사용했다. Python 부모 프로세스의 audit가 비-loopback `socket.connect`를 거절하도록 했으며 해당 거절 기록은 0개였다. 이는 하위 프로세스나 OS 전체의 외부 통신 계측·차단 증거가 아니다. 모델·실제 provider API·Drive 또는 기존 개인 home을 실행 입력으로 사용하지 않았고 D 드라이브에는 접근하지 않았다. 이 결과는 수정된 watchdog의 실제 Colab 모델 실행이나 runtime 준비·모델 품질 검증이 아니다.
 
 ## 보존·미검증 범위
 

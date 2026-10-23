@@ -6,7 +6,7 @@
 
 현재 후속 개발의 시작 소스는 `e0df07f2179b208cfec072da7e869ea40c5cc48e`이며 아래 제품·배포·이전 회귀 항목은 각 시점의 이력으로 보존한다. [이번 Colab 모델 검증과 종료 감시 보고서](docs/COLAB_MODEL_VALIDATION_20261023.md)를 먼저 읽는다. 지정된 원본 결과를 문서화하고 모델 재실행 없이 감시 종료 경쟁을 수정·오프라인 회귀하는 범위다.
 
-Llama INT8 r02의 단일 짧은 입력 생성은 3토큰·EOS로 엔진 smoke 성공이다. 원래 watchdog은 `worker_identity_changed`로 중단되고 종료코드가 보존되지 않아 전체 감시 PASS는 미확정이다. Qwen FP32 두 크기의 단일 WAV와 Kokoro 직접 음소 FP32 smoke는 별도 근거의 한정 성공이며 청취 품질·전체 텍스트 G2P·앱 통합 성공으로 확대하지 않는다. `scripts/colab/llama_watchdog.py`의 새 합성 타깃 회귀는 기존 20개·신규 10개 합계 30개 통과·실패/skip 0이며 부모 독립 실행에서도 통과했다. 명령과 시간은 위 보고서를 따른다. 이는 제품 전체 회귀가 아니다. 기존 동결/업로드 notebook·현재 Colab을 교체하거나 재실행하지 않았고 수정된 감시기의 실제 Colab 모델 실행은 미검증이다.
+Llama INT8 r02의 단일 짧은 입력 생성은 3토큰·EOS로 엔진 smoke 성공이다. 원래 watchdog은 `worker_identity_changed`로 중단되고 종료코드가 보존되지 않아 전체 감시 PASS는 미확정이다. Qwen FP32 두 크기의 단일 WAV와 Kokoro 직접 음소 FP32 smoke는 별도 근거의 한정 성공이며 청취 품질·전체 텍스트 G2P·앱 통합 성공으로 확대하지 않는다. `scripts/colab/llama_watchdog.py`의 새 합성 타깃 회귀는 기존 20개·신규 10개 합계 30개 통과·실패/skip 0이며 부모 독립 실행에서도 통과했다. 명령과 시간은 위 보고서를 따른다. 이 타깃 결과와 별도로 PR #2 병합 소스와 동일 tree의 새 전체 오프라인 회귀를 실행해 507개 중 500개 통과·7개 skip·실패/오류 0(71.789초)을 확인했다. skip은 tracking CPU 4개·decode 2개 의존성 미설치와 비특권 symlink 1개다. 전후 추적 소스 동일·새 격리 임시 자료·C 여유 조건을 확인했으며 부모 Python audit의 비-loopback 거절 기록 0은 OS 전체 계측이 아니다. 기존 동결/업로드 notebook·현재 Colab을 교체하거나 재실행하지 않았고 수정된 감시기의 실제 Colab 모델 실행은 미검증이다.
 
 기존 인증·키·DB·보안·모델·원본 실행 증거를 보존한다. 이번 후속 작업에서 모델 재실행·다운로드·유료 API 호출·Drive 접근은 하지 않는다. 원본에 없는 OS 종료코드는 합성 회귀로 복원할 수 없다.
 
