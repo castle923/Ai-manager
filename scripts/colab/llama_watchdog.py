@@ -34,6 +34,20 @@ class PsutilBackend:
         except self.psutil.NoSuchProcess:
             return None
 
+    def exit_state(self, pid, expected_identity):
+        """Explain a missing live identity without granting permission to signal."""
+        try:
+            process = self.psutil.Process(pid)
+            if process.create_time() != expected_identity:
+                return 'identity_changed'
+            if process.status() == self.psutil.STATUS_ZOMBIE:
+                return 'owned_zombie'
+            return 'live_or_unknown'
+        except self.psutil.NoSuchProcess:
+            return 'process_absent'
+        except self.psutil.AccessDenied:
+            return 'identity_unavailable'
+
     def children(self, pid):
         try:
             return [p.pid for p in self.psutil.Process(pid).children(recursive=True)]
@@ -302,6 +316,7 @@ def run_owned(command, run_dir, env, *, timeout_seconds=600, handshake_seconds=1
     child = None
     known = {}
     root_identity = None
+    exit_confirmation_started = None
     io_failed = threading.Event()
     io_overflow = threading.Event()
     counters = {'stdout': 0, 'stderr': 0}
@@ -312,7 +327,8 @@ def run_owned(command, run_dir, env, *, timeout_seconds=600, handshake_seconds=1
                'minimum_cgroup_headroom_bytes': None, 'samples': 0,
                'peak_cgroup_current_bytes': None, 'last_cgroup_max_bytes': None,
                'peak_cgroup_file_bytes': None,
-               'automatic_retry': False, 'sampled_guard_not_OS_memory_limit': True}
+               'automatic_retry': False, 'sampled_guard_not_OS_memory_limit': True,
+               'exit_confirmation_samples': 0}
 
     def drain(stream, target, label):
         try:
@@ -360,6 +376,16 @@ def run_owned(command, run_dir, env, *, timeout_seconds=600, handshake_seconds=1
             if io_overflow.is_set():
                 raise GuardStop('log_size_cap')
             rss, alive = _snapshot(backend, child.pid, root_identity, known)
+            root_exit_state = None
+            if child.pid not in alive and hasattr(backend, 'exit_state'):
+                root_exit_state = backend.exit_state(child.pid, root_identity)
+                if root_exit_state == 'owned_zombie':
+                    root_rss = backend.rss(child.pid)
+                    if not _finite_integer(root_rss):
+                        raise ValueError('root_RSS_measurement_invalid')
+                    root_exit_state = backend.exit_state(child.pid, root_identity)
+                    if root_exit_state == 'owned_zombie':
+                        rss += root_rss
             memory = sample()
             summary['samples'] += 1
             summary['peak_owned_RSS_bytes'] = max(summary['peak_owned_RSS_bytes'], rss)
@@ -383,8 +409,22 @@ def run_owned(command, run_dir, env, *, timeout_seconds=600, handshake_seconds=1
                 raise GuardStop('cgroup_memory_floor')
             if rss >= summary.get('RSS_cap_bytes', hard_rss_cap_bytes):
                 raise GuardStop('RSS_cap')
+            if root_exit_state is not None and root_exit_state not in ('owned_zombie', 'process_absent'):
+                summary['identity_observation'] = ('identity_changed' if root_exit_state == 'identity_changed' else 'live_or_unknown')
+                raise GuardStop('worker_identity_changed')
+            if exit_confirmation_started is not None:
+                age = time.monotonic()-exit_confirmation_started
+                summary['exit_confirmation_seconds'] = round(age, 3)
+                if age >= 1.:
+                    raise GuardStop('worker_exit_confirmation_timeout')
             returncode = child.poll()
             if returncode is not None:
+                summary['exit_poll_path'] = 'main_poll'
+                if exit_confirmation_started is not None:
+                    age = time.monotonic()-exit_confirmation_started
+                    summary['exit_confirmation_seconds'] = round(age, 3)
+                    if age >= 1.:
+                        raise GuardStop('worker_exit_confirmation_timeout')
                 _record_confirmed_exit(child, backend, known, summary, returncode)
                 break
             identity = backend.identity(child.pid)
@@ -393,9 +433,38 @@ def run_owned(command, run_dir, env, *, timeout_seconds=600, handshake_seconds=1
                 # Accept only a newly confirmed Popen exit, never a changed live PID.
                 returncode = child.poll() if identity is None else None
                 if returncode is None:
-                    raise GuardStop('worker_identity_changed')
+                    state = (backend.exit_state(child.pid, root_identity)
+                             if identity is None and hasattr(backend, 'exit_state')
+                             else 'identity_unavailable' if identity is None else 'identity_changed')
+                    if state not in ('owned_zombie', 'process_absent', 'identity_changed', 'live_or_unknown', 'identity_unavailable'):
+                        state = 'identity_unavailable'
+                    summary['identity_observation'] = state
+                    if state not in ('owned_zombie', 'process_absent'):
+                        raise GuardStop('worker_identity_changed')
+                    # An owned exit state can precede Popen exit confirmation.
+                    # Keep every guard active; only Popen can confirm exit.
+                    now = time.monotonic()
+                    if exit_confirmation_started is None:
+                        exit_confirmation_started = now
+                    summary['exit_confirmation_seconds'] = round(now-exit_confirmation_started, 3)
+                    summary['exit_confirmation_samples'] += 1
+                    if now-exit_confirmation_started >= 1.:
+                        raise GuardStop('worker_exit_confirmation_timeout')
+                    if not summary['gate_opened'] and elapsed >= handshake_seconds:
+                        raise GuardStop('handshake_deadline_exceeded')
+                    time.sleep(min(interval_seconds, 1.-(now-exit_confirmation_started)))
+                    continue
+                summary['exit_poll_path'] = 'identity_repoll'
+                if exit_confirmation_started is not None:
+                    age = time.monotonic()-exit_confirmation_started
+                    summary['exit_confirmation_seconds'] = round(age, 3)
+                    if age >= 1.:
+                        raise GuardStop('worker_exit_confirmation_timeout')
                 _record_confirmed_exit(child, backend, known, summary, returncode)
                 break
+            if exit_confirmation_started is not None:
+                summary['identity_observation'] = 'live_or_unknown'
+                raise GuardStop('worker_identity_changed')
             if not summary['gate_opened'] and handshake.exists():
                 if handshake.is_symlink() or handshake.stat().st_size > 64*1024:
                     raise GuardStop('handshake_invalid')

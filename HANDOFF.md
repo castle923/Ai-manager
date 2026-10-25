@@ -1,6 +1,44 @@
 # 다른 PC·새 세션 개발 인계
 
-기준일: 2026-10-23 (Asia/Seoul). 이 문서는 같은 Ai Manager의 소스·진행 상태를 이어받기 위한 공개 인계서다. 실제 개인 자료와 비밀은 포함하지 않는다. 새 PC 설치·인증·모델 실행을 이번에 검증했다는 뜻은 아니다.
+기준일: 2026-10-25 (Asia/Seoul). 이 문서는 같은 Ai Manager의 소스·진행 상태를 이어받기 위한 공개 인계서다. 실제 개인 자료와 비밀은 포함하지 않는다. 새 PC 설치·인증·모델 실행을 이번에 검증했다는 뜻은 아니다.
+
+## 2026-10-25 수정 guard의 새 무료 T4 실제 완료 — 최신 상태
+
+[Colab 검증 보고서의 최신 실제 검증 절](docs/COLAB_MODEL_VALIDATION_20261023.md)을 먼저 읽는다. 종료 확인 수정 guard `218747316b9fdca77b17983feb531dccae979ded78ba39fe91428b804c6e358b`의 별도 새 실행에서 단일 엔진 smoke와 guard 정상 완료를 확인했다. 원본 packet `5796fff3f78ad7fd915da99c7750d488c4ef82457dc877528658f26751a6e5c1`(11셀·코드 6개·자산 9개)은 불변이고, Drive 새 실행본은 정상 UI의 코드 6개와 안내 Markdown으로 구성해 코드 source 해시를 검증했다. 아래 준비 한정·실제 Colab 미검증 표기는 당시 이력이며 앞선 guard STOP도 그대로 보존한다.
+
+이번 고정 모델 다운로드는 10파일·16,069,722,669 bytes·전체 SHA-256 true·token_saved false다. context·root·work true·phase done이며 생성 1회·입력 41/새 출력 3토큰·EOS true다. 로딩 70.153177724초·생성 2.018226058초, GPU peak allocated 10,087,137,280/reserved 10,412,359,680 bytes, 224개 INT8 Linear·GPU parameter 텐서 291개·CPU/disk offload 없음이다.
+
+실제 guard 필드는 `completed / worker_exited`, worker_returncode 0·final_worker_returncode 0·remaining_owned_count 0·cleanup_measurement_error false다. elapsed 186.037초·917표본, `owned_zombie / main_poll`·종료 확인 1표본/0.201초를 관측했다. 최소 cgroup 여유 2,807,578,624 bytes > 2 GiB, peak owned RSS 6,658,187,264 bytes < cap 7,340,994,560 bytes이며 자동 재시도는 false다. helper 보조 필드뿐 아니라 지정된 이번 비공개 download·watchdog·phase·file-result-check·runtime·실행 허용값 증거의 실제 필드를 직접 대조했다. 원격 OS의 독립 감사나 모든 종료 경쟁·순간별 메모리 상한 보장은 아니다.
+
+무료 계정·구독 없음·유료 CU 0을 UI에서 확인한 범위이고 유료 API 호출은 0회다. Python 3.12.13·Torch 2.11.0+cu128·NumPy 2.0.2에서 격리 text API를 실행했으며 사용하지 않는 Gradio/huggingface-hub 충돌이 남아 전체 상속 환경 `pip check` PASS는 아니다. 품질·일반 성능·앱 통합으로 확대하지 않는다. 이번 문서 갱신 자체는 모델 실행·다운로드·네트워크·인증/DB 접근 없이 두 문서만 추가 변경했으며 기존 미커밋 변경·packet·실행 증거를 보존했다.
+
+남은 앱 연결 작업: 현재 앱 manifest의 model revision·10파일은 일치하지만 로컬 FP16 프로필(Torch 2.9.1·NumPy 2.2.6, GPU 3 GiB/CPU 4 GiB offload)과 이번 Colab INT8 전량 GPU 계약은 다르다. 별도 INT8 runtime/profile 연결과 합성 검증·새 실제 앱 E2E가 필요하다. 이번 Colab 결과로 로컬 `execution_verified=true`를 자동 갱신하지 않는다. 추가 다운로드 승인은 Colab 범위에 한정하며 D 드라이브 I/O는 보류하고 기존 모델·인증·DB를 보존한다. 직전 문서 갱신 시점에는 commit·push를 수행하지 않았다. 후속 검토·게시 단계는 별도 기록으로 구분한다.
+
+## 2026-10-25 수정 감시기 노트북 준비 — 준비 당시 기록
+
+[Colab 검증 보고서의 최신 노트북 준비 절](docs/COLAB_MODEL_VALIDATION_20261023.md)을 먼저 읽는다. 종료 확인을 수정한 canonical guard `218747316b9fdca77b17983feb531dccae979ded78ba39fe91428b804c6e358b`와 새 읽기 전용 결과 helper를 포함한 별도 새 packet을 로컬에 준비했다. 전달 후보 `Llama_Free_T4_INT8_Exit_Confirmation.ipynb`는 80,682 bytes·SHA-256 `5796fff3f78ad7fd915da99c7750d488c4ef82457dc877528658f26751a6e5c1`, 11셀·코드 6개·내장 자산 9개다. 기존 packet·동결 원본·helper는 보존했다.
+
+확인/승인/live 허용값 6개는 모두 False다. 새 helper는 컨텍스트·경로 결합과 제한된 파일 읽기를 검증하고 새 identity/poll/종료 확인 진단 필드를 허용 목록으로 출력한다. 컨텍스트가 없는 기본 실행에서는 파일을 읽지 않는 `not_ready / live_context_absent`를 출력한다. 완료 보조 필드만으로 OS cleanup을 보장하지 않으며 최종 종료코드와 cleanup 측정 오류도 별도로 확인해야 한다.
+
+이번 새 타깃은 guard 45개·builder 18개·helper 8개 합계 71개다. 독립 검토자 7.330초·부모 7.224초에 모두 통과했고 실패·오류·skip은 0이다. 생성한 실제 notebook의 6개 코드 셀도 빈 namespace에서 파일·외부 실행을 거절하는 sentinel 아래 검증 표시 1개·live SKIP 3개·결과 진단 SKIP를 확인했으며 ROOT 생성·파일시스템 호출은 없었다. 추가 도구 설치·전체 제품 회귀는 하지 않았다.
+
+소형 코드 packet 3파일 합계는 83,880 bytes다. builder는 실제 직렬화 합계와 1 MiB 여유분을 제외하고 최소 500,000,000,000 bytes를 보존하는 사전 검사로 조정했다. 생성 후 C 여유 표본은 598,362,329,088 bytes이며 동시 외부 사용 예약이나 전후 차이 전체의 작업 귀속을 보장하지 않는다. 모델·런타임 설치 정책 변경이나 cleanup은 아니다.
+
+새 Colab 업로드·화면·GPU·설치·모델 다운로드/실행·Drive·유료 API·기존 인증/키/개인 DB 접근은 수행하지 않았다. 수정 guard의 실제 Colab 실행은 미검증이며 앞선 실제 엔진 smoke PASS/guard STOP 판정은 유지한다. 아래 '새 live packet 미생성'과 59개 검증은 이번 준비 이전 감시 수정 시점의 이력이다.
+
+## 2026-10-25 새 Llama 실행과 감시 후속 진단 이력
+
+[Colab 검증 보고서의 2026-10-25 절](docs/COLAB_MODEL_VALIDATION_20261023.md)을 먼저 읽는다. 아래 2026-10-23·24 및 제품/배포/전체 회귀 항목은 각 시점의 기록이다. 새 실행의 결과 출처는 사용자가 직접 수행한 읽기 전용 `FILE_RESULT_CHECK` 출력의 허용 필드 요약이며 원격 파일 전체를 독립 재검사한 결과가 아니다.
+
+새 무료 T4 실행에서 고정 모델 10파일 16,069,722,669 bytes 다운로드와 전체 SHA-256 검증 true·토큰 저장 false를 관측했다. context·root·work 검증은 모두 true이고 Llama LLM.int8 단일 smoke는 1회 생성·입력 41/새 출력 3토큰·EOS로 성공했다. 로딩 69.674526초·추론 1.986636초, 224개 양자화 Linear·GPU 파라미터 텐서 291개·CPU/disk offload 없음이며 7개 phase의 마지막은 done이다.
+
+감시는 다시 `stopped / worker_identity_changed`였다. 이번에는 `final_worker_returncode=0`·남은 owned 0을 확인했으나 `worker_returncode`는 없고 전체 guard 완료 PASS는 아니다. 최소 cgroup 여유 2,835,795,968 bytes는 2 GiB보다 높고 peak owned RSS 6,634,229,760 bytes는 cap 7,347,048,448 bytes보다 작다. OOM·traceback 표시는 false다. 실제 identity가 None이었는지 달라졌는지는 요약에 없어 실제 원인을 확정하지 않는다. 브라우저 결과 JavaScript·reCAPTCHA 오류와 도구 timeout의 원인도 미확정이며, 사용자 직접 결과 확인은 모델 재실행이 아니다.
+
+오프라인에서는 독립 poll/psutil 제어로 같은 소유 zombie·process_absent인데 즉시 poll이 None인 두 종료 순서의 조기 STOP 결함을 재현하고 수정했다. 이 두 상태에만 1초 표본 기준 종료 확인 창을 두고 매회 기존 보호와 상태·RSS를 재검증한다. 1초는 OS 강제 시간 보장이 아니며 확인 기한을 넘긴 poll/wait 0으로 소급 PASS를 만들지 않는다. 실제 identity 변경·소유권 불명은 STOP을 유지한다. 새 진단 요약 필드는 identity 관측·poll 경로·확인 표본 수/시간이며 향후 새 읽기 전용 helper에 포함해야 한다. 이번 동결 helper는 보존했다.
+
+수정 전 두 사례 실패 → 수정 후 guard 45개·builder 14개 통과를 확인했고 독립 검토자 합계 59개 7.197초·부모 독립 합계 59개 7.219초에 통과했다. 실패·오류·skip은 모두 0이다. canonical 감시기 raw LF SHA-256은 `218747316b9fdca77b17983feb531dccae979ded78ba39fe91428b804c6e358b`이며 builder pin을 연동했다. 새 live packet은 생성하지 않았고 이번 전체 제품 회귀는 반복하지 않았다. 이 수정과 오프라인 결과로 실제 Colab guard STOP을 재분류하지 않는다.
+
+실행 전 builder 컨텍스트 보호의 별도 합성 13개 통과는 해당 준비 시점 기록이며 이번 감시 수정 검증으로 재사용하지 않는다. 기존 원본 packet·동결 소스·실행 증거·모델·인증·키·개인 DB를 보존한다. 새 모델 실행·다운로드·유료 API·Drive·브라우저·개인 인증/DB 접근을 하지 않으며 후속 수정의 실제 Colab 모델 실행도 수행하지 않는다.
 
 ## 2026-10-23 모델 관측과 종료 감시 후속 작업
 
@@ -9,6 +47,8 @@
 Llama INT8 r02의 단일 짧은 입력 생성은 3토큰·EOS로 엔진 smoke 성공이다. 원래 watchdog은 `worker_identity_changed`로 중단되고 종료코드가 보존되지 않아 전체 감시 PASS는 미확정이다. Qwen FP32 두 크기의 단일 WAV와 Kokoro 직접 음소 FP32 smoke는 별도 근거의 한정 성공이며 청취 품질·전체 텍스트 G2P·앱 통합 성공으로 확대하지 않는다. `scripts/colab/llama_watchdog.py`의 새 합성 타깃 회귀는 기존 20개·신규 10개 합계 30개 통과·실패/skip 0이며 부모 독립 실행에서도 통과했다. 명령과 시간은 위 보고서를 따른다. 이 타깃 결과와 별도로 PR #2 병합 소스와 동일 tree의 새 전체 오프라인 회귀를 실행해 507개 중 500개 통과·7개 skip·실패/오류 0(71.789초)을 확인했다. skip은 tracking CPU 4개·decode 2개 의존성 미설치와 비특권 symlink 1개다. 전후 추적 소스 동일·새 격리 임시 자료·C 여유 조건을 확인했으며 부모 Python audit의 비-loopback 거절 기록 0은 OS 전체 계측이 아니다. 기존 동결/업로드 notebook·현재 Colab을 교체하거나 재실행하지 않았고 수정된 감시기의 실제 Colab 모델 실행은 미검증이다.
 
 기존 인증·키·DB·보안·모델·원본 실행 증거를 보존한다. 이번 후속 작업에서 모델 재실행·다운로드·유료 API 호출·Drive 접근은 하지 않는다. 원본에 없는 OS 종료코드는 합성 회귀로 복원할 수 없다.
+
+2026-10-24에는 수정 감시기와 r02 캐시 보호를 연결하는 별도 노트북 builder·합성 타깃 테스트를 로컬에 준비했다. 기본 무료 확인·새 실험 승인·세 live 허용값은 모두 False이며, 새 노트북의 stdlib 검사 및 기본 전체 5개 코드 셀에서 실단계 3개 SKIP를 확인했다. 새 합성 7개 통과(0.120초)는 앞선 전체 507개 회귀와 다른 검증이다. 원본/업로드 Colab을 변경하지 않았으며 업로드·설치·토큰 입력·GPU·모델 실행·시각 검증은 하지 않았다. 향후 외부 실행은 별도 승인 대상이다. 자세한 입력 핀·기본 차단·검증 공백은 위 보고서의 2026-10-24 절을 따른다.
 
 ## 먼저 읽을 상태
 

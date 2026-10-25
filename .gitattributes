@@ -1,2 +1,5 @@
 # These officially vendored sources have pinned byte hashes in PROVENANCE.json.
 src/ai_manager/tapir_vendor/* -text
+# The notebook builder pins the canonical guard's raw bytes across checkouts.
+scripts/colab/llama_watchdog.py text eol=lf
+scripts/colab/file_result_check.py text eol=lf
