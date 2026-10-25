@@ -19,9 +19,6 @@ except ImportError:
     HandoffStore = None
 
 
-EVIDENCE = Path(__file__).resolve().parents[2] / "development-evidence" / "llama-colab-implementation-20261025-r4n8"
-
-
 def raw(value):
     return json.dumps(value, ensure_ascii=False).encode()
 
@@ -29,7 +26,7 @@ def raw(value):
 class StoreTests(unittest.TestCase):
     def setUp(self):
         self.assertIsNotNone(HandoffStore, "handoff sidecar is not implemented")
-        self.temp = tempfile.TemporaryDirectory(prefix="task1-home-", dir=EVIDENCE)
+        self.temp = tempfile.TemporaryDirectory(prefix="task1-home-")
         self.addCleanup(self.temp.cleanup)
         self.home = Path(self.temp.name) / "new-home"
         self.request = contract.build_request("새 합성 입력", PINS)

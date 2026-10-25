@@ -16,8 +16,7 @@ class Auth:
 
 class HandoffHTTPTests(unittest.TestCase):
     def setUp(self):
-        evidence = Path(__file__).resolve().parents[2] / 'development-evidence/llama-colab-implementation-20261025-r4n8'
-        self.temp = tempfile.TemporaryDirectory(prefix='task-3-http-', dir=evidence)
+        self.temp = tempfile.TemporaryDirectory(prefix='task-3-http-')
         self.home = Path(self.temp.name)
         self.app = create_application(self.home, {'allowlist': [], 'mode': 'local'}, Auth())
         self.app.start()
