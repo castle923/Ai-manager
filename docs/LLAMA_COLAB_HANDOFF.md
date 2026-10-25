@@ -38,3 +38,13 @@
 새 paired-request 실제 Colab 실행은 **미검증·보류**다. 기존 Colab 화면은 자연 재연결 후 T4 활성 세션으로 관찰됐지만, 컴퓨터 사용 안전검사가 현재 브라우저 URL을 확인하지 못해 화면 조작을 중단했다. 모델 cache와 정확한 runtime/source 조건은 아직 검사하지 않았다. 연결 불가나 모델 실패로 판정한 것은 아니다.
 
 기존 notebook에 빈 셀 하나만 추가됐으며 실행 소스 붙여넣기와 모델 생성은 수행하지 않았다. 기존 VM·모델·별도 새 요청을 보존했고, 다른 UI나 숨은 API로 우회하거나 모델을 재시도하지 않았다. 다음 사용자 대화에서 UI 연결이 복구되면 source/runtime/model 검사를 먼저 이어갈 수 있다. 설치나 다운로드가 필요하면 대상·용량을 사전 안내하고 멈춘다. 실제 생성·guard 완료·앱 결과 가져오기까지 새 요청으로 확인하기 전 성공으로 보고하지 않으며, 이전 고정 prompt smoke를 이번 앱 요청의 근거로 사용하지 않는다.
+
+## 2026-10-25 후속 연결과 배포 점검
+
+후속 승인에 따라 정상 Edge의 기존 무료 T4 세션에서 재연결을 한 번 시도했으나 Colab이 GPU 사용량 제한으로 거절했다. 유료 전환·CPU 대체·재시도·설치·다운로드·모델 생성·결과 가져오기는 수행하지 않았다. 연결되지 않아 현재 cache·runtime·source는 미확인이다. 실제 앱 요청부터 생성·guard 완료·결과 가져오기까지의 E2E는 계속 미완료이며 배포 준비 완료로 판정하지 않는다.
+
+설치 산출물 검토에서 필수 `colab_source_pins.json`과 공개 notebook 소스가 wheel/desktop 수집 규칙에서 빠지는 문제를 수정했다. 공통 staging helper를 wheel의 `build_py` hook과 desktop builder가 사용하며 지정된 공개 파일만 복사한다. `MANIFEST.in`은 sdist에서도 helper와 공개 실행 소스를 보존하기 위해 필요하다. 설치본은 checkout이 없을 때 패키지 내부의 `colab_public`을 사용한다. 동일 바이트의 빌드 결과는 다시 사용하고 충돌·추가 파일은 덮어쓰지 않고 거절한다. 이 수정은 설치 패키지에 개인 home·인증·DB·모델을 포함하지 않는다.
+
+새 오프라인 확인에서 handoff 계약·bridge·HTTP·store 40개 중 39개 통과·symlink 권한 skip 1개, packaging 회귀 3개 통과를 확인했다. 기존 setuptools/wheel로 네트워크 DNS/connect 거절 조건에서 wheel 생성과 동일 빌드 경로 재생성이 통과했다. 생성 wheel을 checkout 없는 별도 경로에 풀어 격리 Python 프로세스의 앱 시작·metadata·합성 입력 미리보기·공개 notebook 응답을 확인했다. 요청은 저장하지 않았다. 새 frozen EXE/설치 프로그램 빌드·실행과 실제 Colab E2E는 검증하지 않았으며 앞선 588개 전체 회귀를 이번 수정 후 다시 수행한 결과도 아니다.
+
+UUID 재시도 차단의 범위는 notebook 커널 메모리의 `APP_HANDOFF_CONTEXTS`와 해당 실행 디렉터리의 marker다. 커널을 다시 시작하고 새 실행 디렉터리를 만들면 같은 UUID의 재실행을 전역적으로 막지 못한다. 영구 중복 실행 방지를 보장하지 않으며 사용자는 실패·불명 결과를 같은 요청으로 재시도하지 않아야 한다.

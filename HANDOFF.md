@@ -4,6 +4,8 @@
 
 ## 2026-10-25 Llama 무료 Colab 파일 연결 — 최신 앱 상태
 
+최신 후속 실행은 기존 무료 T4 세션의 정상 Edge 재연결 1회에서 GPU 사용량 제한으로 거절됐다. 유료 전환·CPU 대체·재시도·다운로드·설치·생성·결과 가져오기는 없었고 현재 cache/runtime/source는 연결되지 않아 미확인이다. 실제 app→Colab→결과 가져오기 E2E와 새 Windows standalone 설치 프로그램은 미검증이므로 배포 준비 완료로 판정하지 않는다. 설치본에 빠지던 공개 source pin·notebook 자산을 공통 staging과 wheel build hook으로 포함하도록 수정했고, 새 handoff 회귀 40개(39 통과·symlink skip 1) 및 packaging 3개 통과, 네트워크 거절 조건의 wheel 빌드/재빌드·checkout 없는 설치본 시작/metadata/합성 미리보기/notebook 응답을 확인했다. 전체 588개를 이번 수정 후 재실행한 결과는 아니다. UUID 재시도 차단은 현재 커널 메모리와 실행 디렉터리 marker 범위이며 커널 재시작·새 디렉터리를 넘어서는 영구 중복 방지가 아니다. 자세한 범위는 아래 연결 문서의 후속 절을 따른다.
+
 [무료 Colab 파일 실행 안내와 검증 범위](docs/LLAMA_COLAB_HANDOFF.md)를 먼저 읽는다. 새 local-only 작업실에서 요청을 검토·내보내고, 사용자가 준비된 무료 T4에서 직접 실행한 결과 JSON을 가져오는 별도 handoff 기능을 추가했다. strict JSON·UUID/digest 결합·불변 sidecar·공개 소스 notebook·독립 앱 패널을 구현했으며 기존 로컬 FP16/BF16 profile과 검증 판정은 유지했다. 외부 보고를 로컬 `execution_verified`나 registry verified로 승격하지 않는다.
 
 새 격리 앱의 실제 브라우저에서 합성 요청·결과의 정확한 다운로드/가져오기, Unicode·HTML 형태 문자열의 텍스트 표시, 동일 결과 재가져오기, 충돌 보존, 잘못된/과대 파일 거절, 중단/실패/32토큰 상한 구분, 새 페이지의 동일 결과 재가져오기 및 빈 registry 유지까지 확인했다. 자동 reload/history 복원은 제공하지 않는다. 테스트 임시 경로 이식성 수정 전 최종 전체 오프라인 회귀 588개는 580개 통과·실패 0·오류 0·skip 8, frontend production build는 통과했으며 정적 산출물과 공개 source pin의 커밋·working tree·bundle 바이트 일치를 확인했다. 최초 하네스 실패와 보정 조건은 비공개 증거에 보존했다. skip 8개는 symlink 권한 2개와 별도 tracking 의존성 6개다.

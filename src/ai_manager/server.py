@@ -18,7 +18,10 @@ import uuid
 from datetime import datetime, timezone
 
 
-_HANDOFF_PUBLIC_ROOT = Path(__file__).resolve().parents[2]
+_HANDOFF_CHECKOUT_ROOT = Path(__file__).resolve().parents[2]
+_HANDOFF_PUBLIC_ROOT = (_HANDOFF_CHECKOUT_ROOT
+    if (_HANDOFF_CHECKOUT_ROOT / 'src/ai_manager/colab_contract.py').is_file()
+    else Path(__file__).resolve().parent / 'colab_public')
 
 
 def _verify_handoff_sources(declared_pins):
@@ -269,10 +272,10 @@ def _create_application(home, settings, auth, port, constructed):
                             runtime=RUNTIME, profile_id=PROFILE_ID, input_max_bytes=INPUT_MAX_BYTES,
                             default_text='물은 얼면 무엇이 되나요?'))
                     if path == '/api/colab-handoff/bundle':
-                        # Source-checkout feature: only the repository's public builder is used.
+                        # Only the reviewed public sources from this checkout/package are used.
                         import runpy
                         import tempfile
-                        builder = Path(__file__).resolve().parents[2] / 'scripts/colab/build_llama_handoff.py'
+                        builder = _HANDOFF_PUBLIC_ROOT / 'scripts/colab/build_llama_handoff.py'
                         if not builder.is_file():
                             return self.reply(503, {'error':'public_sources_unavailable'})
                         with tempfile.TemporaryDirectory(prefix='colab-public-bundle-', dir=home) as temporary:

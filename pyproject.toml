@@ -16,4 +16,4 @@ ai-manager = "ai_manager.cli:main"
 where = ["src"]
 
 [tool.setuptools.package-data]
-ai_manager = ["static/index.html", "static/assets/*", "model_manifest*.json", "adapter_manifest*.json", "requirements_*.lock", "tapir_vendor/*.json", "tapir_vendor/LICENSE"]
+ai_manager = ["static/index.html", "static/assets/*", "model_manifest*.json", "adapter_manifest*.json", "requirements_*.lock", "tapir_vendor/*.json", "tapir_vendor/LICENSE", "colab_source_pins.json"]
