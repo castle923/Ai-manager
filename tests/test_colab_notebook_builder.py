@@ -75,6 +75,7 @@ class NotebookBuilderTests(unittest.TestCase):
                     exec(compile(''.join(cell['source']), '<offline-cell>', 'exec'), namespace)
         self.assertIn('__OFFLINE_PACKET_VALIDATED__', output.getvalue())
         self.assertEqual(output.getvalue().count('__PHASE_SKIPPED__'), 3)
+        self.assertEqual(output.getvalue().count('__RESULT_CHECK_SKIPPED__'), 1)
         self.assertTrue(all(namespace[name] is False for name in (
             'USER_CONFIRMED_FREE_ACCOUNT_NO_PAID_CU', 'USER_CONFIRMED_FREE_T4',
             'USER_APPROVED_RUNTIME_AND_LLAMA_EXPERIMENT', 'ALLOW_RUNTIME_DOWNLOAD',
@@ -119,6 +120,29 @@ class NotebookBuilderTests(unittest.TestCase):
             self.build()
         self.assertEqual(target.read_bytes(), before)
 
+    def test_disk_reserve_includes_all_serialized_files_and_allowance(self):
+        self.build()
+        serialized_bytes=sum(p.stat().st_size for p in self.output.rglob('*') if p.is_file())
+        threshold=m.MINIMUM_FREE_BYTES+serialized_bytes+m.FILESYSTEM_ALLOWANCE_BYTES
+        self.output=self.root/'boundary-pass'
+        with patch.object(m.shutil,'disk_usage',return_value=type('Disk',(),{'free':threshold})()):
+            self.build()
+        self.output=self.root/'boundary-fail'
+        with patch.object(m.shutil,'disk_usage',return_value=type('Disk',(),{'free':threshold-1})()):
+            with self.assertRaisesRegex(ValueError,'C_reserve_not_met'):self.build()
+        self.assertFalse(self.output.exists())
+
+    def test_oversized_packet_is_rejected_before_creating_output(self):
+        with patch.object(m,'INTRO','x'*(2*1024**2)),patch.object(m.shutil,'disk_usage',
+                return_value=type('Disk',(),{'free':m.MINIMUM_FREE_BYTES+m.FILESYSTEM_ALLOWANCE_BYTES+1024**2})()):
+            with self.assertRaisesRegex(ValueError,'C_reserve_not_met'):self.build()
+        self.assertFalse(self.output.exists())
+
+    def test_readonly_helper_tamper_is_rejected_before_output(self):
+        with patch.object(m,'RESULT_HELPER_SHA','0'*64):
+            with self.assertRaisesRegex(ValueError,'source_hash_mismatch'):self.build()
+        self.assertFalse(self.output.exists())
+
     def test_fresh_execution_flow_has_no_resume_state_and_preserves_guards(self):
         self.assertNotIn('ORIGINAL_SUMMARY', m.EXECUTE)
         self.assertNotIn('RESUME_', m.EXECUTE)
@@ -140,6 +164,102 @@ class NotebookBuilderTests(unittest.TestCase):
             runtime_cell = ''.join(nb['cells'][4]['source'])
             live = ast.literal_eval(m.assignment(runtime_cell, 'LIVE_SOURCE').value)
             exec(compile(live, '<disabled-runtime>', 'exec'), {'ALLOW_RUNTIME_DOWNLOAD': False})
+
+    def test_controls_preserve_run_context_for_normal_stage_flag_changes(self):
+        namespace = {name: object() for name in (
+            'ROOT', 'DOWNLOAD', 'MODEL', 'WORK', 'FRESH_META', 'FRESH_META_TIME',
+            'RUNTIME_CONTEXT', 'DOWNLOAD_CONTEXT')}
+        exec(m.CONTROLS, namespace)
+        self.assertTrue(all(name in namespace for name in (
+            'ROOT', 'DOWNLOAD', 'MODEL', 'WORK', 'FRESH_META', 'FRESH_META_TIME',
+            'RUNTIME_CONTEXT', 'DOWNLOAD_CONTEXT')))
+
+    def test_failed_runtime_cannot_reuse_previous_download_or_timestamp(self):
+        _, notebook = self.build()
+        namespace = dict(ALLOW_RUNTIME_DOWNLOAD=True,
+            USER_CONFIRMED_FREE_ACCOUNT_NO_PAID_CU=True, USER_CONFIRMED_FREE_T4=True,
+            USER_APPROVED_RUNTIME_AND_LLAMA_EXPERIMENT=True,
+            ROOT='old', DOWNLOAD={'status': 'completed'}, FRESH_META_TIME=123,
+            RUNTIME_CONTEXT=('old',), DOWNLOAD_CONTEXT=('old',), PAYLOADS={})
+        with self.assertRaisesRegex(RuntimeError, 'live_source_executed'):
+            exec(''.join(notebook['cells'][4]['source']), namespace)
+        for name in ('DOWNLOAD', 'FRESH_META_TIME', 'RUNTIME_CONTEXT', 'DOWNLOAD_CONTEXT'):
+            self.assertNotIn(name, namespace)
+
+    def test_execution_rejects_mixed_context_before_model_assignment(self):
+        namespace = dict(ALLOW_MODEL_EXECUTION=True,
+            USER_CONFIRMED_FREE_ACCOUNT_NO_PAID_CU=True, USER_CONFIRMED_FREE_T4=True,
+            USER_APPROVED_RUNTIME_AND_LLAMA_EXPERIMENT=True,
+            DOWNLOAD=dict(status='completed', file_count=10, total_bytes=16_069_722_669,
+                          full_weight_SHA_verified=True, model_path='/content/llama-t4-int8-old/model'),
+            ROOT=Path('/content/llama-t4-int8-new'), pathlib=__import__('pathlib'))
+        with self.assertRaisesRegex(AssertionError, 'runtime_context_missing_or_changed'):
+            exec(m.EXECUTE, namespace)
+        self.assertNotIn('MODEL', namespace)
+
+    def ready_namespace(self):
+        root = Path('/content/llama-t4-int8-synthetic')
+        namespace = dict(ALLOW_MODEL_DOWNLOAD=True, ALLOW_MODEL_EXECUTION=True,
+            USER_CONFIRMED_FREE_ACCOUNT_NO_PAID_CU=True, USER_CONFIRMED_FREE_T4=True,
+            USER_APPROVED_RUNTIME_AND_LLAMA_EXPERIMENT=True,
+            ROOT=root, PY=root/'venv/bin/python', META=root/'metadata-proof.json',
+            FRESH_META_TIME=100, FRESH_META={'status': 'INT8_preflight_candidate'},
+            PAYLOADS={'test.py': {'sha256': 'synthetic'}}, env=lambda offline: {},
+            json=json, pathlib=__import__('pathlib'), load_reviewed=lambda *args: None,
+            DOWNLOAD=dict(status='completed', file_count=10, total_bytes=16_069_722_669,
+                          full_weight_SHA_verified=True, model_path=str(root/'model')))
+        namespace['RUNTIME_CONTEXT'] = eval(m.CONTEXT_VALUE, namespace)
+        namespace['DOWNLOAD_CONTEXT'] = (namespace['RUNTIME_CONTEXT'], namespace['load_reviewed'])
+        return namespace
+
+    def test_bound_execution_prefix_accepts_normal_control_stage_changes(self):
+        namespace = self.ready_namespace()
+        context = namespace['RUNTIME_CONTEXT']
+        exec(m.CONTROLS, namespace)
+        self.assertEqual(namespace['RUNTIME_CONTEXT'], context)
+        for name in ('ALLOW_MODEL_EXECUTION', 'USER_CONFIRMED_FREE_ACCOUNT_NO_PAID_CU',
+                     'USER_CONFIRMED_FREE_T4', 'USER_APPROVED_RUNTIME_AND_LLAMA_EXPERIMENT'):
+            namespace[name] = True
+        exec(m.EXECUTE[:m.EXECUTE.index('WORK=')], namespace)
+        self.assertEqual(namespace['MODEL'], namespace['ROOT']/'model')
+
+    def test_execution_blocks_swapped_root_timestamp_metadata_payload_and_helpers(self):
+        changes = {'ROOT': Path('/content/llama-t4-int8-other'), 'FRESH_META_TIME': 101,
+            'FRESH_META': {'status': 'stopped'}, 'PAYLOADS': {'test.py': {'sha256': 'changed'}},
+            'env': lambda offline: {}, 'load_reviewed': lambda *args: None,
+            'DOWNLOAD_CONTEXT': None}
+        for name,value in changes.items():
+            with self.subTest(name=name):
+                namespace = self.ready_namespace();namespace[name] = value
+                with self.assertRaisesRegex(AssertionError, 'context_missing_or_changed'):
+                    exec(m.EXECUTE, namespace)
+                self.assertNotIn('MODEL', namespace)
+
+    def test_download_failure_invalidates_old_proof_before_reuse(self):
+        namespace = self.ready_namespace()
+        namespace['time'] = type('Clock', (), {'monotonic': lambda: 701})
+        with self.assertRaisesRegex(AssertionError, 'fresh_preflight_expired_before_token_prompt'):
+            exec(m.DOWNLOAD, namespace)
+        self.assertNotIn('DOWNLOAD', namespace)
+        self.assertNotIn('DOWNLOAD_CONTEXT', namespace)
+        with self.assertRaisesRegex(AssertionError, 'download_context_missing_or_changed'):
+            exec(m.EXECUTE, namespace)
+
+
+class SourcePinTests(unittest.TestCase):
+    def test_canonical_guard_pin_and_original_input_binding_are_distinct(self):
+        source = SOURCE.read_text(encoding='utf-8')
+        declared = ast.literal_eval(m.assignment(source, 'GUARD_SHA').value)
+        self.assertEqual(declared, hashlib.sha256((SOURCE.parent/'llama_watchdog.py').read_bytes()).hexdigest())
+        self.assertEqual(ast.literal_eval(m.assignment(source, 'OLD_GUARD_SHA').value),
+                         'e708957971410a3594d9174e11b15cd401cbf9971f75924c9c94407478b19b14')
+
+    def test_readonly_helper_raw_pin_matches_LF_source(self):
+        source=SOURCE.read_text(encoding='utf-8')
+        declared=ast.literal_eval(m.assignment(source,'RESULT_HELPER_SHA').value)
+        raw=(SOURCE.parent/'file_result_check.py').read_bytes()
+        self.assertNotIn(b'\r',raw)
+        self.assertEqual(declared,hashlib.sha256(raw).hexdigest())
 
 
 if __name__ == '__main__':
