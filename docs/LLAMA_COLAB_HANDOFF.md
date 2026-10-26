@@ -1,5 +1,7 @@
 # Llama 무료 Colab 파일 실행
 
+2026-10-26 노트북 준비 개선: [설치 재사용·전체 사전 검사 분리 보고서](COLAB_RUNTIME_REUSE_20261026.md)를 추가했다. 새 준비 notebook은 같은 커널의 검증된 설치 재클릭에서 중복 설치를 건너뛰고 원래 full GPU 사전 검사를 별도 기본 OFF 단계로 실행한다. 기존 앱 handoff bridge의 모델 옆 venv 경로와 worker/guard/contract/source pin은 유지했다. 오프라인 관련 회귀는 122개 중 121개 통과·symlink 권한 skip 1개다. 추가 Colab 실행·다운로드·설치는 없었으며 실제 RAM 감소나 앱→Colab→결과 E2E의 성공을 뜻하지 않는다.
+
 앱에서 검토한 요청 JSON을 내보내고, 준비된 무료 Colab T4에서 사용자가 직접 한 번 실행한 결과 JSON을 가져오는 기능이다. 로컬 모델 등록과 Drive 로그인 없이 새 local-only 작업실에서 열 수 있다. 결과는 파일 결합을 검사한 **외부 실행 보고**이며 로컬 `execution_verified`나 등록 모델의 verified 상태를 올리지 않는다.
 
 ## 사용 순서

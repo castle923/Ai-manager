@@ -36,7 +36,7 @@ class NotebookBuilderTests(unittest.TestCase):
                    for name, raw in assets.items()}
         setup = ('USER_APPROVED_RUNTIME_AND_LLAMA_EXPERIMENT=True\n# Diagnostic-only\n'
                  + 'PAYLOADS=' + repr(payload) + '\n'
-                 + "raise RuntimeError('live_source_executed')\n")
+                 + "raise RuntimeError('live_source_executed')\nMETA_RESULT=subprocess.run([])\n")
         self.original.write_text(json.dumps(dict(cells=[{}, dict(source=setup.splitlines(True))])), encoding='utf8')
         replacements = {}
         for key, (filename, _) in m.R02_INPUTS.items():
@@ -74,12 +74,12 @@ class NotebookBuilderTests(unittest.TestCase):
                 if cell['cell_type'] == 'code':
                     exec(compile(''.join(cell['source']), '<offline-cell>', 'exec'), namespace)
         self.assertIn('__OFFLINE_PACKET_VALIDATED__', output.getvalue())
-        self.assertEqual(output.getvalue().count('__PHASE_SKIPPED__'), 3)
+        self.assertEqual(output.getvalue().count('__PHASE_SKIPPED__'), 4)
         self.assertEqual(output.getvalue().count('__RESULT_CHECK_SKIPPED__'), 1)
         self.assertTrue(all(namespace[name] is False for name in (
             'USER_CONFIRMED_FREE_ACCOUNT_NO_PAID_CU', 'USER_CONFIRMED_FREE_T4',
             'USER_APPROVED_RUNTIME_AND_LLAMA_EXPERIMENT', 'ALLOW_RUNTIME_DOWNLOAD',
-            'ALLOW_MODEL_DOWNLOAD', 'ALLOW_MODEL_EXECUTION')))
+            'ALLOW_FULL_PREFLIGHT', 'ALLOW_MODEL_DOWNLOAD', 'ALLOW_MODEL_EXECUTION')))
         self.assertNotIn('ROOT', namespace)
 
     def test_packet_shape_empty_outputs_ids_and_exact_guard_bytes(self):

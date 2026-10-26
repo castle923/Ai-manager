@@ -1,6 +1,10 @@
 # 다른 PC·새 세션 개발 인계
 
-기준일: 2026-10-25 (Asia/Seoul). 이 문서는 같은 Ai Manager의 소스·진행 상태를 이어받기 위한 공개 인계서다. 실제 개인 자료와 비밀은 포함하지 않는다. 새 PC 설치·인증·모델 실행을 이번에 검증했다는 뜻은 아니다.
+기준일: 2026-10-26 (Asia/Seoul). 이 문서는 같은 Ai Manager의 소스·진행 상태를 이어받기 위한 공개 인계서다. 실제 개인 자료와 비밀은 포함하지 않는다. 새 PC 설치·인증·모델 실행을 이번에 검증했다는 뜻은 아니다.
+
+## 2026-10-26 노트북 중복 설치 예방 — 최신 후속 상태
+
+[설치 재사용·전체 사전 검사 분리 보고서](docs/COLAB_RUNTIME_REUSE_20261026.md)를 먼저 읽는다. 새 `Llama_Free_T4_INT8_Reusable_Runtime.ipynb`는 동일 커널의 성공한 준비 context를 실제 경로·payload SHA·격리 자식의 정확한 모듈/설치 버전으로 재검사한 뒤 설치를 건너뛴다. 원래 full preflight는 별도 기본 OFF gate와 UUID별 새 proof 경로로 분리했다. 불완전 준비/변조/실패는 자동 수리·새 ROOT·once 초기화 없이 중단하며, 기존 TTL·deadline·RAM floor/cap·모델/worker/guard/contract와 원본 packet을 보존했다. 새 오프라인 관련 회귀는 122개 중 121개 통과·실패/오류 0·symlink 권한 skip 1개이며, 실물 notebook 기본 Run all의 no-IO 네 단계 SKIP를 확인했다. 실제 RAM/GPU 효과·Colab 실행·app paired E2E·새 Windows 설치 프로그램은 미검증이다. 추가 다운로드·설치·Colab 재연결·과금은 하지 않았다.
 
 ## 2026-10-25 Llama 무료 Colab 파일 연결 — 최신 앱 상태
 
