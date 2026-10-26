@@ -29,6 +29,7 @@ import {
 import "./style.css";
 import { PreparationPanel } from "./PreparationPanel";
 import { TaskPanel } from "./TaskPanel";
+import { ColabHandoffPanel } from "./ColabHandoffPanel";
 import { WorkshopModelsPanel } from "./WorkshopModelsPanel";
 import { ClaudeRecommendationsPanel } from "./ClaudeRecommendationsPanel";
 import { TtsPanel } from "./TtsPanel";
@@ -982,6 +983,7 @@ function App() {
             </>
           ) : section === "tasks" ? (
             <>
+              {(!workshopType || workshopType === "llm") && <ColabHandoffPanel csrf={csrf.current} />}
               <WorkshopModelsPanel key={`references-${workshopType || "all"}`} task={workshopType} csrf={csrf.current} onManage={() => setSection("registry")} onPrepare={() => setSection("preparation")} onCandidate={(item) => { setRegistration(item); setSection("registry"); }} />
               <TaskPanel
                 key={workshopType || "all"}

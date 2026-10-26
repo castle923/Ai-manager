@@ -1,8 +1,24 @@
 # 다른 PC·새 세션 개발 인계
 
-기준일: 2026-10-25 (Asia/Seoul). 이 문서는 같은 Ai Manager의 소스·진행 상태를 이어받기 위한 공개 인계서다. 실제 개인 자료와 비밀은 포함하지 않는다. 새 PC 설치·인증·모델 실행을 이번에 검증했다는 뜻은 아니다.
+기준일: 2026-10-26 (Asia/Seoul). 이 문서는 같은 Ai Manager의 소스·진행 상태를 이어받기 위한 공개 인계서다. 실제 개인 자료와 비밀은 포함하지 않는다. 새 PC 설치·인증·모델 실행을 이번에 검증했다는 뜻은 아니다.
 
-## 2026-10-25 수정 guard의 새 무료 T4 실제 완료 — 최신 상태
+## 2026-10-26 노트북 중복 설치 예방 — 최신 후속 상태
+
+[설치 재사용·전체 사전 검사 분리 보고서](docs/COLAB_RUNTIME_REUSE_20261026.md)를 먼저 읽는다. 새 `Llama_Free_T4_INT8_Reusable_Runtime.ipynb`는 동일 커널의 성공한 준비 context를 실제 경로·payload SHA·격리 자식의 정확한 모듈/설치 버전으로 재검사한 뒤 설치를 건너뛴다. 원래 full preflight는 별도 기본 OFF gate와 UUID별 새 proof 경로로 분리했다. 불완전 준비/변조/실패는 자동 수리·새 ROOT·once 초기화 없이 중단하며, 기존 TTL·deadline·RAM floor/cap·모델/worker/guard/contract와 원본 packet을 보존했다. 새 오프라인 관련 회귀는 122개 중 121개 통과·실패/오류 0·symlink 권한 skip 1개이며, 실물 notebook 기본 Run all의 no-IO 네 단계 SKIP를 확인했다. 실제 RAM/GPU 효과·Colab 실행·app paired E2E·새 Windows 설치 프로그램은 미검증이다. 추가 다운로드·설치·Colab 재연결·과금은 하지 않았다.
+
+## 2026-10-25 Llama 무료 Colab 파일 연결 — 최신 앱 상태
+
+최신 후속 실행은 기존 무료 T4 세션의 정상 Edge 재연결 1회에서 GPU 사용량 제한으로 거절됐다. 유료 전환·CPU 대체·재시도·다운로드·설치·생성·결과 가져오기는 없었고 현재 cache/runtime/source는 연결되지 않아 미확인이다. 실제 app→Colab→결과 가져오기 E2E와 새 Windows standalone 설치 프로그램은 미검증이므로 배포 준비 완료로 판정하지 않는다. 설치본에 빠지던 공개 source pin·notebook 자산을 공통 staging과 wheel build hook으로 포함하도록 수정했고, 새 handoff 회귀 40개(39 통과·symlink skip 1) 및 packaging 3개 통과, 네트워크 거절 조건의 wheel 빌드/재빌드·checkout 없는 설치본 시작/metadata/합성 미리보기/notebook 응답을 확인했다. 전체 588개를 이번 수정 후 재실행한 결과는 아니다. UUID 재시도 차단은 현재 커널 메모리와 실행 디렉터리 marker 범위이며 커널 재시작·새 디렉터리를 넘어서는 영구 중복 방지가 아니다. 자세한 범위는 아래 연결 문서의 후속 절을 따른다.
+
+[무료 Colab 파일 실행 안내와 검증 범위](docs/LLAMA_COLAB_HANDOFF.md)를 먼저 읽는다. 새 local-only 작업실에서 요청을 검토·내보내고, 사용자가 준비된 무료 T4에서 직접 실행한 결과 JSON을 가져오는 별도 handoff 기능을 추가했다. strict JSON·UUID/digest 결합·불변 sidecar·공개 소스 notebook·독립 앱 패널을 구현했으며 기존 로컬 FP16/BF16 profile과 검증 판정은 유지했다. 외부 보고를 로컬 `execution_verified`나 registry verified로 승격하지 않는다.
+
+새 격리 앱의 실제 브라우저에서 합성 요청·결과의 정확한 다운로드/가져오기, Unicode·HTML 형태 문자열의 텍스트 표시, 동일 결과 재가져오기, 충돌 보존, 잘못된/과대 파일 거절, 중단/실패/32토큰 상한 구분, 새 페이지의 동일 결과 재가져오기 및 빈 registry 유지까지 확인했다. 자동 reload/history 복원은 제공하지 않는다. 테스트 임시 경로 이식성 수정 전 최종 전체 오프라인 회귀 588개는 580개 통과·실패 0·오류 0·skip 8, frontend production build는 통과했으며 정적 산출물과 공개 source pin의 커밋·working tree·bundle 바이트 일치를 확인했다. 최초 하네스 실패와 보정 조건은 비공개 증거에 보존했다. skip 8개는 symlink 권한 2개와 별도 tracking 의존성 6개다.
+
+최종 검토에서 HTTP·store 테스트의 비공개 과거 증거 폴더 의존성을 제거했다. 공개 Git 소스만 둔 새 OS 임시 체크아웃에서 대상 15개 모두 수정 전 fixture 오류를 재현했고, 두 테스트 파일 수정 후 14개 통과·Windows symlink 권한 skip 1개·실패/오류 0을 확인했다. 표준 임시 디렉터리가 실행기의 TEMP/TMP를 따르며 제품 소스는 변경하지 않았다. 전체 588개를 재실행한 결과는 아니다. 프런트엔드 빌드는 사전 승인된 정확한 잠금 개발 의존성 23개 설치본을 재사용했다. 설치는 `ignore-scripts`·audit/fund 비활성 조건이며 전역 환경·`package.json`·잠금 파일은 불변이고 모델·런타임 다운로드는 없었다.
+
+**새 앱 요청의 실제 paired-request Colab 생성·결과 import는 미검증·보류다.** 기존 화면의 T4 활성 세션은 관찰했으나 컴퓨터 사용 안전검사가 현재 브라우저 URL을 확인하지 못해 화면 조작을 중단했다. 빈 셀 하나 추가 이후 실행 소스 붙여넣기·모델 생성은 없었고, 정확한 source/runtime/model cache 검사는 미수행이다. 기존 VM·모델·새 요청을 보존했으며 다른 UI나 숨은 API로 우회하지 않았다. 다음 사용자 대화에서 UI 연결 복구 후 검사를 이어가고, 설치·다운로드가 필요하면 사전 안내한다. 아래 수정 guard의 과거 고정 prompt smoke는 별도 이력이다. 새로운 다운로드·설치·자동 재시도·Drive 연결·상시 원격 추론은 포함하지 않는다.
+
+## 2026-10-25 수정 guard의 새 무료 T4 실제 완료 — 이전 실제 smoke 이력
 
 [Colab 검증 보고서의 최신 실제 검증 절](docs/COLAB_MODEL_VALIDATION_20261023.md)을 먼저 읽는다. 종료 확인 수정 guard `218747316b9fdca77b17983feb531dccae979ded78ba39fe91428b804c6e358b`의 별도 새 실행에서 단일 엔진 smoke와 guard 정상 완료를 확인했다. 원본 packet `5796fff3f78ad7fd915da99c7750d488c4ef82457dc877528658f26751a6e5c1`(11셀·코드 6개·자산 9개)은 불변이고, Drive 새 실행본은 정상 UI의 코드 6개와 안내 Markdown으로 구성해 코드 source 해시를 검증했다. 아래 준비 한정·실제 Colab 미검증 표기는 당시 이력이며 앞선 guard STOP도 그대로 보존한다.
 

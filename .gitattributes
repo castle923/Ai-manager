@@ -3,3 +3,8 @@ src/ai_manager/tapir_vendor/* -text
 # The notebook builder pins the canonical guard's raw bytes across checkouts.
 scripts/colab/llama_watchdog.py text eol=lf
 scripts/colab/file_result_check.py text eol=lf
+
+# Public app-request handoff raw-byte pins.
+src/ai_manager/colab_contract.py text eol=lf
+scripts/colab/llama_handoff_worker.py text eol=lf
+scripts/colab/build_llama_handoff.py text eol=lf

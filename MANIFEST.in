@@ -1,0 +1,5 @@
+include scripts/stage_colab_resources.py
+include scripts/colab/build_llama_handoff.py
+include scripts/colab/llama_handoff_worker.py
+include scripts/colab/llama_watchdog.py
+include src/ai_manager/colab_source_pins.json

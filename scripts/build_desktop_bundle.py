@@ -10,6 +10,7 @@ import tarfile
 import urllib.request
 import zipfile
 import importlib.metadata
+import runpy
 
 PYTHON_URL = 'https://github.com/astral-sh/python-build-standalone/releases/download/20261009/cpython-3.10.22%2B20261009-x86_64-pc-windows-msvc-install_only.tar.gz'
 PYTHON_SHA256 = 'cb023e83e42d8937ba77c7cf83641083c3b81e88e1226e1c694a347ae1924d54'
@@ -107,6 +108,7 @@ def main():
     for name in ('__init__.py','tapir_model.py','nets.py','utils.py','LICENSE','PROVENANCE.json'):
         shutil.copyfile(root/'src/ai_manager/tapir_vendor'/name, vendor/name)
     shutil.copytree(root / 'src/ai_manager/static', package_data / 'static')
+    runpy.run_path(str(root / 'scripts/stage_colab_resources.py'))['stage'](root, package_data)
     source_hashes = {'src/ai_manager/' + p.relative_to(package_data).as_posix(): digest(p) for p in sorted(package_data.rglob('*')) if p.is_file()}
     command = [sys.executable, '-m', 'PyInstaller', '--noconfirm', '--clean', '--onedir', '--windowed', '--name', 'AiManager',
                '--distpath', str(output / 'dist'), '--workpath', str(output / 'work'), '--specpath', str(output),

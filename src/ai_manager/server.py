@@ -18,6 +18,44 @@ import uuid
 from datetime import datetime, timezone
 
 
+_HANDOFF_CHECKOUT_ROOT = Path(__file__).resolve().parents[2]
+_HANDOFF_PUBLIC_ROOT = (_HANDOFF_CHECKOUT_ROOT
+    if (_HANDOFF_CHECKOUT_ROOT / 'src/ai_manager/colab_contract.py').is_file()
+    else Path(__file__).resolve().parent / 'colab_public')
+
+
+def _verify_handoff_sources(declared_pins):
+    """Check only bounded public source files; never inspect a model/runtime."""
+    import hashlib
+    from .colab_contract import ColabContractError, MODEL, parse_document
+    root = _HANDOFF_PUBLIC_ROOT
+
+    def read(relative):
+        path = root / relative
+        if path.is_symlink():
+            raise ColabContractError('source_mismatch')
+        with path.open('rb') as source:
+            raw = source.read(1_048_577)
+        if len(raw) > 1_048_576:
+            raise ColabContractError('source_mismatch')
+        return raw
+
+    try:
+        current = parse_document(read('src/ai_manager/colab_source_pins.json'), 'request')
+        if current != declared_pins:
+            raise ColabContractError('source_mismatch')
+        sources = {'contract':'src/ai_manager/colab_contract.py',
+                   'worker':'scripts/colab/llama_handoff_worker.py',
+                   'guard':'scripts/colab/llama_watchdog.py'}
+        for name, relative in sources.items():
+            if hashlib.sha256(read(relative)).hexdigest() != declared_pins[name]:
+                raise ColabContractError('source_mismatch')
+        if hashlib.sha256(read('src/ai_manager/adapter_manifest_llama.json')).hexdigest() != MODEL['manifest_sha256']:
+            raise ColabContractError('source_mismatch')
+    except (OSError, ValueError, KeyError, TypeError):
+        raise ColabContractError('source_mismatch') from None
+
+
 class LocalApplication:
     """An explicitly owned loopback server with deterministic host shutdown."""
     def __init__(self, server, inference, cancel, tasks=None, validation=None, admission=None, mutation_lock=None, busy=None):
@@ -113,6 +151,11 @@ def _create_application(home, settings, auth, port, constructed):
     from .validation_contracts import ContractError
     validation = ValidationUI(home, settings, auth)
     constructed.append(validation)
+    from .colab_contract import (ColabContractError, build_request, parse_document,
+                                 LIMITS, MODEL, RUNTIME, PROFILE_ID, INPUT_MAX_BYTES)
+    from .colab_handoff import HandoffStore
+    source_pins = json.loads((Path(__file__).parent / 'colab_source_pins.json').read_bytes())
+    handoff = HandoffStore(home, source_pins)
     csrf = secrets.token_urlsafe(32)
     job_lock = threading.Lock()
     task_state_lock = threading.RLock()
@@ -222,6 +265,41 @@ def _create_application(home, settings, auth, port, constructed):
             if not self.allowed():
                 return self.reply(403, {"error": "forbidden"})
             path = urlsplit(self.path).path
+            if path.startswith('/api/colab-handoff/'):
+                try:
+                    if path == '/api/colab-handoff/meta':
+                        return self.reply(200, dict(source_sha256=source_pins, limits=LIMITS, model=MODEL,
+                            runtime=RUNTIME, profile_id=PROFILE_ID, input_max_bytes=INPUT_MAX_BYTES,
+                            default_text='물은 얼면 무엇이 되나요?'))
+                    if path == '/api/colab-handoff/bundle':
+                        # Only the reviewed public sources from this checkout/package are used.
+                        import runpy
+                        import tempfile
+                        builder = _HANDOFF_PUBLIC_ROOT / 'scripts/colab/build_llama_handoff.py'
+                        if not builder.is_file():
+                            return self.reply(503, {'error':'public_sources_unavailable'})
+                        with tempfile.TemporaryDirectory(prefix='colab-public-bundle-', dir=home) as temporary:
+                            output = Path(temporary) / 'bundle'
+                            namespace = runpy.run_path(str(builder))
+                            metadata = namespace['build_bundle'](output)
+                            name = 'Llama_App_Request.ipynb'
+                            raw = (output / name).read_bytes()
+                            import hashlib
+                            if metadata['notebook'] != dict(name=name, sha256=hashlib.sha256(raw).hexdigest(), bytes=len(raw)):
+                                raise ValueError('source_mismatch')
+                        return self.reply(200, raw, 'application/x-ipynb+json', name)
+                    match = re.fullmatch(r'/api/colab-handoff/requests/([a-f0-9]{32})(/download)?', path)
+                    if match:
+                        detail = handoff.detail(match[1])
+                        if match[2]:
+                            raw = json.dumps(detail['request'], ensure_ascii=False, sort_keys=True, separators=(',', ':'), allow_nan=False).encode('utf-8')
+                            return self.reply(200, raw, download=match[1] + '.request.json')
+                        return self.reply(200, detail)
+                    return self.reply(404, {'error':'not_found'})
+                except ColabContractError as error:
+                    return self.reply(404 if error.code == 'request_not_found' else 400, {'error':error.code})
+                except (OSError, ValueError, KeyError, TypeError):
+                    return self.reply(503, {'error':'public_sources_or_handoff_unavailable'})
             if path == '/api/validation/scopes':
                 return self.reply(200,validation.scopes())
             if path == '/api/validation' or re.fullmatch(r'/api/validation/[a-f0-9]{32}',path):
@@ -373,7 +451,54 @@ def _create_application(home, settings, auth, port, constructed):
                 self.close_connection = True
                 return self.reply(409, {'error': 'workspace_reconfiguring'})
             if self.headers.get("Content-Type") != "application/json":
+                if self.path.startswith('/api/colab-handoff/'):
+                    self.close_connection = True
+                    try:
+                        length = int(self.headers.get('Content-Length', '0'))
+                        if 0 < length <= 65537:
+                            self.connection.settimeout(3)
+                            self.rfile.read(length)
+                    except (OSError, ValueError):
+                        pass
                 return self.reply(415, {"error": "json_required"})
+            if self.path.startswith('/api/colab-handoff/'):
+                self.close_connection = True
+                try:
+                    limit = {'/api/colab-handoff/preview':16384,
+                             '/api/colab-handoff/requests':16384,
+                             '/api/colab-handoff/results':65536}.get(self.path)
+                    if limit is None:
+                        return self.reply(404, {'error':'not_found'})
+                    lengths = self.headers.get_all('Content-Length', [])
+                    if self.headers.get_all('Transfer-Encoding') or len(lengths) != 1 or not re.fullmatch(r'[0-9]+', lengths[0]):
+                        raise ColabContractError('invalid_framing')
+                    length = int(lengths[0])
+                    self.connection.settimeout(3)
+                    if not 0 < length <= limit:
+                        # Small rejected bodies must be drained before closing on
+                        # Windows, otherwise the reset can hide the JSON denial.
+                        if 0 < length <= 65537:
+                            self.rfile.read(length)
+                        raise ColabContractError('document_too_large')
+                    raw = self.rfile.read(length)
+                    if len(raw) != length:
+                        raise ColabContractError('invalid_framing')
+                    if self.path == '/api/colab-handoff/preview':
+                        _verify_handoff_sources(source_pins)
+                        value = parse_document(raw, 'request')
+                        if set(value) != {'text'}:
+                            raise ColabContractError('invalid_document')
+                        return self.reply(200, build_request(value['text'], source_pins))
+                    if self.path == '/api/colab-handoff/requests':
+                        _verify_handoff_sources(source_pins)
+                        value = handoff.save_request(parse_document(raw, 'request'))
+                        return self.reply(200, handoff.detail(value['request_id']))
+                    value = handoff.import_result(raw)
+                    return self.reply(200, handoff.detail(value['request_id']))
+                except ColabContractError as error:
+                    return self.reply(409 if error.code in {'request_conflict','result_conflict'} else 400, {'error':error.code})
+                except (OSError, ValueError, KeyError, TypeError):
+                    return self.reply(400, {'error':'handoff_operation_failed_preserved'})
             try:
                 length = int(self.headers.get("Content-Length", "0"))
                 limit = 65536 if self.path.startswith('/api/claude-recommendations/') or self.path.startswith('/api/validation/') or self.path == '/api/registry' or re.fullmatch(r'/api/registry/[a-f0-9]{32}(/runs)?',self.path) else 4096
